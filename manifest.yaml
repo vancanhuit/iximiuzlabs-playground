@@ -1,0 +1,38 @@
+kind: playground
+name: debian-trixie-base
+title: Debian Trixie Base (Custom)
+description: A minimal Debian Trixie (stable) server built from a custom rootfs image.
+categories:
+    - linux
+playground:
+    networks:
+        - name: local
+          subnet: 172.16.0.0/24
+    machines:
+        - name: debian-01
+          users:
+            - name: root
+            - name: laborant
+              default: true
+          drives:
+            - source: oci://ghcr.io/vancanhuit/debian-rootfs:trixie-base
+              mount: /
+              size: 30GiB
+          network:
+            interfaces:
+                - network: local
+          resources:
+            cpuCount: 2
+            ramSize: 2GiB
+    tabs:
+        - id: terminal-debian-01
+          kind: terminal
+          name: Term
+          machine: debian-01
+    accessControl:
+        canList:
+            - anyone
+        canRead:
+            - anyone
+        canStart:
+            - anyone
