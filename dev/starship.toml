@@ -1,0 +1,74 @@
+# ~/.config/starship.toml
+
+"$schema" = "https://starship.rs/config-schema.json"
+
+command_timeout = 1000
+
+format = """
+$username\
+$hostname\
+$directory\
+$git_branch\
+$git_status\
+$git_state\
+$golang\
+$rust\
+$nodejs\
+$bun\
+$python\
+$terraform\
+$aws\
+$kubernetes\
+$docker_context\
+$cmd_duration\
+$time\
+$status\
+$line_break\
+$character"""
+
+[git_branch]
+format = "[$symbol$branch]($style) "
+
+[cmd_duration]
+format = "[$duration](bold yellow) "
+
+[golang]
+format = "[$symbol($version)]($style) "
+
+[bun]
+format = "[$symbol($version)]($style) "
+
+[nodejs]
+format = "[$symbol($version)]($style) "
+
+[rust]
+format = "[$symbol($version)]($style) "
+
+[python]
+format = "[$symbol($version)( $virtualenv)]($style) "
+
+[terraform]
+format = "[$symbol$workspace]($style) "
+
+[aws]
+format = "[$symbol($profile)(@$region)]($style) "
+
+[kubernetes]
+format = "[$symbol$context( \\($namespace\\))]($style) "
+disabled = false
+
+[docker_context]
+format = "[$symbol$context]($style) "
+
+[username]
+format = "[$user]($style)@"
+
+[hostname]
+format = "[$hostname]($style) "
+
+[time]
+format = "[$time]($style) "
+disabled = false
+
+[status]
+disabled = false

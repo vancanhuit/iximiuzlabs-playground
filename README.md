@@ -1,18 +1,30 @@
 # Custom Debian Trixie Rootfs for iximiuz Labs Playgrounds
 
-A minimal Debian **Trixie** (current stable) root filesystem image, built to be used as
-a custom [iximiuz Labs](https://labs.iximiuz.com) playground rootfs. It follows the
+Custom Debian **Trixie** (current stable) root filesystem images for
+[iximiuz Labs](https://labs.iximiuz.com) playgrounds. This repo builds two images,
+both published as tags of `ghcr.io/vancanhuit/debian-rootfs`:
+
+| Tag           | Built from   | Purpose                                                            |
+| ------------- | ------------ | ----------------------------------------------------------------- |
+| `trixie-base` | `Dockerfile` | Minimal sysadmin server (bash). Follows the upstream pattern.     |
+| `trixie-dev`  | `dev/Dockerfile` | Development environment (zsh, mise, Neovim/LazyVim) on top of `trixie-base`. |
+
+The base image follows the
 [official `100.rootfs-debian-stable`](https://github.com/iximiuz/labs/tree/main/playgrounds/100.rootfs-debian-stable)
 pattern, stripped down to the essentials needed to boot as a real microVM.
 
 ## Contents
 
-| File            | Purpose                                                              |
-| --------------- | ------------------------------------------------------------------- |
-| `Dockerfile`    | Builds the minimal Debian Trixie rootfs image.                      |
-| `manifest.yaml` | iximiuz Labs playground manifest referencing the published image.   |
-| `.vimrc`        | Vim config copied into the lab user's home.                         |
-| `.tmux.conf`    | tmux config copied into the lab user's home.                        |
+| File                   | Purpose                                                         |
+| ---------------------- | -------------------------------------------------------------- |
+| `Dockerfile`           | Builds the minimal `trixie-base` rootfs image.                 |
+| `manifest.yaml`        | Playground manifest for the base image.                        |
+| `.vimrc`               | Vim config copied into the lab user's home (base image).       |
+| `.tmux.conf`           | tmux config copied into the lab user's home (base image).      |
+| `dev/Dockerfile`       | Builds the `trixie-dev` development image (`FROM` base).        |
+| `dev/.zshrc`           | zsh config (mise, starship, atuin, fzf, completion, aliases).  |
+| `dev/starship.toml`    | Starship prompt config.                                        |
+| `dev.playground.yaml`  | Playground manifest for the dev image.                         |
 
 ## What's in the image
 
@@ -26,6 +38,8 @@ pattern, stripped down to the essentials needed to boot as a real microVM.
 
 > The iximiuz-internal `examiner` service and the various `get-*.sh` tool installers
 > from the upstream repo are **not** required for a custom playground and are omitted.
+
+## The base image (`trixie-base`)
 
 ## Prerequisites
 
@@ -131,9 +145,62 @@ labctl playground manifest debian-stable  # official Debian analog
 
 - a single VM (`debian-01`) with `root` and a default `laborant` user
 - the custom rootfs as the `/` drive via `source: oci://ghcr.io/vancanhuit/debian-rootfs:trixie-base`
-- a 30 GiB disk, 2 vCPUs, 2 GiB RAM
+- a 30 GiB disk, 2 vCPUs, 4 GiB RAM
 - one terminal tab
 - public access control
+
+To list your own custom playgrounds:
+
+```bash
+labctl playground catalog --filter my-custom
+```
+
+> **SSH note:** `labctl ssh <run-id>` works from an interactive terminal. The
+> non-interactive form `labctl ssh <run-id> -- <cmd>` needs a TTY and will appear
+> to hang when run without one (e.g. in scripts/CI); use the browser terminal or an
+> interactive shell instead.
+
+## The dev image (`trixie-dev`)
+
+Built from `dev/Dockerfile` (`FROM ghcr.io/vancanhuit/debian-rootfs:trixie-base`). On
+top of the base it adds:
+
+- **Shell:** `zsh` as the lab user's default shell, plus `build-essential`
+- **Tool manager:** [`mise`](https://mise.jdx.dev) installed for the lab user, used to
+  install: starship, ripgrep, fd, lazygit, neovim, ast-grep, tree-sitter, fzf, bat,
+  shellcheck, shfmt, python (3.14.6), uv, ruff, delta, node (lts), atuin, eza
+- **Neovim providers:** `pynvim` via `uv tool install` (Neovim auto-detects the
+  `pynvim-python` shim on `PATH`) and the `neovim` npm package
+- **Editor config:** [LazyVim starter](https://github.com/LazyVim/starter) at `~/.config/nvim`
+- **Dotfiles:** `dev/.zshrc` and `dev/starship.toml`
+- **Git config:** sensible global defaults via `git config --global` (delta pager,
+  `init.defaultBranch=main`, rebase-on-pull, etc.); user name/email are intentionally
+  left unset
+
+### Build, push, and run the dev image
+
+```bash
+# Build (from the dev/ directory)
+docker build --build-arg LAB_USER=laborant \
+  -t ghcr.io/vancanhuit/debian-rootfs:trixie-dev dev/
+
+# Optional: pass a GitHub token to avoid API rate limits while mise downloads tools.
+# The secret mount is optional — a plain build works without it.
+# Read the token straight from the gh CLI:
+GITHUB_TOKEN="$(gh auth token)" docker build --build-arg LAB_USER=laborant \
+  --secret id=github_token,env=GITHUB_TOKEN \
+  -t ghcr.io/vancanhuit/debian-rootfs:trixie-dev dev/
+
+# Push (also requires the package to be public; see above)
+docker push ghcr.io/vancanhuit/debian-rootfs:trixie-dev
+
+# Create / update the dev playground
+labctl playground create --base flexbox -f dev.playground.yaml debian-trixie-dev
+labctl playground update debian-trixie-dev-<suffix> -f dev.playground.yaml
+```
+
+`dev.playground.yaml` uses the `trixie-dev` drive with a 50 GiB disk, 4 vCPUs, and
+10 GiB RAM.
 
 ## References
 
