@@ -9,7 +9,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN <<EOF
 set -eu
 apt-get update
-apt-get install --no-install-recommends -y zsh build-essential
+apt-get install -y zsh build-essential
 chsh -s "$(command -v zsh)" "$LAB_USER"
 apt-get clean -y
 rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*

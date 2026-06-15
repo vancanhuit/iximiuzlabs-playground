@@ -14,7 +14,7 @@ set -eu
 apt-get update
 apt-get upgrade -y
 
-apt-get install --no-install-recommends -y \
+apt-get install -y \
   bash-completion \
   bzip2 \
   ca-certificates \
@@ -26,6 +26,8 @@ apt-get install --no-install-recommends -y \
   git \
   gnupg \
   htop \
+  iproute2 \
+  iptables \
   iputils-ping \
   kmod \
   locales \
@@ -35,6 +37,7 @@ apt-get install --no-install-recommends -y \
   mtr \
   netcat-openbsd \
   net-tools \
+  nftables \
   psmisc \
   socat \
   sudo \
