@@ -67,6 +67,9 @@ apt-get autoremove -y
 apt-get autoclean -y
 apt-get clean -y
 rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+curl -Lso /usr/local/bin/websocat https://github.com/vi/websocat/releases/download/v1.14.1/websocat.x86_64-unknown-linux-musl
+chmod 0755 /usr/local/bin/websocat
 EOF
 
 RUN <<EOF
@@ -92,6 +95,25 @@ systemctl mask sshd-keygen.target
 # EOT
 
 rm -f /etc/ssh/ssh_host_*
+
+cat <<EOT > /etc/systemd/system/examiner.service
+[Unit]
+Description=Examiner
+After=network.target
+
+[Service]
+Type=simple
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" "HOME=/root" "LAB_USER=$LAB_USER"
+ExecStart=/usr/local/bin/examiner
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOT
+
+ln -s /etc/systemd/system/examiner.service /etc/systemd/system/multi-user.target.wants/examiner.service
+
 EOF
 
 RUN <<EOF
