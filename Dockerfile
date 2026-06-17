@@ -5,6 +5,7 @@ ARG LAB_USER
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=UTC
+ENV LANG=en_US.UTF-8
 
 # udev is needed for booting a "real" VM, setting up the ttyS0 console properly
 # kmod is needed for modprobing modules
@@ -136,6 +137,8 @@ EOF
 
 USER $LAB_USER
 ENV HOME=/home/$LAB_USER
+ENV LANG=en_US.UTF-8
+ENV PATH=/usr/local/bin:/usr/bin:/bin
 
 COPY --chown=$LAB_USER:$LAB_USER .vimrc $HOME
 COPY --chown=$LAB_USER:$LAB_USER .tmux.conf $HOME
