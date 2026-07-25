@@ -6,8 +6,6 @@ ARG LAB_USER=laborant
 # --- Install zsh and make it the lab user's default shell (needs root) ---
 USER root
 ENV DEBIAN_FRONTEND=noninteractive
-ENV LANG=en_US.UTF-8
-ENV LC_ALL=en_US.UTF-8
 RUN <<EOF
 set -eu
 
