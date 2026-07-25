@@ -96,7 +96,7 @@
           set -euo pipefail
 
           curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.36/deb/Release.key | \
-            sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+            sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg --yes
           echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.36/deb/ /' | \
             sudo tee /etc/apt/sources.list.d/kubernetes.list
       args:
@@ -114,11 +114,12 @@
 
     - name: Hold kubeadm, kubelet and kubectl packages at current version
       ansible.builtin.dpkg_selections:
-        name:
-          - kubeadm
-          - kubelet
-          - kubectl
+        name: '{{ item }}'
         selection: hold
+      loop:
+        - kubeadm
+        - kubelet
+        - kubectl
 
     - name: Get Tailscale IPv4 address
       ansible.builtin.command:
