@@ -6,6 +6,7 @@ ARG LAB_USER
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=UTC
 ENV LANG=en_US.UTF-8
+ENV LC_ALL=C.UTF-8
 
 # udev is needed for booting a "real" VM, setting up the ttyS0 console properly
 # kmod is needed for modprobing modules
@@ -144,6 +145,7 @@ set -euo pipefail
 cat <<EOT >> $HOME/.bashrc
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 export LANG=en_US.UTF-8
+export LC_ALL=C.UTF-8
 export EDITOR=/usr/bin/vim
 export VISUAL=/usr/bin/vim
 export GPG_TTY=$(tty)

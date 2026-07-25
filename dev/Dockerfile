@@ -9,7 +9,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN <<EOF
 set -eu
 apt-get update
-apt-get install -y zsh build-essential
+apt-get install -y zsh build-essential libreadline-dev
 chsh -s "$(command -v zsh)" "$LAB_USER"
 apt-get clean -y
 rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
@@ -44,10 +44,11 @@ RUN --mount=type=secret,id=github_token,env=GITHUB_TOKEN \
   delta \
   node@lts \
   atuin \
-  eza
+  eza \
+  lua@5.1.5
 
 # Neovim language providers: pynvim via uv, neovim package via npm
-RUN <<EOF 
+RUN <<EOF
 #!/usr/bin/env zsh
 set -e
 eval "$(mise activate zsh)"
