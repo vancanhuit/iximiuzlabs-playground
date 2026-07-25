@@ -6,7 +6,7 @@ ARG LAB_USER
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=UTC
 ENV LANG=en_US.UTF-8
-ENV LC_ALL=C.UTF-8
+ENV LC_ALL=en_US.UTF-8
 
 # udev is needed for booting a "real" VM, setting up the ttyS0 console properly
 # kmod is needed for modprobing modules
@@ -52,6 +52,10 @@ apt-get install -y \
   wget \
   tmux \
   openssh-server
+
+locale-gen en_US.UTF-8
+localedef -i en_US -f UTF-8 en_US.UTF-8
+dpkg-reconfigure locales --frontend=noninteractive
 
 # Doesn't seem to be needed and produces extra noise in journald.
 systemctl mask networkd-dispatcher.service
@@ -145,7 +149,7 @@ set -euo pipefail
 cat <<'EOT' >> $HOME/.bashrc
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 export LANG=en_US.UTF-8
-export LC_ALL=C.UTF-8
+export LC_ALL=en_US.UTF-8
 export EDITOR=/usr/bin/vim
 export VISUAL=/usr/bin/vim
 export GPG_TTY=$(tty)
