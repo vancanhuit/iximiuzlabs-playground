@@ -51,7 +51,10 @@ apt-get install -y \
   vim \
   wget \
   tmux \
-  openssh-server
+  openssh-server \
+  python3-pip \
+  python3-venv \
+  python3-dev
 
 locale-gen en_US.UTF-8
 localedef -i en_US -f UTF-8 en_US.UTF-8
