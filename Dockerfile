@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 FROM debian:trixie
 
-ARG LAB_USER
+ARG LAB_USER=laborant
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=UTC
@@ -9,7 +9,7 @@ ENV TZ=UTC
 # udev is needed for booting a "real" VM, setting up the ttyS0 console properly
 # kmod is needed for modprobing modules
 RUN <<EOF
-set -eu
+set -euo pipefail
 
 apt-get update
 apt-get upgrade -y
@@ -80,7 +80,7 @@ chmod 0755 /usr/local/bin/websocat
 EOF
 
 RUN <<EOF
-set -eu
+set -euo pipefail
 
 cat >> /etc/ssh/sshd_config <<EOT
 HostKey /etc/ssh/ssh_host_ed25519_key
@@ -124,7 +124,7 @@ ln -s /etc/systemd/system/examiner.service /etc/systemd/system/multi-user.target
 EOF
 
 RUN <<EOF
-set -eu
+set -euo pipefail
 
 USER_ID=1001
 USERNAME=$LAB_USER

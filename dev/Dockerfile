@@ -7,11 +7,7 @@ ARG LAB_USER=laborant
 USER root
 ENV DEBIAN_FRONTEND=noninteractive
 RUN <<EOF
-set -eu
-
-locale-gen en_US.UTF-8
-localedef -i en_US -f UTF-8 en_US.UTF-8
-dpkg-reconfigure locales --frontend=noninteractive
+set -euo pipefail
 
 apt-get update
 apt-get install -y zsh build-essential libreadline-dev
@@ -55,7 +51,7 @@ RUN --mount=type=secret,id=github_token,env=GITHUB_TOKEN \
 # Neovim language providers: pynvim via uv, neovim package via npm
 RUN <<EOF
 #!/usr/bin/env zsh
-set -e
+set -euo pipefail
 eval "$(mise activate zsh)"
 uv tool install pynvim
 npm install -g neovim

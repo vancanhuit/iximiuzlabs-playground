@@ -49,7 +49,7 @@ pattern, stripped down to the essentials needed to boot as a real microVM.
 
 ## 1. Build the image
 
-`LAB_USER` has no default, so it must be supplied:
+The default `LAB_USER` is `laborant`, we can supply with a custom username:
 
 ```bash
 docker build \
