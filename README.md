@@ -33,11 +33,8 @@ pattern, stripped down to the essentials needed to boot as a real microVM.
   (required so the rootfs boots as a real microVM, not just a container)
 - **Lab user:** `laborant` (uid 1001), member of `sudo`, passwordless sudo, `bash` shell
 - **SSH:** `openssh-server` configured for **publickey-only** auth with an ed25519 host key
-- **Tooling:** vim, tmux, git, curl, wget, socat, netcat, htop, tree, ripgrep-free
+- **Tooling:** `vim`, `tmux`, `git`, `curl`, `wget`, `socat`, `netcat`, `htop`, `tree` and other
   sysadmin basics (see `Dockerfile` for the full package list)
-
-> The iximiuz-internal `examiner` service and the various `get-*.sh` tool installers
-> from the upstream repo are **not** required for a custom playground and are omitted.
 
 ## The base image (`trixie-base`)
 
@@ -47,6 +44,7 @@ pattern, stripped down to the essentials needed to boot as a real microVM.
   `# syntax=docker/dockerfile:1` heredocs)
 - A container registry account — **`ghcr.io` is required; Docker Hub is not supported**
   by iximiuz Labs due to its rate limiting
+- [GitHub CLI](https://cli.github.com/)
 - [`labctl`](https://github.com/iximiuz/labctl) — the iximiuz Labs CLI
 
 ## 1. Build the image
@@ -66,8 +64,9 @@ To target a different Debian release, edit the `FROM` line in the `Dockerfile`
 ## 2. Push to ghcr.io
 
 ```bash
-# Authenticate (needs a token with write:packages scope)
-echo "$CR_PAT" | docker login ghcr.io -u vancanhuit --password-stdin
+gh auth login --scopes write:packages
+gh auth status
+echo $(gh auth token) | docker login ghcr.io -u vancanhuit --password-stdin
 
 docker push ghcr.io/vancanhuit/debian-rootfs:trixie-base
 ```

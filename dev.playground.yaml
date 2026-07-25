@@ -3,36 +3,36 @@ name: debian-trixie-dev
 title: Debian Trixie Dev (Custom)
 description: A Debian Trixie development environment (zsh, mise, Neovim/LazyVim, and a curated toolchain) built from a custom rootfs image.
 categories:
-    - linux
+  - linux
 playground:
-    networks:
-        - name: local
-          subnet: 172.16.0.0/24
-    machines:
-        - name: debian-01
-          users:
-            - name: root
-            - name: laborant
-              default: true
-          drives:
-            - source: oci://ghcr.io/vancanhuit/debian-rootfs:trixie-dev
-              mount: /
-              size: 50GiB
-          network:
-            interfaces:
-                - network: local
-          resources:
-            cpuCount: 4
-            ramSize: 10GiB
-    tabs:
-        - id: terminal-debian-01
-          kind: terminal
-          name: Term
-          machine: debian-01
-    accessControl:
-        canList:
-            - anyone
-        canRead:
-            - anyone
-        canStart:
-            - anyone
+  networks:
+    - name: local
+      subnet: 172.16.0.0/24
+  machines:
+    - name: debian-01
+      users:
+        - name: root
+        - name: laborant
+          default: true
+      drives:
+        - source: oci://ghcr.io/vancanhuit/debian-rootfs:trixie-dev
+          mount: /
+          size: 50GiB
+      network:
+        interfaces:
+          - network: local
+      resources:
+        cpuCount: 4
+        ramSize: 10GiB
+  tabs:
+    - id: terminal-debian-01
+      kind: terminal
+      name: Term
+      machine: debian-01
+  accessControl:
+    canList:
+      - anyone
+    canRead:
+      - anyone
+    canStart:
+      - anyone
