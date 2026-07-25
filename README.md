@@ -166,8 +166,8 @@ top of the base it adds:
 
 - **Shell:** `zsh` as the lab user's default shell, plus `build-essential`
 - **Tool manager:** [`mise`](https://mise.jdx.dev) installed for the lab user, used to
-  install: starship, ripgrep, fd, lazygit, neovim, ast-grep, tree-sitter, fzf, bat,
-  shellcheck, shfmt, python (3.14.6), uv, ruff, delta, node (lts), atuin, eza
+  install: `starship`, `ripgrep`, `fd`, `lazygit`, `neovim`, `ast-grep`, `tree-sitter`, `fzf`, `bat`,
+  `shellcheck`, `shfmt`, `python` (3.14.6), `uv`, `ruff`, `delta`, `node` (LTS), `atuin`, `eza`
 - **Neovim providers:** `pynvim` via `uv tool install` (Neovim auto-detects the
   `pynvim-python` shim on `PATH`) and the `neovim` npm package
 - **Editor config:** [LazyVim starter](https://github.com/LazyVim/starter) at `~/.config/nvim`
