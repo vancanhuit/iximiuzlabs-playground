@@ -1,0 +1,9 @@
+[settings]
+pipx.uvx = true
+lockfile = true
+disable_backends = ["asdf", "vfox"]
+
+[tools]
+python = "3.14.6"
+uv = { version = "0.11.32", depends = ["python"] }
+"pipx:ansible" = { version = "14.2.0", depends = ["uv"], "uvx_args" = '--with-executables-from ansible-core,ansible-lint'}

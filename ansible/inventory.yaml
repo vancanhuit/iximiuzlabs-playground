@@ -1,0 +1,6 @@
+k8s:
+  hosts:
+    control-plane-01:
+    node-01:
+    node-02:
+    node-03:
