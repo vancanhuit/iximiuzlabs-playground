@@ -11,6 +11,11 @@ mise install
 ## Kubernetes
 
 ```console
+$ ansible-playbook k8s.yaml
+```
+
+
+```console
 $ cilium install \
     --set ipam.mode=cluster-pool \
     --set ipam.operator.clusterPoolIPv4PodCIDRList="{10.244.0.0/16}" \

@@ -113,13 +113,12 @@
         update_cache: true
 
     - name: Hold kubeadm, kubelet and kubectl packages at current version
-      ansible.builtin.apt:
+      ansible.builtin.dpkg_selections:
         name:
           - kubeadm
           - kubelet
           - kubectl
-        state: present
-        update_cache: true
+        selection: hold
 
     - name: Get Tailscale IPv4 address
       ansible.builtin.command:
