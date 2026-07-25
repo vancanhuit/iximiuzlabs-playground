@@ -203,6 +203,6 @@ labctl playground update debian-trixie-dev-<suffix> -f dev.playground.yaml
 
 ## References
 
-- [Custom Playgrounds docs](https://labs.iximiuz.com/docs/playgrounds/custom-playgrounds)
+- [Custom Playgrounds docs](https://labs.iximiuz.com/docs/custom-playgrounds)
 - [Upstream playground rootfs images](https://github.com/iximiuz/labs/tree/main/playgrounds)
 - [labctl CLI](https://github.com/iximiuz/labctl)
