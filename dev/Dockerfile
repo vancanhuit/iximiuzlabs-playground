@@ -6,8 +6,15 @@ ARG LAB_USER=laborant
 # --- Install zsh and make it the lab user's default shell (needs root) ---
 USER root
 ENV DEBIAN_FRONTEND=noninteractive
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
 RUN <<EOF
 set -eu
+
+locale-gen en_US.UTF-8
+localedef -i en_US -f UTF-8 en_US.UTF-8
+dpkg-reconfigure locales --frontend=noninteractive
+
 apt-get update
 apt-get install -y zsh build-essential libreadline-dev
 chsh -s "$(command -v zsh)" "$LAB_USER"
