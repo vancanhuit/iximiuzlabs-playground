@@ -137,8 +137,19 @@ EOF
 
 USER $LAB_USER
 ENV HOME=/home/$LAB_USER
-ENV LANG=en_US.UTF-8
-ENV PATH=/usr/local/bin:/usr/bin:/bin
+
+RUN <<EOF
+set -euo pipefail
+
+cat <<EOT >> $HOME/.bashrc
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export LANG=en_US.UTF-8
+export EDITOR=/usr/bin/vim
+export VISUAL=/usr/bin/vim
+export GPG_TTY=$(tty)
+EOT
+
+EOF
 
 COPY --chown=$LAB_USER:$LAB_USER .vimrc $HOME
 COPY --chown=$LAB_USER:$LAB_USER .tmux.conf $HOME

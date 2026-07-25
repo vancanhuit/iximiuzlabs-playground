@@ -1,9 +1,12 @@
 # ~/.zshrc
 
+export GPG_TTY=$(tty)
+export LANG=en_US.UTF-8
+
 # -----------------------------
 # PATH
 # -----------------------------
-
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 typeset -U path PATH
 path=("$HOME/.local/bin" $path)
 export PATH
@@ -48,30 +51,78 @@ stty -ixon
 # Completion
 # -----------------------------
 
-autoload -Uz compinit
+# User completion functions (mise, etc.) must be on fpath before compinit.
+fpath=("$HOME/.local/share/zsh/site-functions" $fpath)
 
-# Let `cd -<TAB>` complete cd's own options (-L/-P). Only the _cd completer
-# consults this style; option completion for other commands is automatic.
+# Regenerate tool completions onto fpath *before* compinit so they load this
+# session. Track changes so we can force a dump rebuild when one is updated.
+_comp_changed=0
+if command -v mise >/dev/null 2>&1; then
+  _mise_comp="$HOME/.local/share/zsh/site-functions/_mise"
+  mkdir -p "${_mise_comp:h}"
+  if [[ ! -f "$_mise_comp" || $commands[mise] -nt "$_mise_comp" ]]; then
+    mise completion zsh > "$_mise_comp" 2>/dev/null && _comp_changed=1
+  fi
+  unset _mise_comp
+fi
+
+autoload -Uz compinit
+# Rebuild the dump when a completion changed, once a day, or if it's missing;
+# otherwise load from cache for fast startup.
+_zcompdump="$HOME/.zcompdump"
+if (( _comp_changed )) || [[ -n "$_zcompdump"(#qNmh+24) ]] || [[ ! -f "$_zcompdump" ]]; then
+  compinit -d "$_zcompdump"
+else
+  compinit -C -d "$_zcompdump"
+fi
+unset _zcompdump _comp_changed
+
+# Complete command options after arguments/subcommands, e.g.:
+# apt purge --<TAB>
 zstyle ':completion:*' complete-options true
 
 # Show descriptions/groups in completion menu.
 zstyle ':completion:*' verbose true
-zstyle ':completion:*:descriptions' format '%F{yellow}%d%f'
+zstyle ':completion:*:descriptions' format '%F{yellow}-- %d --%f'
+zstyle ':completion:*:messages' format '%F{purple}-- %d --%f'
+zstyle ':completion:*:warnings' format '%F{red}-- no matches --%f'
+zstyle ':completion:*:corrections' format '%F{green}-- %d (errors: %e) --%f'
 zstyle ':completion:*' group-name ''
+
+# Pick up newly installed binaries (e.g. via mise) without a manual rehash.
+zstyle ':completion:*' rehash true
+
+# Cache slow completions (apt, etc.).
 zstyle ':completion:*' use-cache on
 zstyle ':completion:*' cache-path "$HOME/.zcompcache"
 
-compinit -d "$HOME/.zcompdump"
-
+# Interactive menu + smart matching.
 zstyle ':completion:*' menu select
-zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'
+# Case-insensitive, then partial-word, then substring matching.
+zstyle ':completion:*' matcher-list \
+  'm:{a-zA-Z}={A-Za-z}' \
+  'r:|[._-]=* r:|=*' \
+  'l:|=* r:|=*'
+zstyle ':completion:*' completer _complete _match _extensions _approximate _ignored
+zstyle ':completion:*:approximate:*' max-errors 'reply=( $((($#PREFIX+$#SUFFIX)/3)) )'
 zstyle ':completion:*' squeeze-slashes true
 zstyle ':completion:*' special-dirs true
+
+# Better process completion for kill/killall.
+zstyle ':completion:*:*:kill:*:processes' list-colors '=(#b) #([0-9]#)*=0=01;31'
+zstyle ':completion:*:*:*:*:processes' command 'ps -u $USER -o pid,user,comm -w -w'
 
 # Use LS_COLORS for completion colors when available.
 if [[ -n "$LS_COLORS" ]]; then
   zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
 fi
+
+# Navigate the completion menu with vim keys.
+zmodload zsh/complist
+bindkey -M menuselect 'h' vi-backward-char
+bindkey -M menuselect 'j' vi-down-line-or-history
+bindkey -M menuselect 'k' vi-up-line-or-history
+bindkey -M menuselect 'l' vi-forward-char
 
 
 # -----------------------------
@@ -85,8 +136,10 @@ autoload -Uz colors && colors
 # -----------------------------
 
 if command -v mise >/dev/null 2>&1; then
+  # Completion is regenerated in the Completion section (before compinit).
   eval "$(mise activate zsh)"
 fi
+
 
 # -----------------------------
 # fzf
@@ -94,6 +147,8 @@ fi
 
 if command -v fzf >/dev/null 2>&1; then
   export FZF_DEFAULT_OPTS='--height 40% --layout=reverse --border'
+  # Enable fzf key bindings (Ctrl-R, Ctrl-T, Alt-C) and tab completion.
+  source <(fzf --zsh) 2>/dev/null
 fi
 
 
@@ -108,7 +163,6 @@ else
   export EDITOR='vim'
   export VISUAL='vim'
 fi
-
 
 # -----------------------------
 # Aliases
@@ -159,4 +213,3 @@ fi
 if command -v zoxide >/dev/null 2>&1; then
   eval "$(zoxide init zsh)"
 fi
-
