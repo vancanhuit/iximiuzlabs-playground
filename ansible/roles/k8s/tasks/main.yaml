@@ -1,0 +1,145 @@
+- name: Enable IPv4 packet forwarding
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: '1'
+    state: present
+    reload: true
+    sysctl_set: true
+
+- name: Install containerd
+  ansible.builtin.unarchive:
+    src: https://github.com/containerd/containerd/releases/download/v2.3.3/containerd-2.3.3-linux-amd64.tar.gz
+    dest: /usr/local
+    remote_src: true
+    mode: '0755'
+    owner: root
+    group: root
+
+- name: Create containerd systemd service file
+  ansible.builtin.copy:
+    src: containerd.service
+    dest: /etc/systemd/system/containerd.service
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Install runc
+  ansible.builtin.get_url:
+    url: https://github.com/opencontainers/runc/releases/download/v1.5.1/runc.amd64
+    dest: /usr/local/bin/runc
+    mode: '0755'
+    owner: root
+    group: root
+
+- name: Create CNI plugin directory
+  ansible.builtin.file:
+    path: /opt/cni/bin
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Install CNI plugins
+  ansible.builtin.unarchive:
+    src: https://github.com/containernetworking/plugins/releases/download/v1.9.1/cni-plugins-linux-amd64-v1.9.1.tgz
+    dest: /opt/cni/bin
+    remote_src: true
+    mode: '0755'
+    owner: root
+    group: root
+
+- name: Create containerd configuration directory
+  ansible.builtin.file:
+    path: /etc/containerd
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Generate default containerd configuration
+  ansible.builtin.shell:
+    cmd: "containerd config default > /etc/containerd/config.toml"
+  args:
+    creates: /etc/containerd/config.toml
+    executable: /bin/bash
+
+- name: Enable systemd cgroup driver in containerd configuration
+  ansible.builtin.lineinfile:
+    backup: true
+    backrefs: true
+    regexp: '^(\s*)SystemdCgroup\s*=\s*false'
+    line: '\1SystemdCgroup = true'
+    path: /etc/containerd/config.toml
+
+- name: Enable and start containerd service
+  ansible.builtin.systemd:
+    name: containerd
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Install kubeadm, kubelet and kubectl
+  block:
+    - name: Install required packages for Kubernetes
+      ansible.builtin.apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gpg
+        state: present
+        update_cache: true
+
+    - name: Add Kubernetes repository
+      ansible.builtin.shell:
+        cmd: |
+          set -euo pipefail
+
+          curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.36/deb/Release.key | \
+            sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+          echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.36/deb/ /' | \
+            sudo tee /etc/apt/sources.list.d/kubernetes.list
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Install kubeadm, kubelet and kubectl packages
+      ansible.builtin.apt:
+        name:
+          - kubeadm
+          - kubelet
+          - kubectl
+        state: present
+        update_cache: true
+
+    - name: Hold kubeadm, kubelet and kubectl packages at current version
+      ansible.builtin.apt:
+        name:
+          - kubeadm
+          - kubelet
+          - kubectl
+        state: present
+        update_cache: true
+
+    - name: Get Tailscale IPv4 address
+      ansible.builtin.command:
+        cmd: "tailscale ip -4"
+      register: k8s_tailscale_ip
+      changed_when: false
+
+    - name: Advertise Node IP address to kubelet
+      ansible.builtin.lineinfile:
+        path: /etc/default/kubelet
+        regexp: '^KUBELET_EXTRA_ARGS='
+        line: 'KUBELET_EXTRA_ARGS=--node-ip={{ k8s_tailscale_ip.stdout | trim }}'
+        create: true
+        mode: '0644'
+        owner: root
+        group: root
+
+    - name: Enable and start kubelet service
+      ansible.builtin.systemd:
+        name: kubelet
+        enabled: true
+        state: started
+        daemon_reload: true
