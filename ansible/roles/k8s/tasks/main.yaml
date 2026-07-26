@@ -109,6 +109,7 @@
           - kubeadm
           - kubelet
           - kubectl
+          - cri-tools
         state: present
         update_cache: true
 
@@ -127,7 +128,7 @@
       register: k8s_tailscale_ip
       changed_when: false
 
-    - name: Advertise Node IP address to kubelet
+    - name: Advertise Tailscale IP address to kubelet
       ansible.builtin.lineinfile:
         path: /etc/default/kubelet
         regexp: '^KUBELET_EXTRA_ARGS='
@@ -143,3 +144,15 @@
         enabled: true
         state: started
         daemon_reload: true
+
+    - name: Add crictl configuration file
+      ansible.builtin.copy:
+        dest: /etc/crictl.yaml
+        content: |
+          runtime-endpoint: unix:///var/run/containerd/containerd.sock
+          image-endpoint: unix:///var/run/containerd/containerd.sock
+          timeout: 10
+          debug: true
+        owner: root
+        group: root
+        mode: '0644'
