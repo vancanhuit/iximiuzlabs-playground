@@ -7,10 +7,7 @@ export LANG=en_US.UTF-8
 # PATH
 # -----------------------------
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-typeset -U path PATH
 path=("$HOME/.local/bin" $path)
-export PATH
-
 
 # -----------------------------
 # History
@@ -213,3 +210,5 @@ fi
 if command -v zoxide >/dev/null 2>&1; then
   eval "$(zoxide init zsh)"
 fi
+
+typeset -U path PATH
