@@ -1,7 +1,7 @@
 kind: playground
 name: debian-trixie-dev
-title: Debian Trixie Dev (Custom)
-description: A Debian Trixie development environment (zsh, mise, Neovim/LazyVim, and a curated toolchain) built from a custom rootfs image.
+base: debian-stable
+title: Debian Trixie Dev
 categories:
   - linux
 playground:
@@ -25,14 +25,18 @@ playground:
         cpuCount: 4
         ramSize: 10GiB
   tabs:
+    - id: ide-debian-01
+      kind: ide
+      name: IDE
+      machine: debian-01
     - id: terminal-debian-01
       kind: terminal
       name: Term
       machine: debian-01
   accessControl:
     canList:
-      - anyone
+      - owner
     canRead:
-      - anyone
+      - owner
     canStart:
-      - anyone
+      - owner

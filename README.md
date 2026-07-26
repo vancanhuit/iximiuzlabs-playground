@@ -96,7 +96,7 @@ The manifest references the published image via an `oci://` drive source. Custom
 playgrounds are created on top of the `flexbox` base:
 
 ```bash
-labctl playground create --base flexbox -f manifest.yaml debian-trixie-base
+labctl playground create debian-trixie-base --base debian-stable -f manifest.yaml
 ```
 
 This prints the playground name (e.g. `debian-trixie-base-<suffix>`) and its URL.
@@ -105,7 +105,7 @@ This prints the playground name (e.g. `debian-trixie-base-<suffix>`) and its URL
 
 ```bash
 # Start a session (waits until all machines reach RUNNING)
-labctl playground start debian-trixie-base-<suffix> --safety-disclaimer-consent
+labctl playground start debian-trixie-base-<suffix>
 
 # Check status (use the run ID printed by start, NOT the playground name)
 labctl playground status <run-id>
@@ -144,7 +144,7 @@ labctl playground manifest debian-stable  # official Debian analog
 
 - a single VM (`debian-01`) with `root` and a default `laborant` user
 - the custom rootfs as the `/` drive via `source: oci://ghcr.io/vancanhuit/debian-rootfs:trixie-base`
-- a 30 GiB disk, 2 vCPUs, 4 GiB RAM
+- a 50 GiB disk, 4 vCPUs, 10 GiB RAM (maximum for the paid plan)
 - one terminal tab
 - public access control
 
@@ -194,7 +194,7 @@ GITHUB_TOKEN="$(gh auth token)" docker build --build-arg LAB_USER=laborant \
 docker push ghcr.io/vancanhuit/debian-rootfs:trixie-dev
 
 # Create / update the dev playground
-labctl playground create --base flexbox -f dev.playground.yaml debian-trixie-dev
+labctl playground create debian-trixie-dev --base debian-stable -f dev.playground.yaml
 labctl playground update debian-trixie-dev-<suffix> -f dev.playground.yaml
 ```
 
