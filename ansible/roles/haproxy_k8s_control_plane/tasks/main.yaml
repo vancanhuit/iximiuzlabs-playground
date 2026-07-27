@@ -1,18 +1,3 @@
-- name: Remove 172.16.* entries in /etc/hosts
-  block:
-    - name: Remove 172.16.* entries in /etc/hosts
-      ansible.builtin.replace:
-        path: /etc/hosts
-        regexp: '^172\.16\..*$'
-        replace: ''
-        backup: true
-    - name: Remove empty lines in /etc/hosts
-      ansible.builtin.replace:
-        path: /etc/hosts
-        regexp: '^\s*$'
-        replace: ''
-        backup: true
-
 - name: Install HAProxy
   ansible.builtin.apt:
     name: haproxy

@@ -5,4 +5,5 @@
   remote_user: laborant
 
   roles:
+    - common
     - haproxy_k8s_control_plane
