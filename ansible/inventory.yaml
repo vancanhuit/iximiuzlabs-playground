@@ -1,6 +1,22 @@
-k8s:
+all:
+  vars:
+    tailscale_domain: tailaa4bf1.ts.net
+
+k8s_control_plane_lb:
+  hosts:
+    control-plane:
+
+k8s_control_plane:
   hosts:
     control-plane-01:
-    node-01:
-    node-02:
-    node-03:
+    control-plane-02:
+    control-plane-03:
+
+k8s:
+  children:
+    k8s_control_plane:
+    k8s_node:
+      hosts:
+        node-01:
+        node-02:
+        node-03:

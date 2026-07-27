@@ -1,0 +1,37 @@
+- name: Remove 172.16.* entries in /etc/hosts
+  block:
+    - name: Remove 172.16.* entries in /etc/hosts
+      ansible.builtin.replace:
+        path: /etc/hosts
+        regexp: '^172\.16\..*$'
+        replace: ''
+        backup: true
+    - name: Remove empty lines in /etc/hosts
+      ansible.builtin.replace:
+        path: /etc/hosts
+        regexp: '^\s*$'
+        replace: ''
+        backup: true
+
+- name: Install HAProxy
+  ansible.builtin.apt:
+    name: haproxy
+    state: present
+    update_cache: true
+
+- name: Enable and start HAProxy service
+  ansible.builtin.service:
+    name: haproxy
+    state: started
+    enabled: true
+    daemon_reload: true
+
+- name: Configure HAProxy
+  ansible.builtin.template:
+    src: haproxy.cfg.j2
+    dest: /etc/haproxy/haproxy.cfg
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - Restart HAProxy
