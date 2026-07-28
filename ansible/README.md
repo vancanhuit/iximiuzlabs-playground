@@ -52,3 +52,13 @@ cilium install \
 cilium status
 cilium hubble enable
 ```
+
+**References:**
+- https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/
+- https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/
+- https://gateway-api.sigs.k8s.io/guides/getting-started/introduction/
+- https://docs.cilium.io/en/stable/network/kubernetes/kubeproxy-free/
+- https://docs.cilium.io/en/stable/network/servicemesh/gateway-api/gateway-api/
+- https://docs.cilium.io/en/stable/observability/hubble/
+- https://docs.cilium.io/en/stable/network/kubernetes/ipam-cluster-pool/
+- https://docs.cilium.io/en/stable/helm-reference/
