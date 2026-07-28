@@ -13,19 +13,6 @@ The base image follows the
 [official `100.rootfs-debian-stable`](https://github.com/iximiuz/labs/tree/main/playgrounds/100.rootfs-debian-stable)
 pattern, stripped down to the essentials needed to boot as a real microVM.
 
-## Contents
-
-| File                   | Purpose                                                         |
-| ---------------------- | -------------------------------------------------------------- |
-| `base/Dockerfile`           | Builds the minimal `trixie-base` rootfs image.                 |
-| `base/.vimrc`               | Vim config copied into the lab user's home (base image).       |
-| `base/.tmux.conf`           | tmux config copied into the lab user's home (base image).      |
-| `dev/Dockerfile`       | Builds the `trixie-dev` development image (`FROM` base).        |
-| `dev/.zshrc`           | zsh config (mise, starship, atuin, fzf, completion, aliases).  |
-| `dev/starship.toml`    | Starship prompt config.                                        |
-| `base.manifest.yaml`        | Playground manifest for the base image.                        |
-| `dev.manifest.yaml`  | Playground manifest for the dev image.                         |
-
 ## Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/)
