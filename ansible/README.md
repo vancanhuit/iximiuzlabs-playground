@@ -31,6 +31,11 @@ sudo kubeadm join <endpoint> \
 sudo kubeadm join <endpoint> \
     --token <token> \
     --discovery-token-ca-cert-hash sha256:<hash>
+
+kubectl get node -o wide
+
+# Install Gateway API CRDs before installing Cilium with Gateway API support
+kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.1/standard-install.yaml
 ```
 
 ```sh
