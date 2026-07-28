@@ -1,13 +1,5 @@
 # Ansible Playbooks
 
-```bash
-curl https://mise.run | sh
-```
-
-```bash
-mise install
-```
-
 ## Kubernetes
 
 ```sh
