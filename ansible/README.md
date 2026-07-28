@@ -38,7 +38,7 @@ cilium install \
     --namespace kube-system \
     --set kubeProxyReplacement=true \
     --set ipam.mode=cluster-pool \
-    --set ipam.operator.clusterPoolIPv4PodCIDRList="{10.244.0.0/16}" \
+    --set ipam.operator.clusterPoolIPv4PodCIDRList="10.244.0.0/16" \
     --set ipam.operator.clusterPoolIPv4MaskSize=24 \
     --set gatewayAPI.enabled=true \
     --set gatewayAPI.hostNetwork.enabled=true \
