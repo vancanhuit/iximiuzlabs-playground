@@ -24,7 +24,6 @@ env = { GITHUB_TOKEN = "{{ exec(command='gh auth token') }}" }
 dir = "dev"
 run = '''
 docker build \
-    --build-arg LAB_USER=laborant \
     --secret id=github_token,env=GITHUB_TOKEN \
     -t ghcr.io/vancanhuit/debian-rootfs:trixie-dev .
 '''

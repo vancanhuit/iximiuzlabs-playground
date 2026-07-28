@@ -50,8 +50,6 @@ mise install
 
 ### 1. Build the image
 
-The default `LAB_USER` is `laborant`, we can supply with a custom username:
-
 ```bash
 mise run docker:build:trixie-base
 ```
@@ -89,9 +87,6 @@ docker manifest inspect ghcr.io/vancanhuit/debian-rootfs:trixie-base >/dev/null 
 ```
 
 ### 3. Create the playground
-
-The manifest references the published image via an `oci://` drive source. Custom-rootfs
-playgrounds are created on top of the `flexbox` base:
 
 ```bash
 labctl playground create debian-trixie-base --base debian-stable -f base.manifest.yaml
@@ -138,43 +133,15 @@ labctl playground manifest flexbox        # base for custom-rootfs playgrounds
 labctl playground manifest debian-stable  # official Debian analog
 ```
 
-`manifest.yaml` in this repo sets:
-
-- a single VM (`debian-01`) with `root` and a default `laborant` user
-- the custom rootfs as the `/` drive via `source: oci://ghcr.io/vancanhuit/debian-rootfs:trixie-base`
-- a 50 GiB disk, 4 vCPUs, 10 GiB RAM (maximum for the paid plan)
-- one terminal tab
-- public access control
-
 #### To list your own custom playgrounds:
 
 ```bash
 labctl playground catalog --filter my-custom
 ```
 
-> **SSH note:** `labctl ssh <run-id>` works from an interactive terminal. The
-> non-interactive form `labctl ssh <run-id> -- <cmd>` needs a TTY and will appear
-> to hang when run without one (e.g. in scripts/CI); use the browser terminal or an
-> interactive shell instead.
-
 ## The dev image (`trixie-dev`)
 
-Built from `dev/Dockerfile` (`FROM ghcr.io/vancanhuit/debian-rootfs:trixie-base`). On
-top of the base it adds:
-
-- **Shell:** `zsh` as the lab user's default shell, plus `build-essential`
-- **Tool manager:** [`mise`](https://mise.jdx.dev) installed for the lab user, used to
-  install: `starship`, `ripgrep`, `fd`, `lazygit`, `neovim`, `ast-grep`, `tree-sitter`, `fzf`, `bat`,
-  `shellcheck`, `shfmt`, `python` (3.14.6), `uv`, `ruff`, `delta`, `node` (LTS), `atuin`, `eza`
-- **Neovim providers:** `pynvim` via `uv tool install` (Neovim auto-detects the
-  `pynvim-python` shim on `PATH`) and the `neovim` npm package
-- **Editor config:** [LazyVim starter](https://github.com/LazyVim/starter) at `~/.config/nvim`
-- **Dotfiles:** `dev/.zshrc` and `dev/starship.toml`
-- **Git config:** sensible global defaults via `git config --global` (delta pager,
-  `init.defaultBranch=main`, rebase-on-pull, etc.); user name/email are intentionally
-  left unset
-
-### Build, push, and run the dev image
+### Build, push, and create/update the dev playground
 
 ```bash
 mise run docker:build:trixie-dev
@@ -186,9 +153,6 @@ docker push ghcr.io/vancanhuit/debian-rootfs:trixie-dev
 labctl playground create debian-trixie-dev --base debian-stable -f dev.manifest.yaml
 labctl playground update debian-trixie-dev-<suffix> -f dev.manifest.yaml
 ```
-
-`dev.manifest.yaml` uses the `trixie-dev` drive with a 50 GiB disk, 4 vCPUs, and
-10 GiB RAM.
 
 ## References
 
