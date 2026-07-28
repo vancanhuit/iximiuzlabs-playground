@@ -6,6 +6,25 @@ disable_backends = ["asdf", "vfox"]
 [tools]
 python = "3.14.6"
 uv = { version = "0.11.32", depends = ["python"] }
-"pipx:ansible" = { version = "14.2.0", depends = ["uv"], "uvx_args" = '--with-executables-from ansible-core,ansible-lint'}
+"pipx:ansible" = { version = "14.2.0", depends = [
+  "uv",
+], "uvx_args" = '--with-executables-from ansible-core,ansible-lint' }
 kubectl = "1.36.3"
 cilium-cli = "0.19.6"
+gh = '2.96.0'
+
+[tasks."docker:build:trixie-base"]
+description = "Build the base image for trixie"
+dir = "base"
+run = "docker build -t ghcr.io/vancanhuit/debian-rootfs:trixie-base ."
+
+[tasks."docker:build:trixie-dev"]
+description = "Build the development image for trixie"
+env = { GITHUB_TOKEN = "{{ exec(command='gh auth token') }}" }
+dir = "dev"
+run = '''
+docker build \
+    --build-arg LAB_USER=laborant \
+    --secret id=github_token,env=GITHUB_TOKEN \
+    -t ghcr.io/vancanhuit/debian-rootfs:trixie-dev .
+'''

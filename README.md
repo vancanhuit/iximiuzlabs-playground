@@ -6,7 +6,7 @@ both published as tags of `ghcr.io/vancanhuit/debian-rootfs`:
 
 | Tag           | Built from   | Purpose                                                            |
 | ------------- | ------------ | ----------------------------------------------------------------- |
-| `trixie-base` | `Dockerfile` | Minimal sysadmin server (bash). Follows the upstream pattern.     |
+| `trixie-base` | `base/Dockerfile` | Minimal sysadmin server (bash). Follows the upstream pattern.     |
 | `trixie-dev`  | `dev/Dockerfile` | Development environment (zsh, mise, Neovim/LazyVim) on top of `trixie-base`. |
 
 The base image follows the
@@ -17,51 +17,49 @@ pattern, stripped down to the essentials needed to boot as a real microVM.
 
 | File                   | Purpose                                                         |
 | ---------------------- | -------------------------------------------------------------- |
-| `Dockerfile`           | Builds the minimal `trixie-base` rootfs image.                 |
-| `manifest.yaml`        | Playground manifest for the base image.                        |
-| `.vimrc`               | Vim config copied into the lab user's home (base image).       |
-| `.tmux.conf`           | tmux config copied into the lab user's home (base image).      |
+| `base/Dockerfile`           | Builds the minimal `trixie-base` rootfs image.                 |
+| `base/.vimrc`               | Vim config copied into the lab user's home (base image).       |
+| `base/.tmux.conf`           | tmux config copied into the lab user's home (base image).      |
 | `dev/Dockerfile`       | Builds the `trixie-dev` development image (`FROM` base).        |
 | `dev/.zshrc`           | zsh config (mise, starship, atuin, fzf, completion, aliases).  |
 | `dev/starship.toml`    | Starship prompt config.                                        |
-| `dev.playground.yaml`  | Playground manifest for the dev image.                         |
-
-## What's in the image
-
-- **Base:** `debian:trixie` (Debian 13, current stable)
-- **Boot-as-VM essentials:** `systemd`, `udev`, `kmod`, `dbus`
-  (required so the rootfs boots as a real microVM, not just a container)
-- **Lab user:** `laborant` (uid 1001), member of `sudo`, passwordless sudo, `bash` shell
-- **SSH:** `openssh-server` configured for **publickey-only** auth with an ed25519 host key
-- **Tooling:** `vim`, `tmux`, `git`, `curl`, `wget`, `socat`, `netcat`, `htop`, `tree` and other
-  sysadmin basics (see `Dockerfile` for the full package list)
-
-## The base image (`trixie-base`)
+| `base.manifest.yaml`        | Playground manifest for the base image.                        |
+| `dev.manifest.yaml`  | Playground manifest for the dev image.                         |
 
 ## Prerequisites
 
-- [Docker](https://docs.docker.com/get-docker/) (with BuildKit; the Dockerfile uses
-  `# syntax=docker/dockerfile:1` heredocs)
+- [Docker](https://docs.docker.com/get-docker/)
 - A container registry account — **`ghcr.io` is required; Docker Hub is not supported**
   by iximiuz Labs due to its rate limiting
-- [GitHub CLI](https://cli.github.com/)
+- [`mise`](https://mise.jdx.dev) — manage tools, environment variables and tasks in one place
 - [`labctl`](https://github.com/iximiuz/labctl) — the iximiuz Labs CLI
 
-## 1. Build the image
+```sh
+git clone https://github.com/vancanhuit/iximiuzlabs-playground.git
+cd iximiuzlabs-playground
+# Install mise
+curl https://mise.run | sh
+# Since `labctl` is not available via `mise`, install it separately:
+curl -sf https://labs.iximiuz.com/cli/install.sh | sh
+
+# Install the tools defined in `mise.toml`
+mise install
+```
+
+## The base image (`trixie-base`)
+
+### 1. Build the image
 
 The default `LAB_USER` is `laborant`, we can supply with a custom username:
 
 ```bash
-docker build \
-  --build-arg LAB_USER=laborant \
-  -t ghcr.io/vancanhuit/debian-rootfs:trixie-base \
-  .
+mise run docker:build:trixie-base
 ```
 
 To target a different Debian release, edit the `FROM` line in the `Dockerfile`
 (e.g. `debian:bookworm` or the floating `debian:stable`).
 
-## 2. Push to ghcr.io
+### 2. Push to ghcr.io
 
 ```bash
 gh auth login --scopes write:packages
@@ -90,18 +88,18 @@ docker manifest inspect ghcr.io/vancanhuit/debian-rootfs:trixie-base >/dev/null 
   && echo "public: pullable"
 ```
 
-## 3. Create the playground
+### 3. Create the playground
 
 The manifest references the published image via an `oci://` drive source. Custom-rootfs
 playgrounds are created on top of the `flexbox` base:
 
 ```bash
-labctl playground create debian-trixie-base --base debian-stable -f manifest.yaml
+labctl playground create debian-trixie-base --base debian-stable -f base.manifest.yaml
 ```
 
 This prints the playground name (e.g. `debian-trixie-base-<suffix>`) and its URL.
 
-## 4. Start, inspect, and tear down
+### 4. Start, inspect, and tear down
 
 ```bash
 # Start a session (waits until all machines reach RUNNING)
@@ -122,15 +120,15 @@ labctl playground stop <run-id>
 labctl playground remove -f debian-trixie-base-<suffix>
 ```
 
-## 5. Update the playground
+### 5. Update the playground
 
-Edit `manifest.yaml` (new image tag, resources, tabs, etc.) and apply:
+Edit `base.manifest.yaml` (new image tag, resources, tabs, etc.) and apply:
 
 ```bash
-labctl playground update debian-trixie-base-<suffix> -f manifest.yaml
+labctl playground update debian-trixie-base-<suffix> -f base.manifest.yaml
 ```
 
-## Manifest reference
+### Manifest reference
 
 There is no formally published schema. The most reliable reference is the live output
 of `labctl playground manifest <name>` for any existing playground, e.g.:
@@ -148,7 +146,7 @@ labctl playground manifest debian-stable  # official Debian analog
 - one terminal tab
 - public access control
 
-To list your own custom playgrounds:
+#### To list your own custom playgrounds:
 
 ```bash
 labctl playground catalog --filter my-custom
@@ -179,26 +177,17 @@ top of the base it adds:
 ### Build, push, and run the dev image
 
 ```bash
-# Build (from the dev/ directory)
-docker build --build-arg LAB_USER=laborant \
-  -t ghcr.io/vancanhuit/debian-rootfs:trixie-dev dev/
-
-# Optional: pass a GitHub token to avoid API rate limits while mise downloads tools.
-# The secret mount is optional — a plain build works without it.
-# Read the token straight from the gh CLI:
-GITHUB_TOKEN="$(gh auth token)" docker build --build-arg LAB_USER=laborant \
-  --secret id=github_token,env=GITHUB_TOKEN \
-  -t ghcr.io/vancanhuit/debian-rootfs:trixie-dev dev/
+mise run docker:build:trixie-dev
 
 # Push (also requires the package to be public; see above)
 docker push ghcr.io/vancanhuit/debian-rootfs:trixie-dev
 
 # Create / update the dev playground
-labctl playground create debian-trixie-dev --base debian-stable -f dev.playground.yaml
-labctl playground update debian-trixie-dev-<suffix> -f dev.playground.yaml
+labctl playground create debian-trixie-dev --base debian-stable -f dev.manifest.yaml
+labctl playground update debian-trixie-dev-<suffix> -f dev.manifest.yaml
 ```
 
-`dev.playground.yaml` uses the `trixie-dev` drive with a 50 GiB disk, 4 vCPUs, and
+`dev.manifest.yaml` uses the `trixie-dev` drive with a 50 GiB disk, 4 vCPUs, and
 10 GiB RAM.
 
 ## References
