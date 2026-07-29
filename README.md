@@ -41,9 +41,6 @@ mise install
 mise run docker:build:trixie-base
 ```
 
-To target a different Debian release, edit the `FROM` line in the `Dockerfile`
-(e.g. `debian:bookworm` or the floating `debian:stable`).
-
 ### 2. Push to ghcr.io
 
 ```bash
@@ -116,8 +113,8 @@ There is no formally published schema. The most reliable reference is the live o
 of `labctl playground manifest <name>` for any existing playground, e.g.:
 
 ```bash
-labctl playground manifest flexbox        # base for custom-rootfs playgrounds
-labctl playground manifest debian-stable  # official Debian analog
+labctl playground manifest flexbox
+labctl playground manifest debian-stable
 ```
 
 #### To list your own custom playgrounds:
