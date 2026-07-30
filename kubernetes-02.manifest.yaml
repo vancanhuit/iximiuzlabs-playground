@@ -1,171 +1,141 @@
 kind: playground
-name: kubernetes-02-8c3112d0
+name: kubernetes-02
 base: flexbox
 title: Kubernetes 02
 categories:
-    - linux
-    - networking
+  - linux
+  - networking
 playground:
-    networks:
-        - name: local
-          subnet: 172.16.0.0/24
-    machines:
-        - name: node-01
-          users:
-            - name: root
-            - name: laborant
-              default: true
-          drives:
-            - source: oci://ghcr.io/vancanhuit/debian-rootfs:trixie-base
-              mount: /
-              size: 40GiB
-          network:
-            interfaces:
-                - network: local
-          resources:
-            cpuCount: 2
-            ramSize: 4GiB
-        - name: node-02
-          users:
-            - name: root
-            - name: laborant
-              default: true
-          drives:
-            - source: oci://ghcr.io/vancanhuit/debian-rootfs:trixie-base
-              mount: /
-              size: 40GiB
-          network:
-            interfaces:
-                - network: local
-          resources:
-            cpuCount: 2
-            ramSize: 4GiB
-        - name: node-03
-          users:
-            - name: root
-            - name: laborant
-              default: true
-          drives:
-            - source: oci://ghcr.io/vancanhuit/debian-rootfs:trixie-base
-              mount: /
-              size: 40GiB
-          network:
-            interfaces:
-                - network: local
-          resources:
-            cpuCount: 2
-            ramSize: 4GiB
-        - name: haproxy-02
-          users:
-            - name: root
-            - name: laborant
-              default: true
-          drives:
-            - source: oci://ghcr.io/vancanhuit/debian-rootfs:trixie-base
-              mount: /
-              size: 15GiB
-          network:
-            interfaces:
-                - network: local
-          resources:
-            cpuCount: 2
-            ramSize: 2GiB
-        - name: haproxy-03
-          users:
-            - name: root
-            - name: laborant
-              default: true
-          drives:
-            - source: oci://ghcr.io/vancanhuit/debian-rootfs:trixie-base
-              mount: /
-              size: 15GiB
-          network:
-            interfaces:
-                - network: local
-          resources:
-            cpuCount: 2
-            ramSize: 2GiB
-    tabs:
-        - id: terminal-node-01
-          kind: terminal
-          name: node-01
-          machine: node-01
-        - id: terminal-node-02
-          kind: terminal
-          name: node-02
-          machine: node-02
-        - id: terminal-node-03
-          kind: terminal
-          name: node-03
-          machine: node-03
-        - id: terminal-haproxy-02
-          kind: terminal
-          name: haproxy-02
-          machine: haproxy-02
-        - id: terminal-haproxy-03
-          kind: terminal
-          name: haproxy-03
-          machine: haproxy-03
-    initTasks:
-        init_haproxy_02_1:
-            name: init_haproxy_02_1
-            machine: haproxy-02
-            init: true
-            user: root
-            timeout_seconds: 300
-            run: |-
-                #!/bin/bash
+  networks:
+    - name: local
+      subnet: 172.16.0.0/24
+  machines:
+    - name: control-plane-02
+      users:
+        - name: root
+        - name: laborant
+          default: true
+      drives:
+        - source: oci://ghcr.io/vancanhuit/debian-rootfs:trixie-base
+          mount: /
+          size: 40GiB
+      network:
+        interfaces:
+          - network: local
+      resources:
+        cpuCount: 2
+        ramSize: 4GiB
+    - name: control-plane-03
+      users:
+        - name: root
+        - name: laborant
+          default: true
+      drives:
+        - source: oci://ghcr.io/vancanhuit/debian-rootfs:trixie-base
+          mount: /
+          size: 40GiB
+      network:
+        interfaces:
+          - network: local
+      resources:
+        cpuCount: 2
+        ramSize: 4GiB
+    - name: node-04
+      users:
+        - name: root
+        - name: laborant
+          default: true
+      drives:
+        - source: oci://ghcr.io/vancanhuit/debian-rootfs:trixie-base
+          mount: /
+          size: 40GiB
+      network:
+        interfaces:
+          - network: local
+      resources:
+        cpuCount: 4
+        ramSize: 4GiB
+    - name: node-05
+      users:
+        - name: root
+        - name: laborant
+          default: true
+      drives:
+        - source: oci://ghcr.io/vancanhuit/debian-rootfs:trixie-base
+          mount: /
+          size: 30GiB
+      network:
+        interfaces:
+          - network: local
+      resources:
+        cpuCount: 2
+        ramSize: 4GiB
+  tabs:
+    - id: terminal-control-plane-02
+      kind: terminal
+      name: control-plane-02
+      machine: control-plane-02
+    - id: terminal-control-plane-03
+      kind: terminal
+      name: control-plane-03
+      machine: control-plane-03
+    - id: terminal-node-04
+      kind: terminal
+      name: node-04
+      machine: node-04
+    - id: terminal-node-05
+      kind: terminal
+      name: node-05
+      machine: node-05
+  initTasks:
+    init_control_plane_02_1:
+      name: init_control_plane_02_1
+      machine: control-plane-02
+      init: true
+      user: root
+      timeout_seconds: 300
+      run: |-
+        #!/bin/bash
 
-                curl -fsSL https://tailscale.com/install.sh | sh
-                systemctl enable --now tailscaled
-        init_haproxy_03_1:
-            name: init_haproxy_03_1
-            machine: haproxy-03
-            init: true
-            user: root
-            timeout_seconds: 300
-            run: |-
-                #!/bin/bash
+        curl -fsSL https://tailscale.com/install.sh | sh
+        systemctl enable --now tailscaled
+    init_control_plane_03_1:
+      name: init_control_plane_03_1
+      machine: control-plane-03
+      init: true
+      user: root
+      timeout_seconds: 300
+      run: |-
+        #!/bin/bash
 
-                curl -fsSL https://tailscale.com/install.sh | sh
-                systemctl enable --now tailscaled
-        init_node_01_1:
-            name: init_node_01_1
-            machine: node-01
-            init: true
-            user: root
-            timeout_seconds: 300
-            run: |-
-                #!/bin/bash
+        curl -fsSL https://tailscale.com/install.sh | sh
+        systemctl enable --now tailscaled
+    init_node_04_1:
+      name: init_node_04_1
+      machine: node-04
+      init: true
+      user: root
+      timeout_seconds: 300
+      run: |-
+        #!/bin/bash
 
-                curl -fsSL https://tailscale.com/install.sh | sh
-                systemctl enable --now tailscaled
-        init_node_02_1:
-            name: init_node_02_1
-            machine: node-02
-            init: true
-            user: root
-            timeout_seconds: 300
-            run: |-
-                #!/bin/bash
+        curl -fsSL https://tailscale.com/install.sh | sh
+        systemctl enable --now tailscaled
+    init_node_05_1:
+      name: init_node_05_1
+      machine: node-05
+      init: true
+      user: root
+      timeout_seconds: 300
+      run: |-
+        #!/bin/bash
 
-                curl -fsSL https://tailscale.com/install.sh | sh
-                systemctl enable --now tailscaled
-        init_node_03_1:
-            name: init_node_03_1
-            machine: node-03
-            init: true
-            user: root
-            timeout_seconds: 300
-            run: |-
-                #!/bin/bash
-
-                curl -fsSL https://tailscale.com/install.sh | sh
-                systemctl enable --now tailscaled
-    accessControl:
-        canList:
-            - owner
-        canRead:
-            - owner
-        canStart:
-            - owner
+        curl -fsSL https://tailscale.com/install.sh | sh
+        systemctl enable --now tailscaled
+  accessControl:
+    canList:
+      - owner
+    canRead:
+      - owner
+    canStart:
+      - owner
