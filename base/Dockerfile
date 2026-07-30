@@ -140,6 +140,9 @@ echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/$USERNAME
 chmod 0440 /etc/sudoers.d/$USERNAME
 EOF
 
+COPY .vimrc /root/
+COPY .tmux.conf /root/
+
 
 USER $LAB_USER
 ENV HOME=/home/$LAB_USER
