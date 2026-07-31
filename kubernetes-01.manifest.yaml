@@ -97,6 +97,8 @@ playground:
       run: |-
         #!/bin/bash
 
+        perl -p -i.bak -e 's/^(?!(127\.0\.0\.1|::1|fe|ff|#)).*$//g ; s/^\s*$//g' /etc/hosts
+
         curl -fsSL https://tailscale.com/install.sh | sh
         systemctl enable --now tailscaled
     init_node_01_1:
@@ -107,6 +109,8 @@ playground:
       timeout_seconds: 300
       run: |-
         #!/bin/bash
+
+        perl -p -i.bak -e 's/^(?!(127\.0\.0\.1|::1|fe|ff|#)).*$//g ; s/^\s*$//g' /etc/hosts
 
         curl -fsSL https://tailscale.com/install.sh | sh
         systemctl enable --now tailscaled
@@ -119,6 +123,8 @@ playground:
       run: |-
         #!/bin/bash
 
+        perl -p -i.bak -e 's/^(?!(127\.0\.0\.1|::1|fe|ff|#)).*$//g ; s/^\s*$//g' /etc/hosts
+
         curl -fsSL https://tailscale.com/install.sh | sh
         systemctl enable --now tailscaled
     init_node_03_1:
@@ -129,6 +135,8 @@ playground:
       timeout_seconds: 300
       run: |-
         #!/bin/bash
+
+        perl -p -i.bak -e 's/^(?!(127\.0\.0\.1|::1|fe|ff|#)).*$//g ; s/^\s*$//g' /etc/hosts
 
         curl -fsSL https://tailscale.com/install.sh | sh
         systemctl enable --now tailscaled
