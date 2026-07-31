@@ -1,0 +1,242 @@
+---
+- name: Validate RKE2 inventory topology
+  ansible.builtin.assert:
+    that:
+      - rke2_control_plane_group in groups
+      - rke2_agent_group in groups
+      - groups[rke2_control_plane_group] | length >= 3
+      - groups[rke2_control_plane_group] | length % 2 == 1
+      - inventory_hostname in groups[rke2_control_plane_group] or inventory_hostname in groups[rke2_agent_group]
+    fail_msg: RKE2 requires an odd number of at least three control-plane hosts and known cluster groups.
+  run_once: true
+
+- name: Get Tailscale IPv4 address
+  ansible.builtin.command:
+    cmd: tailscale ip -4
+  register: rke2_tailscale_ip
+  changed_when: false
+
+- name: Validate Tailscale connectivity
+  ansible.builtin.assert:
+    that:
+      - (rke2_tailscale_ip.stdout | trim | regex_search('^[0-9]+(\.[0-9]+){3}$')) is not none
+    fail_msg: "{{ inventory_hostname }} must already be connected to the tailnet."
+
+- name: Create RKE2 configuration directory
+  ansible.builtin.file:
+    path: /etc/rancher/rke2
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Download RKE2 installation script
+  ansible.builtin.get_url:
+    url: "{{ rke2_install_script_url }}"
+    dest: /var/tmp/install-rke2.sh
+    owner: root
+    group: root
+    mode: '0700'
+    checksum: "sha256:{{ rke2_install_script_checksum }}"
+
+- name: Check installed RKE2 version
+  ansible.builtin.command:
+    cmd: /usr/local/bin/rke2 --version
+  register: rke2_installed_version
+  changed_when: false
+  failed_when: false
+
+- name: Install pinned RKE2 release
+  ansible.builtin.command:
+    cmd: /var/tmp/install-rke2.sh
+  register: rke2_install
+  environment:
+    INSTALL_RKE2_TYPE: "{{ 'server' if inventory_hostname in groups[rke2_control_plane_group] else 'agent' }}"
+    INSTALL_RKE2_VERSION: "{{ rke2_version }}"
+  changed_when: true
+  when: rke2_installed_version.rc != 0 or rke2_version not in rke2_installed_version.stdout
+
+- name: Create RKE2 server manifests directory
+  ansible.builtin.file:
+    path: /var/lib/rancher/rke2/server/manifests
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+  when: inventory_hostname == rke2_initial_server
+
+- name: Seed Cilium configuration before API bootstrap
+  ansible.builtin.template:
+    src: rke2-cilium-config.yaml.j2
+    dest: /var/lib/rancher/rke2/server/manifests/rke2-cilium-config.yaml
+    owner: root
+    group: root
+    mode: '0600'
+    force: false
+  vars:
+    rke2_gateway_api_enabled: false
+  when: inventory_hostname == rke2_initial_server
+
+- name: Configure initial RKE2 server
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: /etc/rancher/rke2/config.yaml
+    owner: root
+    group: root
+    mode: '0600'
+  register: rke2_initial_server_config
+  when: inventory_hostname == rke2_initial_server
+
+- name: Start initial RKE2 server
+  ansible.builtin.systemd_service:
+    name: rke2-server
+    enabled: true
+    state: "{{ 'restarted' if rke2_install.changed or rke2_initial_server_config.changed else 'started' }}"
+    daemon_reload: true
+  when: inventory_hostname == rke2_initial_server
+
+- name: Wait for initial Kubernetes API
+  ansible.builtin.command:
+    cmd: /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml get --raw=/readyz
+  register: rke2_api_ready
+  changed_when: false
+  retries: 60
+  delay: 10
+  until: rke2_api_ready.rc == 0
+  when: inventory_hostname == rke2_initial_server
+
+- name: Download Gateway API experimental manifest
+  ansible.builtin.get_url:
+    url: "{{ rke2_gateway_api_manifest_url }}"
+    dest: "{{ rke2_gateway_api_manifest_path }}"
+    owner: root
+    group: root
+    mode: '0600'
+    checksum: "sha256:{{ rke2_gateway_api_manifest_checksum }}"
+  when: inventory_hostname == rke2_initial_server
+
+- name: Check Gateway API experimental CRD changes
+  ansible.builtin.command:
+    cmd: >-
+      /var/lib/rancher/rke2/bin/kubectl
+      --kubeconfig /etc/rancher/rke2/rke2.yaml
+      diff --server-side
+      --field-manager=ansible-rke2
+      -f {{ rke2_gateway_api_manifest_path }}
+  register: rke2_gateway_api_diff
+  changed_when: rke2_gateway_api_diff.rc == 1
+  failed_when: rke2_gateway_api_diff.rc not in [0, 1]
+  when: inventory_hostname == rke2_initial_server
+
+- name: Install Gateway API experimental CRDs
+  ansible.builtin.command:
+    cmd: >-
+      /var/lib/rancher/rke2/bin/kubectl
+      --kubeconfig /etc/rancher/rke2/rke2.yaml
+      apply --server-side
+      --field-manager=ansible-rke2
+      -f {{ rke2_gateway_api_manifest_path }}
+  changed_when: true
+  when:
+    - inventory_hostname == rke2_initial_server
+    - rke2_gateway_api_diff.rc == 1
+
+- name: Enable Cilium Gateway API support
+  ansible.builtin.template:
+    src: rke2-cilium-config.yaml.j2
+    dest: /var/lib/rancher/rke2/server/manifests/rke2-cilium-config.yaml
+    owner: root
+    group: root
+    mode: '0600'
+  vars:
+    rke2_gateway_api_enabled: true
+  when: inventory_hostname == rke2_initial_server
+
+- name: Read generated RKE2 cluster token
+  ansible.builtin.slurp:
+    src: /var/lib/rancher/rke2/server/node-token
+  register: rke2_node_token
+  no_log: true
+  when: inventory_hostname == rke2_initial_server
+
+- name: Distribute RKE2 cluster token in memory
+  ansible.builtin.set_fact:
+    rke2_cluster_token: "{{ hostvars[rke2_initial_server].rke2_node_token.content | b64decode | trim }}"
+  no_log: true
+
+- name: Wait for initial RKE2 registration endpoint
+  ansible.builtin.wait_for:
+    host: "{{ rke2_registration_host }}"
+    port: 9345
+    connect_timeout: 5
+    timeout: 300
+  when: inventory_hostname != rke2_initial_server
+
+- name: Configure additional RKE2 servers
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: /etc/rancher/rke2/config.yaml
+    owner: root
+    group: root
+    mode: '0600'
+  register: rke2_additional_server_config
+  no_log: true
+  when: inventory_hostname in groups[rke2_control_plane_group] and inventory_hostname != rke2_initial_server
+
+- name: Start additional RKE2 servers
+  ansible.builtin.systemd_service:
+    name: rke2-server
+    enabled: true
+    state: "{{ 'restarted' if rke2_install.changed or rke2_additional_server_config.changed else 'started' }}"
+    daemon_reload: true
+  when: inventory_hostname in groups[rke2_control_plane_group] and inventory_hostname != rke2_initial_server
+
+- name: Wait for each control-plane node to become Ready
+  ansible.builtin.command:
+    cmd: >-
+      /var/lib/rancher/rke2/bin/kubectl
+      --kubeconfig /etc/rancher/rke2/rke2.yaml
+      wait node/{{ item }}
+      --for=condition=Ready
+      --timeout=10s
+  register: rke2_control_plane_ready
+  changed_when: false
+  retries: 60
+  delay: 10
+  until: rke2_control_plane_ready.rc == 0
+  loop: "{{ groups[rke2_control_plane_group] }}"
+  when: inventory_hostname == rke2_initial_server
+
+- name: Wait for Cilium Gateway API controller
+  ansible.builtin.command:
+    cmd: >-
+      /var/lib/rancher/rke2/bin/kubectl
+      --kubeconfig /etc/rancher/rke2/rke2.yaml
+      wait gatewayclass/cilium
+      --for=condition=Accepted
+      --timeout=10s
+  register: rke2_gateway_class_ready
+  changed_when: false
+  retries: 60
+  delay: 10
+  until: rke2_gateway_class_ready.rc == 0
+  when: inventory_hostname == rke2_initial_server
+
+- name: Configure RKE2 agents
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: /etc/rancher/rke2/config.yaml
+    owner: root
+    group: root
+    mode: '0600'
+  register: rke2_agent_config
+  no_log: true
+  when: inventory_hostname in groups[rke2_agent_group]
+
+- name: Start RKE2 agents after control-plane quorum
+  ansible.builtin.systemd_service:
+    name: rke2-agent
+    enabled: true
+    state: "{{ 'restarted' if rke2_install.changed or rke2_agent_config.changed else 'started' }}"
+    daemon_reload: true
+  when: inventory_hostname in groups[rke2_agent_group]

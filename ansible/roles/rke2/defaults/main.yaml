@@ -1,0 +1,28 @@
+---
+rke2_version: v1.35.6+rke2r1
+rke2_install_script_url: "https://raw.githubusercontent.com/rancher/rke2/{{ rke2_version | urlencode }}/install.sh"
+rke2_install_script_checksum: 2d24db2184dd6b1a5e281fa45cc9a8234c889394721746f89b5fe953fdaaf40a
+rke2_gateway_api_version: v1.4.1
+rke2_gateway_api_manifest_url: "https://github.com/kubernetes-sigs/gateway-api/releases/download/{{ rke2_gateway_api_version }}/experimental-install.yaml"
+rke2_gateway_api_manifest_checksum: 553327e0ff32a1a2be446bf93823c8413cf9253ac6a6d5407eebd1e8d269f69e
+rke2_gateway_api_manifest_path: "/var/tmp/gateway-api-{{ rke2_gateway_api_version }}-experimental.yaml"
+
+rke2_control_plane_group: k8s_control_plane
+rke2_agent_group: k8s_node
+rke2_initial_server: "{{ groups[rke2_control_plane_group] | first }}"
+rke2_registration_host: "{{ hostvars[rke2_initial_server].rke2_tailscale_ip.stdout | trim }}"
+rke2_server_url: "https://{{ rke2_registration_host }}:9345"
+
+rke2_cilium_device: tailscale0
+rke2_cilium_mtu: 1230
+rke2_tls_sans: >-
+  {{
+    groups[rke2_control_plane_group]
+    | map('regex_replace', '$', '.' ~ tailscale_domain)
+    | list
+    + groups[rke2_control_plane_group]
+    | map('extract', hostvars)
+    | map(attribute='rke2_tailscale_ip.stdout')
+    | map('trim')
+    | list
+  }}
