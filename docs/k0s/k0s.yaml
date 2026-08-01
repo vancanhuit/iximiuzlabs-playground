@@ -79,12 +79,12 @@ spec:
         api:
           onlyBindToAddress: true
           sans:
-            - control-plane-01
-            - control-plane-02
-            - control-plane-03
-            - 100.99.78.51
-            - 100.80.157.98
-            - 100.110.188.59
+          - control-plane-01
+          - control-plane-02
+          - control-plane-03
+          - 100.99.78.51
+          - 100.80.157.98
+          - 100.110.188.59
         network:
           provider: custom
           podCIDR: 10.244.0.0/16
