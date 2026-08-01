@@ -60,6 +60,13 @@ spec:
           - 10.0.1.12
 """
 
+NOOP_CONFIG_YAML = (
+    CONFIG_YAML.replace("10.0.1.11", "100.64.0.11")
+    .replace("10.0.1.12", "100.64.0.12")
+    .replace("10.0.1.21", "100.64.0.21")
+    .replace("\n          - ", "\n            - ")
+)
+
 # Tailscale status fixture: Self + 2 peers
 STATUS = {
     "Self": {
@@ -253,6 +260,15 @@ class UpdateFileTests(unittest.TestCase):
         changes = update_file(config_path, STATUS, dry_run=True)
 
         self.assertEqual(len(changes), 3)
+        self.assertEqual(config_path.read_bytes(), original)
+
+    def test_noop_update_does_not_rewrite_yaml(self) -> None:
+        config_path = self.write_config(NOOP_CONFIG_YAML)
+        original = config_path.read_bytes()
+
+        changes = update_file(config_path, STATUS)
+
+        self.assertEqual(changes, [])
         self.assertEqual(config_path.read_bytes(), original)
 
     def test_validation_failure_does_not_write(self) -> None:

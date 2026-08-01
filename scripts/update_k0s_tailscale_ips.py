@@ -198,6 +198,7 @@ def update_document(document: dict[str, Any], addresses: dict[str, str]) -> list
             raise UpdateError(f"Invalid document: hosts[{idx}].ssh missing address")
 
         old_address = host["privateAddress"]
+        old_ssh_address = host["ssh"]["address"]
         role = host.get("role", "")
 
         host_validation.append(
@@ -205,6 +206,7 @@ def update_document(document: dict[str, Any], addresses: dict[str, str]) -> list
                 "idx": idx,
                 "hostname": hostname,
                 "old_address": old_address,
+                "old_ssh_address": old_ssh_address,
                 "role": role,
             }
         )
@@ -237,16 +239,21 @@ def update_document(document: dict[str, Any], addresses: dict[str, str]) -> list
     for controller in controllers:
         old_ip = controller["old_address"]
         new_ip = addresses[controller["hostname"]]
-        # We already validated each old_ip appears exactly once, so index() is safe
-        idx = sans.index(old_ip)
-        sans[idx] = new_ip
+        if old_ip != new_ip:
+            # We already validated each old_ip appears exactly once, so index() is safe
+            idx = sans.index(old_ip)
+            sans[idx] = new_ip
 
     # Update each host's addresses
     for host_info in host_validation:
         idx = host_info["idx"]
         hostname = host_info["hostname"]
         old_address = host_info["old_address"]
+        old_ssh_address = host_info["old_ssh_address"]
         new_address = addresses[hostname]
+
+        if old_address == new_address and old_ssh_address == new_address:
+            continue
 
         host = hosts[idx]
         host["privateAddress"] = new_address
@@ -334,8 +341,8 @@ def update_file(config_path: Path, status: dict[str, Any], dry_run: bool = False
     # Update document in-memory (validates document structure)
     changes = update_document(document, addresses)
 
-    # Return early for dry run
-    if dry_run:
+    # Return early for dry runs and no-op updates to preserve file formatting.
+    if dry_run or not changes:
         return changes
 
     # Atomic write: temp file -> fsync -> replace
