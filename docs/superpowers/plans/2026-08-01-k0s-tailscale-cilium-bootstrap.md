@@ -23,7 +23,7 @@
 ### Task 1: k0sctl Cluster Definition
 
 **Files:**
-- Modify: `k0s.yaml`
+- Modify: `docs/k0s/k0s.yaml`
 
 **Interfaces:**
 - Consumes: eight Tailscale host addresses and the cluster-wide CIDRs.
@@ -53,7 +53,7 @@ Set `spec.k0s.version` to `v1.36.3+k0s.0`. Under `spec.k0s.config.spec`, configu
 Run:
 
 ```bash
-rtk k0sctl apply --config k0s.yaml --dry-run
+rtk k0sctl apply --config docs/k0s/k0s.yaml --dry-run
 ```
 
 Expected: configuration loads without YAML/schema errors; k0sctl reaches host discovery without planning mutations.
@@ -63,7 +63,7 @@ Expected: configuration loads without YAML/schema errors; k0sctl reaches host di
 ### Task 2: Cilium Values
 
 **Files:**
-- Create: `cilium-values.yaml`
+- Create: `docs/k0s/cilium-values.yaml`
 
 **Interfaces:**
 - Consumes: k0s NLLB endpoint `127.0.0.1:7443`, pod CIDR `10.244.0.0/16`, and `tailscale0`.
@@ -86,7 +86,7 @@ rtk helm template cilium cilium \
   --repo https://helm.cilium.io \
   --version 1.20.0 \
   --namespace kube-system \
-  --values cilium-values.yaml
+  --values docs/k0s/cilium-values.yaml
 ```
 
 Expected: render succeeds with Cilium DaemonSet, standalone Envoy DaemonSet, operator Deployment, Hubble Relay, and Hubble UI resources.
@@ -98,8 +98,8 @@ If Helm is unavailable, use Cilium CLI dry-run against the values file and repor
 ### Task 3: Cross-Configuration Review
 
 **Files:**
-- Review: `k0s.yaml`
-- Review: `cilium-values.yaml`
+- Review: `docs/k0s/k0s.yaml`
+- Review: `docs/k0s/cilium-values.yaml`
 
 **Interfaces:**
 - Consumes: both completed YAML documents.
@@ -114,7 +114,7 @@ Confirm pod CIDRs match, kube-proxy is disabled in k0s and replaced in Cilium, C
 Run YAML diagnostics for both files, then review only relevant changes:
 
 ```bash
-rtk git diff -- k0s.yaml cilium-values.yaml
+rtk git diff -- docs/k0s/k0s.yaml docs/k0s/cilium-values.yaml
 ```
 
 Expected: only requested cluster and Cilium configuration; no secrets, unrelated edits, external API address, or HAProxy configuration.
@@ -124,11 +124,11 @@ Expected: only requested cluster and Cilium configuration; no secrets, unrelated
 Provide these commands without executing state-changing operations:
 
 ```bash
-k0sctl apply --config k0s.yaml
-k0sctl kubeconfig --config k0s.yaml > k0s-kubeconfig
+k0sctl apply --config docs/k0s/k0s.yaml
+k0sctl kubeconfig --config docs/k0s/k0s.yaml > k0s-kubeconfig
 kubectl --kubeconfig k0s-kubeconfig apply --server-side \
   -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.1/standard-install.yaml
 cilium install --version 1.20.0 \
   --kubeconfig k0s-kubeconfig \
-  --values cilium-values.yaml
+  --values docs/k0s/cilium-values.yaml
 ```

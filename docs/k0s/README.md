@@ -86,7 +86,7 @@ CGNAT range for node addresses.
 
 ## Why the configuration matters
 
-The cluster definition is [`k0s.yaml`](../../k0s.yaml). Every host sets both
+The cluster definition is [`k0s.yaml`](k0s.yaml). Every host sets both
 `privateAddress` and `privateInterface: tailscale0`, making Tailscale the address
 used by kubelet, etcd, and `k0sctl`-generated node settings.
 
@@ -119,7 +119,7 @@ available.
 Run a dry run before every first installation or material configuration change:
 
 ```bash
-k0sctl apply --config k0s.yaml --dry-run
+k0sctl apply --config docs/k0s/k0s.yaml --dry-run
 ```
 
 Confirm the generated controller configurations contain these node-specific
@@ -137,7 +137,7 @@ Controller and worker join validation must target `100.99.78.51`, not a
 ## 2. Bootstrap `k0s`
 
 ```bash
-k0sctl apply --config k0s.yaml
+k0sctl apply --config docs/k0s/k0s.yaml
 ```
 
 `spec.options.wait.enabled` is intentionally `false`. A custom CNI is configured
@@ -172,8 +172,8 @@ controller. Add `api.onlyBindToAddress: true`, then verify the fix with a dry ru
 `k0sctl` can reconcile the partial state on the next apply:
 
 ```bash
-k0sctl apply --config k0s.yaml --dry-run
-k0sctl apply --config k0s.yaml
+k0sctl apply --config docs/k0s/k0s.yaml --dry-run
+k0sctl apply --config docs/k0s/k0s.yaml
 ```
 
 Useful diagnostics:
@@ -198,7 +198,7 @@ if [[ -f ~/.kube/config ]]; then
 fi
 
 tmp_kubeconfig=$(mktemp)
-k0sctl kubeconfig --config k0s.yaml > "$tmp_kubeconfig"
+k0sctl kubeconfig --config docs/k0s/k0s.yaml > "$tmp_kubeconfig"
 install -m 600 "$tmp_kubeconfig" ~/.kube/config
 rm -f "$tmp_kubeconfig"
 chmod 600 ~/.kube/config.pre-k0s 2>/dev/null || true
@@ -235,7 +235,7 @@ kubectl wait --for=condition=Established --timeout=120s \
 
 ## 5. Install Cilium
 
-Cilium values are defined in [`cilium-values.yaml`](../../cilium-values.yaml).
+Cilium values are defined in [`cilium-values.yaml`](cilium-values.yaml).
 They configure:
 
 - full kube-proxy replacement
@@ -251,7 +251,7 @@ They configure:
 Install and wait for readiness:
 
 ```bash
-cilium install --version 1.20.0 --values cilium-values.yaml
+cilium install --version 1.20.0 --values docs/k0s/cilium-values.yaml
 cilium status --wait
 ```
 

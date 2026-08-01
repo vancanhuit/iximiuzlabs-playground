@@ -6,7 +6,7 @@ Bootstrap a Kubernetes v1.36.3 cluster across three dedicated control planes and
 
 ## Stage 1: k0s
 
-`k0s.yaml` is a k0sctl v1beta1 cluster definition. It connects as `root` over Tailscale SSH on port 22, without a key path, and pins each host's discovered Tailscale IPv4 address as its SSH and private address.
+`docs/k0s/k0s.yaml` is a k0sctl v1beta1 cluster definition. It connects as `root` over Tailscale SSH on port 22, without a key path, and pins each host's discovered Tailscale IPv4 address as its SSH and private address.
 
 The embedded k0s configuration uses:
 
@@ -23,7 +23,7 @@ No HAProxy, control-plane VIP, or k0s control-plane load balancer is configured.
 
 ## Stage 2: Gateway API and Cilium
 
-Install Gateway API standard-channel CRDs v1.6.1 first with server-side apply. Then install Cilium v1.20.0 using `cilium-values.yaml`.
+Install Gateway API standard-channel CRDs v1.6.1 first with server-side apply. Then install Cilium v1.20.0 using `docs/k0s/cilium-values.yaml`.
 
 Cilium uses:
 
@@ -41,13 +41,13 @@ Cilium Gateway host-network listeners bind all host interfaces by design. Tailsc
 ## Bootstrap Commands
 
 ```bash
-k0sctl apply --config k0s.yaml
-k0sctl kubeconfig --config k0s.yaml > k0s-kubeconfig
+k0sctl apply --config docs/k0s/k0s.yaml
+k0sctl kubeconfig --config docs/k0s/k0s.yaml > k0s-kubeconfig
 kubectl --kubeconfig k0s-kubeconfig apply --server-side \
   -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.1/standard-install.yaml
 cilium install --version 1.20.0 \
   --kubeconfig k0s-kubeconfig \
-  --values cilium-values.yaml
+  --values docs/k0s/cilium-values.yaml
 ```
 
 ## Validation
