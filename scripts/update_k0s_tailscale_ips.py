@@ -7,8 +7,17 @@
 
 """k0s Tailscale IP updater - pure transformation core."""
 
+import argparse
+import json
+import os
+import subprocess
+import sys
+import tempfile
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
+
+from ruamel.yaml import YAML
 
 
 class UpdateError(Exception):
@@ -246,3 +255,183 @@ def update_document(document: dict[str, Any], addresses: dict[str, str]) -> list
         changes.append(AddressChange(hostname=hostname, old_address=old_address, new_address=new_address))
 
     return changes
+
+
+def load_status() -> dict[str, Any]:
+    """
+    Load Tailscale status via subprocess.
+
+    Returns:
+        Parsed JSON status dict
+
+    Raises:
+        UpdateError: If tailscale command fails, times out, or returns invalid JSON
+    """
+    try:
+        result = subprocess.run(
+            ["tailscale", "status", "--json"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=15,
+            env={**os.environ, "TAILSCALE_BE_CLI": "1"},
+        )
+    except FileNotFoundError:
+        raise UpdateError("tailscale command not found")
+    except subprocess.TimeoutExpired:
+        raise UpdateError("tailscale command timed out after 15 seconds")
+    except subprocess.CalledProcessError as e:
+        raise UpdateError(f"tailscale command failed with exit code {e.returncode}")
+
+    try:
+        status = json.loads(result.stdout)
+    except json.JSONDecodeError as e:
+        raise UpdateError(f"Invalid JSON from tailscale: {e}")
+
+    if not isinstance(status, dict):
+        raise UpdateError("Expected JSON object from tailscale status")
+
+    return status
+
+
+def update_file(config_path: Path, status: dict[str, Any], dry_run: bool = False) -> list[AddressChange]:
+    """
+    Update k0sctl config file with Tailscale addresses.
+
+    Args:
+        config_path: Path to k0sctl YAML config
+        status: Tailscale status dict
+        dry_run: If True, validate and return changes without writing
+
+    Returns:
+        List of AddressChange records
+
+    Raises:
+        UpdateError: If validation fails or I/O error occurs
+    """
+    # Load YAML with quote preservation
+    yaml = YAML(typ="rt")
+    yaml.preserve_quotes = True
+
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            document = yaml.load(f)
+    except FileNotFoundError:
+        raise UpdateError(f"Config file not found: {config_path}")
+    except Exception as e:
+        raise UpdateError(f"Failed to load config: {e}")
+
+    # Extract all hostnames from document
+    try:
+        hosts = document["spec"]["hosts"]
+        hostnames = [host["hostname"] for host in hosts]
+    except (KeyError, TypeError, AttributeError):
+        raise UpdateError("Invalid document structure")
+
+    # Resolve addresses (validates all constraints)
+    addresses = resolve_addresses(status, hostnames)
+
+    # Update document in-memory (validates document structure)
+    changes = update_document(document, addresses)
+
+    # Return early for dry run
+    if dry_run:
+        return changes
+
+    # Atomic write: temp file -> fsync -> replace
+    original_mode = config_path.stat().st_mode
+
+    temp_fd = None
+    temp_path = None
+    try:
+        # Create temp file in same directory to ensure atomic rename
+        temp_fd, temp_name = tempfile.mkstemp(
+            dir=config_path.parent, prefix=".k0s-", suffix=".yaml.tmp"
+        )
+        temp_path = Path(temp_name)
+
+        # Write to temp file
+        with os.fdopen(temp_fd, "w", encoding="utf-8") as f:
+            temp_fd = None  # fdopen takes ownership
+            yaml.dump(document, f)
+            f.flush()
+            os.fsync(f.fileno())
+
+        # Restore original permissions
+        temp_path.chmod(original_mode)
+
+        # Atomic replace
+        os.replace(temp_path, config_path)
+        temp_path = None  # Successfully renamed
+
+    except Exception as e:
+        raise UpdateError(f"Failed to write config: {e}")
+    finally:
+        # Clean up temp file if it still exists
+        if temp_fd is not None:
+            try:
+                os.close(temp_fd)
+            except Exception:
+                pass
+        if temp_path is not None and temp_path.exists():
+            try:
+                temp_path.unlink()
+            except Exception:
+                pass
+
+    return changes
+
+
+def main(argv: list[str] | None = None) -> int:
+    """
+    CLI entry point.
+
+    Args:
+        argv: Command-line arguments (defaults to sys.argv[1:])
+
+    Returns:
+        Exit code: 0 for success, 1 for error
+    """
+    parser = argparse.ArgumentParser(
+        description="Update k0sctl config with Tailscale addresses"
+    )
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=Path(__file__).parent.parent / "docs" / "k0s" / "k0s.yaml",
+        help="k0sctl config (default: <repo>/docs/k0s/k0s.yaml)",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="print planned changes without writing",
+    )
+
+    args = parser.parse_args(argv)
+
+    try:
+        status = load_status()
+        changes = update_file(args.config, status, dry_run=args.dry_run)
+
+        # Print changes
+        for change in changes:
+            print(f"{change.hostname}: {change.old_address} -> {change.new_address}")
+
+        # Print summary
+        if args.dry_run:
+            print("Dry run: no files written")
+        elif changes:
+            print(f"Updated {args.config}")
+        else:
+            print("No address changes")
+
+        return 0
+
+    except UpdateError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+
