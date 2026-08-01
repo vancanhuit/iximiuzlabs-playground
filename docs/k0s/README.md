@@ -17,6 +17,10 @@ CNI.
 | `node-04` | `worker` | `100.102.150.26` |
 | `node-05` | `worker` | `100.108.18.99` |
 
+> **Note:** Tailscale assigns node IPs per tailnet, so the addresses above are
+> examples. The automated updater populates [`k0s.yaml`](k0s.yaml) with your
+> tailnet's operational addresses before bootstrap.
+
 Versions and networks:
 
 | Component | Value |
@@ -63,7 +67,9 @@ mise ls --local
 ```
 
 The control host and all cluster nodes must be connected to the same tailnet.
-Tailscale SSH must permit `root` access from the control host to every node:
+Every configured hostname must appear online in `tailscale status` before running
+the updater. Tailscale SSH must permit `root` access from the control host to
+every node:
 
 ```bash
 tailscale status
@@ -114,7 +120,21 @@ worker-local API endpoint at `127.0.0.1:7443`. NLLB makes in-cluster control-pla
 access resilient, but it does not make the kubeconfig endpoint externally highly
 available.
 
-## 1. Validate the `k0sctl` plan
+## 1. Update Tailscale node addresses
+
+Preview and apply the tailnet-specific addresses:
+
+```bash
+uv run scripts/update_k0s_tailscale_ips.py --dry-run
+uv run scripts/update_k0s_tailscale_ips.py
+```
+
+The command updates each host's `privateAddress` and `ssh.address` and the
+controller API certificate SANs in `docs/k0s/k0s.yaml`. It aborts without
+writing unless every configured node is online and has one unique Tailscale
+IPv4 address.
+
+## 2. Validate the `k0sctl` plan
 
 Run a dry run before every first installation or material configuration change:
 
@@ -134,7 +154,7 @@ control-plane-03: spec.api.address: 100.110.188.59
 Controller and worker join validation must target `100.99.78.51`, not a
 `172.16.0.x` address.
 
-## 2. Bootstrap `k0s`
+## 3. Bootstrap `k0s`
 
 ```bash
 k0sctl apply --config docs/k0s/k0s.yaml
@@ -185,7 +205,7 @@ ssh root@control-plane-01 \
   "ss -lntp | grep -E ':(2380|6443|9443)'"
 ```
 
-## 3. Configure local cluster access
+## 4. Configure local cluster access
 
 Back up an existing kubeconfig, fetch the `k0s` admin config, and secure both
 files:
@@ -217,7 +237,7 @@ The generated kubeconfig points to the first controller. If it is unavailable,
 change the kubeconfig server to another controller Tailscale IP. NLLB protects
 worker components, not clients running on the control host.
 
-## 4. Install Gateway API CRDs
+## 5. Install Gateway API CRDs
 
 Cilium Gateway API support requires the CRDs to exist before Cilium starts:
 
@@ -233,7 +253,7 @@ kubectl wait --for=condition=Established --timeout=120s \
   crd/referencegrants.gateway.networking.k8s.io
 ```
 
-## 5. Install Cilium
+## 6. Install Cilium
 
 Cilium values are defined in [`cilium-values.yaml`](cilium-values.yaml).
 They configure:
@@ -265,7 +285,7 @@ Hubble Relay:    OK (1/1)
 Hubble UI:       Ready (1/1)
 ```
 
-## 6. Verify the cluster
+## 7. Verify the cluster
 
 ```bash
 kubectl get nodes -o wide
