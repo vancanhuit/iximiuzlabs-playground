@@ -197,6 +197,12 @@ tailnet still requires the chosen Tailscale authentication workflow.
 
 Choose one cluster workflow. Do not run both against the same machines.
 
+> **Recommendation:** Use the `k0s` workflow for this lab. It is the fully
+> tested and reproducible path documented in this repository. `k0s` provides
+> more deployment flexibility here than the integrated RKE2 stack, while
+> `k0sctl` makes the multi-controller setup easier to reproduce than the manual
+> kubeadm workflow.
+
 ### `k0s` with Cilium
 
 Use the dedicated [`k0s` runbook](docs/k0s/README.md) for:
@@ -219,6 +225,10 @@ Workers remain `NotReady` until Cilium is installed. Continue through the full
 runbook before evaluating cluster health.
 
 ### Ansible and kubeadm
+
+> **Experimental:** The Ansible roles and kubeadm runbook are not fully tested.
+> Treat them as development references, not the supported deployment path for
+> this lab.
 
 Use the [Ansible runbook](ansible/README.md) for host preparation and the
 alternative kubeadm workflow:
