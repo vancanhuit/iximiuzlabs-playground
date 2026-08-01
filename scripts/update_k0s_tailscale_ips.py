@@ -79,7 +79,7 @@ def resolve_addresses(status: dict[str, Any], hostnames: list[str]) -> dict[str,
         ipv4_addresses = [
             ip
             for ip in tailscale_ips
-            if "." in ip and ip.startswith("100.")  # Simple check for 100.64.0.0/10
+            if "." in ip and ip.startswith("100.")  # Preliminary filter; precise CGNAT check below
         ]
 
         if not ipv4_addresses:
@@ -439,4 +439,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

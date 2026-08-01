@@ -129,10 +129,10 @@ uv run scripts/update_k0s_tailscale_ips.py --dry-run
 uv run scripts/update_k0s_tailscale_ips.py
 ```
 
-The command updates each host's `privateAddress` and `ssh.address` and the
-controller API certificate SANs in `docs/k0s/k0s.yaml`. It aborts without
-writing unless every configured node is online and has one unique Tailscale
-IPv4 address.
+The updater script defaults to `docs/k0s/k0s.yaml` when `--config` is omitted.
+It updates each host's `privateAddress` and `ssh.address` and the controller
+API certificate SANs. It aborts without writing unless every configured node
+is online and has one unique Tailscale IPv4 address.
 
 ## 2. Validate the `k0sctl` plan
 
