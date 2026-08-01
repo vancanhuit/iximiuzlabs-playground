@@ -1,9 +1,0 @@
-- name: Configure HAProxy load balancer for Kubernetes Control Plane
-  hosts: k8s_control_plane_lb
-  become: true
-  become_user: root
-  remote_user: laborant
-
-  roles:
-    - common
-    - haproxy_k8s_control_plane

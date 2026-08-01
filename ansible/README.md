@@ -3,8 +3,6 @@
 ## Kubernetes
 
 ```sh
-# HAProxy load balancer for control-plane nodes
-ansible-playbook haproxy_k8s_control_plane.yaml
 # Configure Kubernetes nodes before running kubeadm init/join
 ansible-playbook k8s.yaml
 ```

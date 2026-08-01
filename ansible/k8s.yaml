@@ -1,4 +1,4 @@
-- name: Provision Debian nodes for Kubernetes cluster installation
+- name: Deploy RKE2 cluster
   hosts: k8s
   any_errors_fatal: true
   become: true
@@ -6,5 +6,4 @@
   remote_user: laborant
 
   roles:
-    - common
     - rke2
