@@ -1,9 +1,4 @@
-#!/usr/bin/env -S uv run --script
-#
-# /// script
-# requires-python = ">=3.12"
-# dependencies = ["ruamel.yaml==0.19.0"]
-# ///
+#!/usr/bin/env -S uv run
 
 """k0s Tailscale IP updater - pure transformation core."""
 
