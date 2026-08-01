@@ -2,6 +2,7 @@
 
 import unittest
 from ruamel.yaml import YAML
+from ruamel.yaml.comments import CommentedSeq
 
 from scripts.update_k0s_tailscale_ips import (
     resolve_addresses,
@@ -93,6 +94,36 @@ class UpdateDocumentTests(unittest.TestCase):
             ["control-plane-01", "control-plane-02", "api.example.test", "100.64.0.11", "100.64.0.12"],
         )
         self.assertEqual(len(changes), 3)
+
+    def test_preserves_sans_commentedseq_object_identity(self) -> None:
+        """Verify that update_document mutates the original CommentedSeq in place, preserving object identity and metadata."""
+        document = YAML().load(CONFIG_YAML)
+        addresses = resolve_addresses(STATUS, ["control-plane-01", "control-plane-02", "node-01"])
+
+        # Capture the original sans object reference and type
+        sans_before = document["spec"]["k0s"]["config"]["spec"]["api"]["sans"]
+        sans_id_before = id(sans_before)
+
+        # Verify it's a CommentedSeq before mutation
+        self.assertIsInstance(sans_before, CommentedSeq)
+
+        update_document(document, addresses)
+
+        # Capture the sans object after mutation
+        sans_after = document["spec"]["k0s"]["config"]["spec"]["api"]["sans"]
+        sans_id_after = id(sans_after)
+
+        # Assert object identity preserved (same object, mutated in place)
+        self.assertEqual(sans_id_before, sans_id_after, "SAN list object identity must be preserved")
+
+        # Assert CommentedSeq type preserved
+        self.assertIsInstance(sans_after, CommentedSeq, "SAN list must remain a CommentedSeq")
+
+        # Verify content updated correctly
+        self.assertEqual(
+            list(sans_after),
+            ["control-plane-01", "control-plane-02", "api.example.test", "100.64.0.11", "100.64.0.12"],
+        )
 
 
 if __name__ == "__main__":

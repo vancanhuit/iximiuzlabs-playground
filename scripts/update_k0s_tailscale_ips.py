@@ -224,16 +224,13 @@ def update_document(document: dict[str, Any], addresses: dict[str, str]) -> list
     # Phase 2: Mutation (all validations passed)
     changes = []
 
-    # Update SANs: replace old controller IPs with new ones
-    new_sans = list(sans)  # Copy to mutate
+    # Update SANs: replace old controller IPs with new ones (mutate in place to preserve CommentedSeq metadata)
     for controller in controllers:
         old_ip = controller["old_address"]
         new_ip = addresses[controller["hostname"]]
-        if old_ip in new_sans:
-            idx = new_sans.index(old_ip)
-            new_sans[idx] = new_ip
-
-    document["spec"]["k0s"]["config"]["spec"]["api"]["sans"] = new_sans
+        # We already validated each old_ip appears exactly once, so index() is safe
+        idx = sans.index(old_ip)
+        sans[idx] = new_ip
 
     # Update each host's addresses
     for host_info in host_validation:
