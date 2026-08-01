@@ -66,6 +66,17 @@ mise install
 mise ls --local
 ```
 
+Prepare the updater environment and verify the test suite:
+
+```bash
+uv sync --locked
+uv run --locked python -m unittest scripts/test_update_k0s_tailscale_ips.py -v
+```
+
+The `uv sync --locked` command creates the repository-local `.venv` from
+`pyproject.toml` and `uv.lock`. The test command runs all 12 unit tests against
+the updater logic.
+
 The control host and all cluster nodes must be connected to the same tailnet.
 Every configured hostname must appear online in `tailscale status` before running
 the updater. Tailscale SSH must permit `root` access from the control host to
