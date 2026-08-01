@@ -72,10 +72,10 @@ tailnet. It covers:
 The k0s runbook instructs users to run:
 
 ```bash
-uv sync
-uv run python -m unittest scripts/test_update_k0s_tailscale_ips.py -v
-uv run scripts/update_k0s_tailscale_ips.py --dry-run
-uv run scripts/update_k0s_tailscale_ips.py
+uv sync --locked
+uv run --locked python -m unittest scripts/test_update_k0s_tailscale_ips.py -v
+uv run --locked scripts/update_k0s_tailscale_ips.py --dry-run
+uv run --locked scripts/update_k0s_tailscale_ips.py
 k0sctl apply --config docs/k0s/k0s.yaml --dry-run
 ```
 

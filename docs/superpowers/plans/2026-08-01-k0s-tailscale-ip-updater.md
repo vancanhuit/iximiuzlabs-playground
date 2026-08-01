@@ -1,5 +1,7 @@
 # k0s Tailscale IP Updater Implementation Plan
 
+> **SUPERSEDED:** Environment setup and test execution paths in this plan are superseded by `2026-08-01-k0s-updater-uv-project.md`, which migrated from PEP 723 inline dependencies to a uv project with lockfile. The historical implementation plan is retained below for reference.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a `uv`-runnable Python utility that discovers every configured node's current Tailscale IPv4 address and safely updates the k0sctl YAML.
