@@ -1,0 +1,43 @@
+cluster:
+  name: tailscale-k0s
+
+kubeProxyReplacement: true
+
+# Host-networked Cilium components reach k0s NLLB through this worker-local endpoint.
+k8sServiceHost: "127.0.0.1"
+k8sServicePort: "7443"
+
+devices:
+  - tailscale0
+
+routingMode: tunnel
+tunnelProtocol: vxlan
+
+ipam:
+  mode: cluster-pool
+  operator:
+    clusterPoolIPv4PodCIDRList:
+      - 10.244.0.0/16
+    clusterPoolIPv4MaskSize: 24
+
+operator:
+  replicas: 2
+
+envoy:
+  enabled: true
+
+gatewayAPI:
+  enabled: true
+  gatewayClass:
+    create: true
+  hostNetwork:
+    enabled: true
+    nodes:
+      matchLabels: {}
+
+hubble:
+  enabled: true
+  relay:
+    enabled: true
+  ui:
+    enabled: true

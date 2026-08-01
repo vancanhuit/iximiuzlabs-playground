@@ -1,0 +1,99 @@
+apiVersion: k0sctl.k0sproject.io/v1beta1
+kind: Cluster
+metadata:
+  name: tailscale-k0s
+spec:
+  hosts:
+  - hostname: control-plane-01
+    privateAddress: 100.99.78.51
+    privateInterface: tailscale0
+    role: controller
+    ssh:
+      address: 100.99.78.51
+      user: root
+      port: 22
+  - hostname: control-plane-02
+    privateAddress: 100.80.157.98
+    privateInterface: tailscale0
+    role: controller
+    ssh:
+      address: 100.80.157.98
+      user: root
+      port: 22
+  - hostname: control-plane-03
+    privateAddress: 100.110.188.59
+    privateInterface: tailscale0
+    role: controller
+    ssh:
+      address: 100.110.188.59
+      user: root
+      port: 22
+  - hostname: node-01
+    privateAddress: 100.100.187.71
+    privateInterface: tailscale0
+    role: worker
+    ssh:
+      address: 100.100.187.71
+      user: root
+      port: 22
+  - hostname: node-02
+    privateAddress: 100.124.198.50
+    privateInterface: tailscale0
+    role: worker
+    ssh:
+      address: 100.124.198.50
+      user: root
+      port: 22
+  - hostname: node-03
+    privateAddress: 100.114.226.97
+    privateInterface: tailscale0
+    role: worker
+    ssh:
+      address: 100.114.226.97
+      user: root
+      port: 22
+  - hostname: node-04
+    privateAddress: 100.102.150.26
+    privateInterface: tailscale0
+    role: worker
+    ssh:
+      address: 100.102.150.26
+      user: root
+      port: 22
+  - hostname: node-05
+    privateAddress: 100.108.18.99
+    privateInterface: tailscale0
+    role: worker
+    ssh:
+      address: 100.108.18.99
+      user: root
+      port: 22
+  k0s:
+    version: v1.36.3+k0s.0
+    config:
+      apiVersion: k0s.k0sproject.io/v1beta1
+      kind: ClusterConfig
+      metadata:
+        name: tailscale-k0s
+      spec:
+        api:
+          onlyBindToAddress: true
+          sans:
+            - control-plane-01
+            - control-plane-02
+            - control-plane-03
+            - 100.99.78.51
+            - 100.80.157.98
+            - 100.110.188.59
+        network:
+          provider: custom
+          podCIDR: 10.244.0.0/16
+          serviceCIDR: 10.96.0.0/12
+          kubeProxy:
+            disabled: true
+          nodeLocalLoadBalancing:
+            enabled: true
+            type: EnvoyProxy
+  options:
+    wait:
+      enabled: false

@@ -5,13 +5,15 @@ disable_backends = ["asdf", "vfox"]
 
 [tools]
 python = "3.14.6"
-uv = { version = "0.11.32", depends = ["python"] }
+uv = { version = "0.12.0", depends = ["python"] }
 "pipx:ansible" = { version = "14.2.0", depends = [
   "uv",
 ], "uvx_args" = '--with-executables-from ansible-core,ansible-lint' }
 kubectl = "1.36.3"
-cilium-cli = "0.19.6"
-gh = '2.96.0'
+cilium-cli = "0.19.7"
+gh = "2.97.0"
+k0sctl = "0.32.2"
+helm = "4.2.3"
 
 [tasks."docker:build:trixie-base"]
 description = "Build the base image for trixie"
