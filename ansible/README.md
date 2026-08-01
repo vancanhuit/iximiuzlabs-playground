@@ -15,7 +15,7 @@ sudo kubeadm init \
     --skip-phases addon/kube-proxy \
     --upload-certs
 
-# On control-plane-01 and control-plane-02
+# On control-plane-02 and control-plane-03
 # Join command is shown in the output of the previous command, for example:
 sudo kubeadm join <endpoint> \
     --apiserver-advertise-address $(tailscale ip -4) \
@@ -24,7 +24,7 @@ sudo kubeadm join <endpoint> \
     --control-plane \
     --certificate-key <certificate-key>
 
-# On node-01, node-02, and node-03
+# On node-01, node-02, node-03, node-04, and node-05
 # Join command is shown in the output of the previous command, for example:
 sudo kubeadm join <endpoint> \
     --token <token> \
@@ -53,7 +53,7 @@ cilium install \
     --set 'envoy.securityContext.capabilities.envoy[2]=SYS_ADMIN'
 
 cilium status
-cilium hubble enable
+cilium hubble enable --ui
 ```
 
 **References:**
