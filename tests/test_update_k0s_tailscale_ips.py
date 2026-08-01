@@ -207,6 +207,28 @@ class ResolveAddressesValidationTests(unittest.TestCase):
             resolve_addresses(status_multi_ip, ["multi-ip"])
         self.assertIn("multi-ip", str(ctx.exception))
 
+    def test_reused_address_raises_error(self) -> None:
+        """Two different configured hosts sharing same Tailscale IP should raise UpdateError."""
+        status_reused_ip = {
+            "Self": {
+                "HostName": "host-a",
+                "DNSName": "host-a.example.ts.net.",
+                "TailscaleIPs": ["100.64.0.50"],
+            },
+            "Peer": {
+                "peer-b": {
+                    "HostName": "host-b",
+                    "DNSName": "host-b.example.ts.net.",
+                    "TailscaleIPs": ["100.64.0.50"],  # Same IP as host-a
+                    "Online": True,
+                }
+            },
+        }
+        with self.assertRaises(UpdateError) as ctx:
+            resolve_addresses(status_reused_ip, ["host-a", "host-b"])
+        # Error message should mention the reused address
+        self.assertIn("100.64.0.50", str(ctx.exception))
+
 
 class UpdateFileTests(unittest.TestCase):
     """Test file I/O and atomic write behavior."""

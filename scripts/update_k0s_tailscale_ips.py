@@ -121,16 +121,21 @@ def resolve_addresses(status: dict[str, Any], hostnames: list[str]) -> dict[str,
             if alias not in ip_to_hostnames[ip]:
                 ip_to_hostnames[ip].append(alias)
 
-    # Check for reused IPs (same IP for different hostname aliases)
-    for ip, aliases in ip_to_hostnames.items():
-        # If multiple different base hostnames share the same IP, that's a problem
-        # But DNS aliases of the same host are fine
-        unique_hosts = set(aliases)
-        if len(unique_hosts) > 1:
-            # Need to verify they're actually different hosts, not just aliases
-            # For now, if we see the same IP mapped to multiple different names, reject
-            # This is conservative but safe
-            pass  # Allow for now, as DNS label and HostName might differ
+    # Check for reused IPs (same IP for different configured hostnames)
+    # Build reverse mapping: IP -> list of configured hostnames that resolve to it
+    ip_to_configured_hosts: dict[str, list[str]] = {}
+    for hostname in hostnames:
+        if hostname in hostname_to_ip:
+            ip = hostname_to_ip[hostname]
+            if ip not in ip_to_configured_hosts:
+                ip_to_configured_hosts[ip] = []
+            ip_to_configured_hosts[ip].append(hostname)
+
+    # Reject if any IP is used by multiple configured hostnames
+    for ip, configured_hosts in ip_to_configured_hosts.items():
+        if len(configured_hosts) > 1:
+            hosts_str = ", ".join(sorted(configured_hosts))
+            raise UpdateError(f"Reused address {ip} for multiple configured hosts: {hosts_str}")
 
     # Verify all requested hostnames are available
     result = {}
