@@ -5,7 +5,7 @@ disable_backends = ["asdf", "vfox"]
 
 [tools]
 python = "3.14.6"
-uv = { version = "0.12.0", depends = ["python"] }
+uv = { version = "0.12.1", depends = ["python"] }
 "pipx:ansible" = { version = "14.2.0", depends = [
   "uv",
 ], "uvx_args" = '--with-executables-from ansible-core,ansible-lint' }
