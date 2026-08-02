@@ -28,6 +28,56 @@ CNI.
 > examples. The automated updater populates [`k0s.yaml`](k0s.yaml) with your
 > tailnet's operational addresses before bootstrap.
 
+### Physical and network topology
+
+```mermaid
+flowchart TB
+  Admin["Control host and tailnet clients"]
+  Internet["Internet<br/>Tailscale coordination and DERP"]
+
+  subgraph Tailnet["Tailscale tailnet - node underlay (100.64.0.0/10)"]
+    direction TB
+    TS["tailscale0 mesh"]
+
+    subgraph Controllers["3 controller-only hosts"]
+      CP["control-plane-01 .. 03<br/>k0s API + etcd + konnectivity"]
+    end
+
+    subgraph Workers["5 worker hosts / Kubernetes Nodes"]
+      W["node-01 .. 05<br/>kubelet + k0s NLLB + Cilium + workloads"]
+      SVC["Service VIPs<br/>10.96.0.0/12"]
+      POD["Cilium Pod overlay<br/>10.244.0.0/16<br/>one /24 per worker"]
+      ETH["eth0<br/>public egress"]
+
+      W --- SVC
+      W --- POD
+      SVC -->|"Cilium BPF load balancing"| POD
+      POD -->|"masqueraded egress"| ETH
+    end
+
+    CP --- TS
+    W --- TS
+    POD -. "VXLAN UDP 8472 over tailscale0" .-> TS
+  end
+
+  Admin -->|"Tailscale SSH and Kubernetes API"| TS
+  ETH --> Internet
+```
+
+The diagram separates two network layers that share each worker. Tailscale is
+the **node underlay**: the `100.x` addresses belong to hosts, and k0s uses them
+for SSH, controller joins, etcd, kubelet registration, and Kubernetes API
+traffic. Cilium is the **Pod overlay**: it allocates a `/24` per worker from
+`10.244.0.0/16` and encapsulates cross-node Pod packets in VXLAN carried by
+`tailscale0`. Service addresses from `10.96.0.0/12` are virtual addresses that
+Cilium translates to Pod endpoints; they are not assigned to an interface.
+
+Workers also need ordinary Internet egress for image pulls, Tailscale
+coordination, and DERP. `tailscale0` remains Cilium's direct-routing device,
+while `forceDeviceDetection: true` attaches the Cilium datapath to both
+`tailscale0` and `eth0`. That lets Cilium masquerade Pod traffic leaving through
+`eth0`; restricting attachment to `tailscale0` alone breaks public Pod egress.
+
 Versions and networks:
 
 | Component | Value |
@@ -43,6 +93,7 @@ Versions and networks:
 | cert-manager chart | `v1.21.1` |
 | ExternalDNS chart / app | `1.21.1` / `v0.21.0` |
 | Echo Server image | `ealen/echo-server:0.9.2` |
+| nginx image | `nginxinc/nginx-unprivileged:1.29.1-alpine` |
 | Pod CIDR | `10.244.0.0/16` |
 | Service CIDR | `10.96.0.0/12` |
 | Node interface | `tailscale0` |
@@ -87,7 +138,7 @@ uv run --locked python -m unittest scripts/test_update_k0s_tailscale_ips.py -v
 ```
 
 The `uv sync --locked` command creates the repository-local `.venv` from
-`pyproject.toml` and `uv.lock`. The test command runs all 12 unit tests against
+`pyproject.toml` and `uv.lock`. The test command runs all 13 unit tests against
 the updater logic.
 
 The control host and all cluster nodes must be connected to the same tailnet.
@@ -144,6 +195,64 @@ balancer.
 worker-local API endpoint at `127.0.0.1:7443`. NLLB makes in-cluster control-plane
 access resilient, but it does not make the kubeconfig endpoint externally highly
 available.
+
+### Kubernetes API access and availability
+
+```mermaid
+flowchart TB
+  Admin["Administrator<br/>on the tailnet"]
+  Components["Worker components<br/>kubelet and system clients"]
+
+  subgraph Tailnet["Tailscale access paths"]
+    Direct["First controller Tailscale IP<br/>TCP 6443"]
+    TSAPI["tailscale-k0s-api<br/>Tailscale Service HTTPS"]
+  end
+
+  subgraph Cluster["Kubernetes cluster"]
+    subgraph Proxies["ProxyGroup/tailscale-k0s-api"]
+      direction LR
+      P0["proxy replica 0"]
+      P1["proxy replica 1"]
+    end
+
+    KubeService["Service/kubernetes<br/>TCP 443"]
+    NLLB["worker-local k0s NLLB<br/>127.0.0.1:7443"]
+    APIS["3 x k0s API server<br/>controller hosts :6443"]
+    RBAC["Kubernetes authentication,<br/>impersonation, and RBAC"]
+    ETCD["3-member etcd cluster<br/>client :2379, peers :2380"]
+  end
+
+  Admin -->|"break-glass context<br/>client certificate"| Direct
+  Direct --> APIS
+  Admin -->|"normal path<br/>Tailscale identity"| TSAPI
+  TSAPI -->|"available replica"| P0
+  TSAPI -->|"available replica"| P1
+  P0 -->|"impersonate Tailscale login"| KubeService
+  P1 -->|"impersonate Tailscale login"| KubeService
+  KubeService -->|"Cilium Service routing"| APIS
+  APIS --> RBAC
+  Components --> NLLB
+  NLLB -->|"healthy controller"| APIS
+  APIS <-->|"etcd client traffic :2379"| ETCD
+```
+
+There are three deliberately different API paths. The generated direct
+kubeconfig targets the first controller and uses its Tailscale address; it is
+the recovery path when operator-managed proxy Pods or cluster networking are
+unavailable. An operator can manually point that context at either remaining
+controller because all three addresses are API certificate SANs.
+
+The normal remote-administration path uses the two-replica API `ProxyGroup`.
+Tailscale authenticates the caller, each proxy forwards the login as a
+Kubernetes impersonated user, and the API server applies Kubernetes RBAC. A
+single proxy replica can restart without losing the endpoint, but both replicas
+still depend on the cluster being able to schedule Pods and route to the
+`kubernetes` Service.
+
+Worker components use neither client path. They connect to the local NLLB
+listener, which selects a healthy controller and isolates them from one
+controller outage. NLLB does not provide an HA endpoint to the control host or
+other tailnet clients.
 
 ## 1. Update Tailscale node addresses
 
@@ -278,6 +387,11 @@ kubectl wait --for=condition=Established --timeout=120s \
   crd/referencegrants.gateway.networking.k8s.io
 ```
 
+This capability remains installed in the live cluster because
+`gatewayAPI.enabled: true` creates the default `cilium` GatewayClass. The Echo
+ingress described below does not create a `Gateway`, `HTTPRoute`, or Cilium
+Envoy configuration.
+
 ## 6. Install Cilium
 
 Cilium values are defined in [`cilium-values.yaml`](cilium-values.yaml).
@@ -292,7 +406,7 @@ They configure:
   proxy Pods to use the packet-level Kubernetes Service path
 - two Cilium operator replicas
 - a separate Envoy DaemonSet
-- Gateway API LoadBalancer Service mode
+- Gateway API and the default `cilium` GatewayClass, retained but unused by Echo
 - Hubble, Hubble Relay, and Hubble UI
 
 Install and wait for readiness:
@@ -361,8 +475,66 @@ kubectl get namespaces | grep cilium-test || true
 ## 8. Install the Tailscale Kubernetes Operator
 
 The remaining steps add a Tailscale-managed Kubernetes API endpoint and expose
-Cilium Gateways through Tailscale LoadBalancer Services. They retain the direct
-controller kubeconfig as a break-glass path.
+application workloads through Tailscale LoadBalancer Services. They retain the
+direct controller kubeconfig as a break-glass path.
+
+### Operator control and reconciliation
+
+```mermaid
+flowchart TB
+  subgraph Kubernetes["Kubernetes API resources and reconcilers"]
+    subgraph Declared["User-declared resources"]
+      PG["ProxyGroup/tailscale-k0s-api<br/>replicas: 2, mode: auth"]
+      LB["Service/echo-tailscale<br/>loadBalancerClass: tailscale"]
+    end
+
+    OP["Tailscale operator<br/>tag:k8s-operator"]
+    Cilium["Cilium agents<br/>BPF L4 Service datapath"]
+
+    subgraph Generated["Operator-generated workloads and state"]
+      APIProxies["API proxy StatefulSet<br/>2 proxy Pods"]
+      AppProxy["Application proxy StatefulSet<br/>standalone proxy Pod"]
+      State["Per-proxy state Secrets"]
+    end
+  end
+
+  Control["Tailscale control plane<br/>devices, Services, and auth keys"]
+  APIEndpoint["Tailscale Service tailscale-k0s-api<br/>2 backing proxy devices<br/>tag:k8s"]
+  AppEndpoint["Tailscale device echo-web<br/>standalone proxy<br/>tag:k8s"]
+
+  PG -. "watch" .-> OP
+  LB -. "watch" .-> OP
+  OP -->|"scoped OAuth client"| Control
+  OP -. "create and reconcile" .-> APIProxies
+  OP -. "create and reconcile" .-> AppProxy
+  OP -. "persist proxy state" .-> State
+  APIProxies <-->|"register and serve"| APIEndpoint
+  AppProxy <-->|"register and serve"| AppEndpoint
+  APIEndpoint <-->|"tailnet coordination"| Control
+  AppEndpoint <-->|"tailnet coordination"| Control
+  LB -. "observed with EndpointSlices" .-> Cilium
+```
+
+The operator is a **reconciler**, not an application traffic hop. It watches
+the user-declared `ProxyGroup` and `LoadBalancer` Service, creates their proxy
+workloads and state Secrets, and uses its scoped OAuth client to request auth
+keys and manage tailnet devices and Services. The operator device carries
+`tag:k8s-operator`; managed proxy identities carry `tag:k8s`, so ACLs can grant
+proxy access without granting the operator device the same data-plane access.
+
+`ProxyGroup/tailscale-k0s-api` produces a two-replica API proxy StatefulSet.
+`Service/echo-tailscale` produces a separate, generated proxy StatefulSet for
+the tailnet device `echo-web`. Generated workload names can contain
+operator-assigned suffixes and are not stable interfaces. Those proxy Pods join
+the tailnet and carry traffic; the operator Pod can restart without being in an
+established client connection's forwarding path. Cilium does not create either
+tailnet endpoint. Its agents observe Service and EndpointSlice state and program
+their own BPF frontend and backend selection after traffic enters the cluster.
+
+There are two secret boundaries. The pre-created `operator-oauth` Secret gives
+the operator its Tailscale API credentials, while operator-generated Secrets
+hold individual proxy state. SOPS protects the user-supplied OAuth values in
+Git, but Kubernetes and etcd must still protect the live Secret objects.
 
 ### Prepare the encrypted lab configuration
 
@@ -774,6 +946,10 @@ helm upgrade --install cert-manager \
 kubectl -n cert-manager get deployments,pods
 ```
 
+Gateway API support matches the retained live Cilium capability. The Echo
+application uses a standalone `Certificate`, so its certificate issuance does
+not depend on a Gateway listener.
+
 Load the cert-manager Cloudflare token into an unexported shell variable and
 create its Kubernetes Secret without placing it in a command argument or
 plaintext file:
@@ -938,6 +1114,10 @@ YAML
 )
 ```
 
+The `gateway-httproute` source matches the retained live Gateway capability but
+currently has no application routes to reconcile. The Echo A and TXT records
+come from the `service` source and annotations on `Service/echo-tailscale`.
+
 ## 13. Use a Tailscale L4 Service for application ingress
 
 Do not place the Tailscale proxy Pod behind Cilium's Gateway L7 service. Cilium
@@ -949,6 +1129,68 @@ regular `LoadBalancer` Service with `loadBalancerClass: tailscale`. This keeps
 the application tailnet-only while bypassing Cilium's L7 TPROXY path. Cilium
 continues to provide CNI, kube-proxy replacement, and ordinary L4 Service
 routing.
+
+### Application request and controller flows
+
+```mermaid
+flowchart TB
+  Client["Authorized tailnet client"]
+  DNS["Cloudflare authoritative DNS<br/>DNS-only A from Service status"]
+  Resolved["Operator-assigned tailnet VIP<br/>currently 100.68.21.84"]
+  Proxy["Tailscale device echo-web<br/>generated proxy Pod"]
+  LB["Service/echo-tailscale<br/>TCP 443"]
+  Nginx["2 x echo-tailscale-nginx<br/>TCP 8443, TLS termination"]
+  Backend["Service/echoserver<br/>HTTP 80"]
+  Echo0["Echo Pod 0"]
+  Echo1["Echo Pod 1"]
+
+  Client -->|"1. resolve echo.lab.canhdinh.com"| DNS
+  DNS -->|"2. return A record"| Resolved
+  Resolved -->|"3. client opens HTTPS inside Tailscale"| Proxy
+  Proxy -->|"4. forward TCP 443"| LB
+  LB -->|"5. Cilium L4 routing"| Nginx
+  Nginx -->|"6. proxy HTTP"| Backend
+  Backend --> Echo0
+  Backend --> Echo1
+
+  OP["Tailscale operator"]
+  ExtDNS["ExternalDNS"]
+  Cert["Certificate/echo-tailscale-tls"]
+  CM["cert-manager"]
+  LE["Let's Encrypt ACME"]
+  Secret["Secret/echo-tailscale-tls"]
+
+  LB -. "watch" .-> OP
+  OP -. "reconcile echo-web" .-> Proxy
+  LB -. "watch status and annotations" .-> ExtDNS
+  ExtDNS -. "sync A and ownership TXT" .-> DNS
+  Cert -. "watch" .-> CM
+  CM <-. "ACME DNS-01 validation" .-> LE
+  CM -. "create temporary TXT" .-> DNS
+  CM -. "write issued keypair" .-> Secret
+  Secret -. "read-only volume" .-> Nginx
+```
+
+Solid arrows are the request path; dotted arrows are controller reconciliation.
+Cloudflare answers a public DNS query but never proxies the HTTP connection.
+The live Service currently reports `100.68.21.84`, but that operator-assigned
+VIP is status, not static configuration, and can change if the managed endpoint
+is recreated. Any returned address remains reachable only through Tailscale,
+where tailnet ACLs authenticate and authorize the client. Tailscale terminates
+its tunnel at the `echo-web` device, but the inner HTTPS stream remains encrypted
+until nginx terminates application TLS on port `8443`.
+
+ExternalDNS publishes the address reported on `Service/echo-tailscale` and owns
+the corresponding A and TXT records. Independently, cert-manager completes an
+ACME DNS-01 challenge through Cloudflare and writes the issued certificate to
+`Secret/echo-tailscale-tls`, which both nginx replicas mount read-only. DNS-01
+therefore needs public DNS authority, not public reachability to the service.
+
+Cilium performs ordinary L4 Service translation twice: first from
+`echo-tailscale:443` to an nginx endpoint, then from `echoserver:80` to an Echo
+Pod. `Gateway`, `HTTPRoute`, and Cilium Envoy TPROXY resources are deliberately
+absent from this request path because the Cilium 1.20 Gateway path failed in
+this Tailscale-backed topology.
 
 ## 14. Deploy Echo Server at `echo.lab.canhdinh.com`
 
@@ -1276,16 +1518,13 @@ SANs when applicable, and any Tailscale ACL grants before applying `k0sctl` agai
 - [`k0s` node-local load balancing](https://docs.k0sproject.io/stable/nllb/)
 - [Cilium kube-proxy replacement](https://docs.cilium.io/en/stable/network/kubernetes/kubeproxy-free/)
 - [Cilium Gateway API](https://docs.cilium.io/en/stable/network/servicemesh/gateway-api/)
-- [Cilium parameterized GatewayClass](https://docs.cilium.io/en/stable/network/servicemesh/gateway-api/parameterized-gatewayclass/)
 - [Cilium Hubble](https://docs.cilium.io/en/stable/observability/hubble/)
 - [Cilium cluster-pool IPAM](https://docs.cilium.io/en/stable/network/kubernetes/ipam-cluster-pool/)
 - [Cilium connectivity test command](https://docs.cilium.io/en/latest/cmdref/cilium_connectivity_test/)
 - [Gateway API installation](https://gateway-api.sigs.k8s.io/guides/getting-started/introduction/)
 - [Tailscale Kubernetes Operator installation](https://tailscale.com/docs/kubernetes-operator/install-operator)
 - [Tailscale Kubernetes API access](https://tailscale.com/docs/kubernetes-operator/api-server-access/setup-api-over-tailscale)
-- [Tailscale custom domains with Gateway API](https://tailscale.com/docs/solutions/kubernetes-operator-byod-gateway-api)
 - [Tailscale Cilium compatibility](https://tailscale.com/docs/kubernetes-operator/reference/compatibility)
-- [cert-manager Gateway support](https://cert-manager.io/docs/usage/gateway/)
 - [cert-manager Cloudflare DNS-01](https://cert-manager.io/docs/configuration/acme/dns01/cloudflare/)
 - [ExternalDNS Cloudflare provider](https://kubernetes-sigs.github.io/external-dns/latest/docs/tutorials/cloudflare/)
 - [Echo Server Kubernetes quick start](https://ealenn.github.io/Echo-Server/pages/quick-start/kubernetes.html)
