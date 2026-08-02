@@ -2,6 +2,19 @@ cluster:
   name: tailscale-k0s
 
 kubeProxyReplacement: true
+rollOutCiliumPods: true
+
+socketLB:
+  hostNamespaceOnly: true
+
+bpf:
+  datapathMode: veth
+  masquerade: true
+  hostLegacyRouting: false
+  tproxy: true
+
+nodePort:
+  directRoutingDevice: tailscale0
 
 # Host-networked Cilium components reach k0s NLLB through this worker-local endpoint.
 k8sServiceHost: "127.0.0.1"
@@ -9,9 +22,11 @@ k8sServicePort: "7443"
 
 devices:
   - tailscale0
+forceDeviceDetection: true
 
 routingMode: tunnel
 tunnelProtocol: vxlan
+underlayProtocol: ipv4
 
 ipam:
   mode: cluster-pool
@@ -22,18 +37,18 @@ ipam:
 
 operator:
   replicas: 2
+  rollOutPods: true
 
 envoy:
   enabled: true
+  rollOutPods: true
 
 gatewayAPI:
   enabled: true
   gatewayClass:
     create: true
   hostNetwork:
-    enabled: true
-    nodes:
-      matchLabels: {}
+    enabled: false
 
 hubble:
   enabled: true

@@ -4,3 +4,8 @@ __pycache__/
 
 # uv virtual environment
 .venv/
+
+# Commit only the encrypted SOPS document from this directory.
+secrets/**
+!secrets/
+!secrets/lab.sops.yaml
