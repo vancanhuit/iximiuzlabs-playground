@@ -85,9 +85,10 @@ The `uv sync --locked` command creates the repository-local `.venv` from
 the updater logic.
 
 The control host and all cluster nodes must be connected to the same tailnet.
-Every configured hostname must appear online in `tailscale status` before running
-the updater. Tailscale SSH must permit `root` access from the control host to
-every node:
+Use the repository's [Tailscale enrollment procedure](../../README.md#enroll-machines-in-tailscale)
+when provisioning the lab with a reusable `tag:lab` auth key. Every configured
+hostname must appear online in `tailscale status` before running the updater.
+Tailscale SSH must permit `root` access from the control host to every node:
 
 ```bash
 tailscale status

@@ -198,9 +198,50 @@ labctl playground create kubernetes-02 \
   --file kubernetes-02.manifest.yaml
 ```
 
-Start one session for each generated playground and complete the Tailscale login
-on all eight machines. Every host must be reachable by its Tailscale name and IP
-from the control host:
+Start one session for each generated playground.
+
+### Enroll machines in Tailscale
+
+For repeatable lab provisioning, create a reusable Tailscale auth key that
+assigns `tag:lab`:
+
+1. Define `tag:lab` and its owners in the tailnet policy.
+2. Add network and Tailscale SSH policy rules that allow the control host to
+   reach `tag:lab` machines and connect as `root`.
+3. Generate a reusable auth key in the Tailscale admin console, assign it
+   `tag:lab`, and make it pre-approved when device approval is enabled.
+
+Run this command on each of the eight machines, replacing the quoted placeholder
+at execution time:
+
+```bash
+sudo tailscale up \
+  --auth-key='tskey-auth-REPLACE_ME' \
+  --ssh \
+  --accept-routes \
+  --advertise-tags=tag:lab
+```
+
+Reusable auth keys can enroll multiple machines and must be handled as secrets.
+Never commit the key or place it in a manifest. The inline form above can expose
+the key through shell history or process inspection; prefer a secret manager and
+Tailscale's `file:` form when available:
+
+```bash
+sudo tailscale up \
+  --auth-key=file:/run/secrets/tailscale-auth-key \
+  --ssh \
+  --accept-routes \
+  --advertise-tags=tag:lab
+```
+
+`--accept-routes` accepts subnet routes advertised by other tailnet nodes. Omit
+it when this lab should not consume those routes. Revoke the reusable auth key
+after provisioning if no more lab machines need to join; revocation does not
+deauthorize machines already enrolled with it.
+
+Every host must now be reachable by its Tailscale name and IP from the control
+host:
 
 ```bash
 tailscale status
@@ -210,8 +251,8 @@ ssh root@control-plane-03 hostname
 ssh root@node-01 hostname
 ```
 
-The manifests install and start `tailscaled`, but joining each machine to the
-tailnet still requires the chosen Tailscale authentication workflow.
+The manifests install and start `tailscaled`; the enrollment command joins each
+machine to the tailnet and enables Tailscale SSH.
 
 ## 6. Bootstrap Kubernetes
 
@@ -343,5 +384,9 @@ caveats.
 - [iximiuz Labs custom playgrounds](https://labs.iximiuz.com/docs/custom-playgrounds)
 - [iximiuz Labs CLI](https://github.com/iximiuz/labctl)
 - [Upstream root filesystem images](https://github.com/iximiuz/labs/tree/main/playgrounds)
+- [Tailscale auth keys](https://tailscale.com/docs/features/access-control/auth-keys)
+- [Tailscale device tags](https://tailscale.com/docs/features/tags)
+- [`tailscale up`](https://tailscale.com/docs/reference/tailscale-cli/up)
+- [Tailscale SSH](https://tailscale.com/docs/features/tailscale-ssh)
 - [`k0s` cluster runbook](docs/k0s/README.md)
 - [Ansible and kubeadm runbook](ansible/README.md)
