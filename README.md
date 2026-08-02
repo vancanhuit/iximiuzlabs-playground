@@ -3,6 +3,26 @@
 Runbooks and manifests for custom Debian Trixie playgrounds and Kubernetes
 clusters on [iximiuz Labs](https://labs.iximiuz.com).
 
+> **Reference environment:** This repository records one tested lab; it is not
+> a drop-in configuration for another account or network. Before running the
+> commands, review and tailor:
+>
+> - the GitHub account, package URLs, and
+>   `ghcr.io/vancanhuit/debian-rootfs` image path in [`mise.toml`](mise.toml)
+>   and the four playground manifests
+> - playground and machine names, topology, resources, storage, and the
+>   `172.16.0.0/24` playground subnet in the manifests
+> - Tailscale enrollment and ACLs, hostnames, SSH user and port, node interface,
+>   and node addresses
+> - Kubernetes and Cilium versions, Pod and Service CIDRs, and feature settings
+>   in [`docs/k0s/k0s.yaml`](docs/k0s/k0s.yaml) and
+>   [`docs/k0s/cilium-values.yaml`](docs/k0s/cilium-values.yaml)
+>
+> Examples below retain the repository owner's values so the tested setup remains
+> reproducible. Keep replacements consistent across tasks, manifests, and cluster
+> configuration, and publish images under a registry path your environment can
+> access.
+
 This repository provides:
 
 - custom `trixie-base` and `trixie-dev` root filesystem images

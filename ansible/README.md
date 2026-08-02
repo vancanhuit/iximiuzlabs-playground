@@ -1,5 +1,12 @@
 # Ansible Playbooks
 
+> **Reference configuration:** This experimental runbook assumes the repository's
+> inventory and hostnames, privileged access through `sudo`, Tailscale networking,
+> a `10.244.0.0/16` Pod CIDR, and the shown Cilium features. Tailor
+> [`inventory.yaml`](inventory.yaml), the kubeadm endpoint and join commands,
+> SSH and privilege settings, network CIDRs, interface selection, and Cilium
+> options for your own hosts and network before running it.
+
 ## Kubernetes
 
 ```sh

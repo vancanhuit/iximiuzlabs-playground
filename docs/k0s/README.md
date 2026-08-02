@@ -4,6 +4,13 @@ This runbook bootstraps an eight-node Kubernetes cluster with `k0sctl`, uses
 Tailscale as the node-to-node underlay, and installs Cilium as a kube-proxy-free
 CNI.
 
+> **Reference configuration:** The topology, hostnames, `root` SSH access,
+> `tailscale0` interface, network CIDRs, and pinned component versions reflect
+> this repository's tested environment. Review [`k0s.yaml`](k0s.yaml) and
+> [`cilium-values.yaml`](cilium-values.yaml) before applying them. The address
+> updater changes Tailscale IP addresses only; it does not adapt hostnames,
+> roles, interfaces, credentials, CIDRs, versions, or Cilium settings.
+
 ## Cluster topology
 
 | Host | Role | Tailscale IPv4 |
