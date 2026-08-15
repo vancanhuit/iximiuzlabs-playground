@@ -41,7 +41,9 @@ setopt INTERACTIVE_COMMENTS
 # setopt CORRECT
 
 # Disable flow control so Ctrl-S works in terminal apps/search.
-stty -ixon
+if [[ -o interactive && -t 0 ]]; then
+  stty -ixon
+fi
 
 
 # -----------------------------
@@ -54,13 +56,25 @@ fpath=("$HOME/.local/share/zsh/site-functions" $fpath)
 # Regenerate tool completions onto fpath *before* compinit so they load this
 # session. Track changes so we can force a dump rebuild when one is updated.
 _comp_changed=0
-if command -v mise >/dev/null 2>&1; then
+_mise_bin=${commands[mise]:-}
+if [[ -n "$_mise_bin" ]]; then
   _mise_comp="$HOME/.local/share/zsh/site-functions/_mise"
+  _mise_comp_tmp="${_mise_comp}.tmp.$$"
   mkdir -p "${_mise_comp:h}"
-  if [[ ! -f "$_mise_comp" || $commands[mise] -nt "$_mise_comp" ]]; then
-    mise completion zsh > "$_mise_comp" 2>/dev/null && _comp_changed=1
+  if [[ ! -f "$_mise_comp" || "$_mise_bin" -nt "$_mise_comp" ]]; then
+    if "$_mise_bin" completion zsh >| "$_mise_comp_tmp" &&
+        IFS= read -r _mise_comp_header < "$_mise_comp_tmp" &&
+        [[ "$_mise_comp_header" == '#compdef mise' ]]; then
+      if [[ ! -f "$_mise_comp" ]] || ! cmp -s "$_mise_comp_tmp" "$_mise_comp"; then
+        _comp_changed=1
+      fi
+      mv -f "$_mise_comp_tmp" "$_mise_comp"
+    else
+      rm -f "$_mise_comp_tmp"
+      print -u2 -- "warning: failed to refresh mise completion; keeping existing completion"
+    fi
   fi
-  unset _mise_comp
+  unset _mise_comp _mise_comp_tmp _mise_comp_header
 fi
 
 autoload -Uz compinit
@@ -132,10 +146,16 @@ autoload -Uz colors && colors
 # mise
 # -----------------------------
 
-if command -v mise >/dev/null 2>&1; then
+if [[ -n "$_mise_bin" ]]; then
   # Completion is regenerated in the Completion section (before compinit).
-  eval "$(mise activate zsh)"
+  if _mise_activation=$("$_mise_bin" activate zsh); then
+    eval "$_mise_activation"
+  else
+    print -u2 -- "warning: mise activation failed"
+  fi
+  unset _mise_activation
 fi
+unset _mise_bin
 
 
 # -----------------------------
