@@ -39,13 +39,14 @@ RUN --mount=type=secret,id=github_token,env=GITHUB_TOKEN \
   bat \
   shellcheck \
   shfmt \
-  python@3.14.6 \
+  python@3.14.7 \
   uv \
   ruff \
   delta \
   node@lts \
   atuin \
   eza \
+  usage \
   lua@5.1.5
 
 # Neovim language providers: pynvim via uv, neovim package via npm
