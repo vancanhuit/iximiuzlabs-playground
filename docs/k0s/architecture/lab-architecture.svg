@@ -310,9 +310,9 @@ rect.c-bg-rect { fill: var(--bg); }
         <rect width="100%" height="100%" fill="url(#grid)"/>
 
         <!-- Boundaries (behind everything) -->
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="security-group" data-composition-frame-id="0" data-composition-frame-label="Identity and policy boundary" x="224" y="89" width="467" height="443" rx="8" class="c-security-group" stroke-width="1"/>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="security-group" data-composition-frame-id="0" data-composition-frame-label="Tailnet identity boundary" x="224" y="89" width="467" height="293" rx="8" class="c-security-group" stroke-width="1"/>
 
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="region" data-composition-frame-id="1" data-composition-frame-label="iximiuz Labs: two playgrounds, one cluster" x="715" y="85" width="530" height="577" rx="12" class="c-region" stroke-width="1"/>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="region" data-composition-frame-id="1" data-composition-frame-label="iximiuz Labs: two playgrounds, one cluster" x="715" y="85" width="585" height="577" rx="12" class="c-region" stroke-width="1"/>
 
         <!-- Connection paths (before components for correct z-order) -->
         <path data-edge-from="people" data-edge-to="tailnet" data-edge-label="authenticate" data-edge-key="0" data-edge-id="join-tailnet" data-composition-points="190,326;250,326" d="M 190 326 L 250 326" class="a-security" data-animate="edge" style="--step:0" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
@@ -321,28 +321,28 @@ rect.c-bg-rect { fill: var(--bg); }
         <path data-edge-from="proxygroup" data-edge-to="controllers" data-edge-label="impersonated identity" data-edge-key="3" data-edge-id="proxy-to-api" data-composition-points="835,187;835,290" d="M 835 187 L 835 290" class="a-security" data-animate="edge" style="--step:3" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
         <path data-edge-from="tailnet" data-edge-to="break_glass" data-edge-label="recover" data-edge-key="4" data-edge-id="direct-recovery" data-composition-points="420,333;455,333;455,476;490,476" d="M 420 333 L 447 333 Q 455 333 455 341 L 455 468 Q 455 476 463 476 L 490 476" class="a-dashed" data-animate="edge" style="--step:4" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
         <path data-edge-from="break_glass" data-edge-to="controllers" data-edge-label="client certificate :6443" data-edge-key="5" data-edge-id="recovery-to-api" data-composition-points="665,476;705,476;705,326;745,326" d="M 665 476 L 697 476 Q 705 476 705 468 L 705 334 Q 705 326 713 326 L 745 326" class="a-dashed" data-animate="edge" style="--step:5" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
-        <path data-edge-from="controllers" data-edge-to="etcd" data-edge-label="quorum" data-edge-key="6" data-edge-id="controller-quorum" data-composition-points="925,326;967.5,326;967.5,151;1010,151" d="M 925 326 L 959.5 326 Q 967.5 326 967.5 318 L 967.5 159 Q 967.5 151 975.5 151 L 1010 151" class="a-security" data-animate="edge" style="--step:6" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
-        <path data-edge-from="controllers" data-edge-to="workers" data-edge-label="NLLB selects healthy API" data-edge-key="7" data-edge-id="worker-control" data-composition-points="925,326;1010,326" d="M 925 326 L 1010 326" class="a-emphasis" data-animate="edge" style="--step:7" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="controllers" data-edge-to="etcd" data-edge-label="etcd peers over Tailscale" data-edge-key="6" data-edge-id="controller-quorum" data-composition-points="925,326;967.5,326;967.5,151;1010,151" d="M 925 326 L 959.5 326 Q 967.5 326 967.5 318 L 967.5 159 Q 967.5 151 975.5 151 L 1010 151" class="a-security" data-animate="edge" style="--step:6" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
+        <path data-edge-from="workers" data-edge-to="controllers" data-edge-label="node-local load balancer forwards API traffic" data-edge-key="7" data-edge-id="worker-control" data-composition-points="1010,326;925,326" d="M 1010 326 L 925 326" class="a-emphasis" data-animate="edge" style="--step:7" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
         <path data-edge-from="workers" data-edge-to="cilium" data-edge-label="node datapath" data-edge-key="8" data-edge-id="workers-to-cilium" data-composition-points="1010,326;967.5,326;967.5,606;925,606" d="M 1010 326 L 975.5 326 Q 967.5 326 967.5 334 L 967.5 598 Q 967.5 606 959.5 606 L 925 606" class="a-default" data-animate="edge" style="--step:8" stroke-width="1.5" marker-end="url(#arrowhead)"/>
         <path data-edge-from="cilium" data-edge-to="workloads" data-edge-label="Pod + Service networking" data-edge-key="9" data-edge-id="cilium-to-workloads" data-composition-points="925,606;1010,606" d="M 925 606 L 1010 606" class="a-emphasis" data-animate="edge" style="--step:9" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
         <path data-edge-from="cilium" data-edge-to="internet" data-edge-label="masqueraded via eth0" data-edge-key="10" data-edge-id="pod-egress" data-composition-points="745,606;665,606" d="M 745 606 L 665 606" class="a-dashed" data-animate="edge" style="--step:10" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
-        <path data-edge-from="tailnet" data-edge-to="controllers" data-edge-label="encrypted node underlay" data-edge-key="11" data-edge-id="tailscale-underlay" data-composition-points="420,326;745,326" d="M 420 326 L 745 326" class="a-security" data-animate="edge" style="--step:11" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
+        <path data-edge-from="tailnet" data-edge-to="controllers" data-edge-label="node, etcd, and VXLAN underlay" data-edge-key="11" data-edge-id="tailscale-underlay" data-composition-points="420,326;745,326" d="M 420 326 L 745 326" class="a-security" data-animate="edge" style="--step:11" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
 
         <!-- Components -->
-        <g id="node-people" data-node-id="people" data-node-label="Lab Owner + Guests" tabindex="0" role="button" aria-label="Focus Lab Owner + Guests, laptops on the tailnet, Architecture component" aria-pressed="false" data-node-kind="external" data-node-sublabel="laptops on the tailnet" data-node-context="Architecture component">
-          <title>Lab Owner + Guests · laptops on the tailnet · Architecture component</title>
+        <g id="node-people" data-node-id="people" data-node-label="Administrators" tabindex="0" role="button" aria-label="Focus Administrators, admin laptops, Architecture component" aria-pressed="false" data-node-kind="external" data-node-sublabel="admin laptops" data-node-context="Architecture component">
+          <title>Administrators · admin laptops · Architecture component</title>
           <rect x="40" y="290" width="150" height="72" rx="6" class="c-mask"/>
           <rect x="40" y="290" width="150" height="72" rx="6" class="c-external" data-animate="node" style="--step:0" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(46 296) scale(0.6875)">
             <rect x="2.5" y="5" width="8.5" height="8" rx="1.5"/>
             <path d="M8 2.5h5.5V8M13.5 2.5 7.5 8.5"/>
           </g>
-          <text data-node-label="" x="115" y="324" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Lab Owner + Guests</text>
-        <text x="115" y="340" class="t-muted" font-size="9" text-anchor="middle">laptops on the tailnet</text>
+          <text data-node-label="" x="115" y="324" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Administrators</text>
+        <text x="115" y="340" class="t-muted" font-size="9" text-anchor="middle">admin laptops</text>
         </g>
 
-        <g id="node-tailnet" data-node-id="tailnet" data-node-label="Tailscale Tailnet" tabindex="0" role="button" aria-label="Focus Tailscale Tailnet, identity + encrypted underlay, Identity and policy boundary" aria-pressed="false" data-node-kind="security" data-node-sublabel="identity + encrypted underlay" data-node-tag="tag:lab" data-node-context="Identity and policy boundary">
-          <title>Tailscale Tailnet · identity + encrypted underlay · Identity and policy boundary · tag:lab</title>
+        <g id="node-tailnet" data-node-id="tailnet" data-node-label="Tailscale Tailnet" tabindex="0" role="button" aria-label="Focus Tailscale Tailnet, identity + encrypted underlay, Tailnet identity boundary" aria-pressed="false" data-node-kind="security" data-node-sublabel="identity + encrypted underlay" data-node-tag="tag:lab" data-node-context="Tailnet identity boundary">
+          <title>Tailscale Tailnet · identity + encrypted underlay · Tailnet identity boundary · tag:lab</title>
           <rect x="250" y="290" width="170" height="72" rx="6" class="c-mask"/>
           <rect x="250" y="290" width="170" height="72" rx="6" class="c-security" data-animate="node" style="--step:1" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(256 296) scale(0.6875)">
@@ -354,8 +354,8 @@ rect.c-bg-rect { fill: var(--bg); }
         <text x="335" y="354" class="t-security" font-size="7" text-anchor="middle">tag:lab</text>
         </g>
 
-        <g id="node-api_service" data-node-id="api_service" data-node-label="lab-k0s Service" tabindex="0" role="button" aria-label="Focus lab-k0s Service, HTTPS + Tailscale identity, Identity and policy boundary" aria-pressed="false" data-node-kind="security" data-node-sublabel="HTTPS + Tailscale identity" data-node-tag="routine path" data-node-context="Identity and policy boundary">
-          <title>lab-k0s Service · HTTPS + Tailscale identity · Identity and policy boundary · routine path</title>
+        <g id="node-api_service" data-node-id="api_service" data-node-label="lab-k0s Service" tabindex="0" role="button" aria-label="Focus lab-k0s Service, HTTPS + Tailscale identity, Tailnet identity boundary" aria-pressed="false" data-node-kind="security" data-node-sublabel="HTTPS + Tailscale identity" data-node-tag="routine path" data-node-context="Tailnet identity boundary">
+          <title>lab-k0s Service · HTTPS + Tailscale identity · Tailnet identity boundary · routine path</title>
           <rect x="490" y="115" width="175" height="72" rx="6" class="c-mask"/>
           <rect x="490" y="115" width="175" height="72" rx="6" class="c-security" data-animate="node" style="--step:2" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(496 121) scale(0.6875)">
@@ -367,15 +367,15 @@ rect.c-bg-rect { fill: var(--bg); }
         <text x="577.5" y="179" class="t-security" font-size="7" text-anchor="middle">routine path</text>
         </g>
 
-        <g id="node-break_glass" data-node-id="break_glass" data-node-label="Direct Kubeconfig" tabindex="0" role="button" aria-label="Focus Direct Kubeconfig, controller IP + client cert, Identity and policy boundary" aria-pressed="false" data-node-kind="security" data-node-sublabel="controller IP + client cert" data-node-tag="recovery path" data-node-context="Identity and policy boundary">
-          <title>Direct Kubeconfig · controller IP + client cert · Identity and policy boundary · recovery path</title>
+        <g id="node-break_glass" data-node-id="break_glass" data-node-label="Admin Kubeconfig" tabindex="0" role="button" aria-label="Focus Admin Kubeconfig, controller IP + client cert, Architecture component" aria-pressed="false" data-node-kind="security" data-node-sublabel="controller IP + client cert" data-node-tag="recovery path" data-node-context="Architecture component">
+          <title>Admin Kubeconfig · controller IP + client cert · Architecture component · recovery path</title>
           <rect x="490" y="440" width="175" height="72" rx="6" class="c-mask"/>
           <rect x="490" y="440" width="175" height="72" rx="6" class="c-security" data-animate="node" style="--step:5" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(496 446) scale(0.6875)">
             <path d="M8 2.2 13 4v3.5c0 3.1-1.8 5.4-5 6.5-3.2-1.1-5-3.4-5-6.5V4Z"/>
             <path d="m5.8 8 1.5 1.5 3-3"/>
           </g>
-          <text data-node-label="" x="577.5" y="474" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Direct Kubeconfig</text>
+          <text data-node-label="" x="577.5" y="474" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Admin Kubeconfig</text>
         <text x="577.5" y="490" class="t-muted" font-size="9" text-anchor="middle">controller IP + client cert</text>
         <text x="577.5" y="504" class="t-security" font-size="7" text-anchor="middle">recovery path</text>
         </g>
@@ -420,7 +420,7 @@ rect.c-bg-rect { fill: var(--bg); }
         <g id="node-workers" data-node-id="workers" data-node-label="k0s Workers" tabindex="0" role="button" aria-label="Focus k0s Workers, 5 Kubernetes Nodes, iximiuz Labs: two playgrounds, one cluster" aria-pressed="false" data-node-kind="backend" data-node-sublabel="5 Kubernetes Nodes" data-node-tag="100.x InternalIP" data-node-context="iximiuz Labs: two playgrounds, one cluster">
           <title>k0s Workers · 5 Kubernetes Nodes · iximiuz Labs: two playgrounds, one cluster · 100.x InternalIP</title>
           <rect x="1010" y="290" width="170" height="72" rx="6" class="c-mask"/>
-          <rect x="1010" y="290" width="170" height="72" rx="6" class="c-backend" data-animate="node" style="--step:8" stroke-width="1.5"/>
+          <rect x="1010" y="290" width="170" height="72" rx="6" class="c-backend" data-animate="node" style="--step:7" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(1016 296) scale(0.6875)">
             <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
@@ -444,15 +444,15 @@ rect.c-bg-rect { fill: var(--bg); }
         <text x="835" y="634" class="t-messagebus" font-size="7" text-anchor="middle">MTU 1230</text>
         </g>
 
-        <g id="node-workloads" data-node-id="workloads" data-node-label="Workloads" tabindex="0" role="button" aria-label="Focus Workloads, Pods 10.244/16 + Services 10.96/12, iximiuz Labs: two playgrounds, one cluster" aria-pressed="false" data-node-kind="cloud" data-node-sublabel="Pods 10.244/16 + Services 10.96/12" data-node-context="iximiuz Labs: two playgrounds, one cluster">
-          <title>Workloads · Pods 10.244/16 + Services 10.96/12 · iximiuz Labs: two playgrounds, one cluster</title>
-          <rect x="1010" y="570" width="205" height="72" rx="6" class="c-mask"/>
-          <rect x="1010" y="570" width="205" height="72" rx="6" class="c-cloud" data-animate="node" style="--step:10" stroke-width="1.5"/>
+        <g id="node-workloads" data-node-id="workloads" data-node-label="Workloads" tabindex="0" role="button" aria-label="Focus Workloads, Pods 10.244.0.0/16 + Services 10.96.0.0/12, iximiuz Labs: two playgrounds, one cluster" aria-pressed="false" data-node-kind="cloud" data-node-sublabel="Pods 10.244.0.0/16 + Services 10.96.0.0/12" data-node-context="iximiuz Labs: two playgrounds, one cluster">
+          <title>Workloads · Pods 10.244.0.0/16 + Services 10.96.0.0/12 · iximiuz Labs: two playgrounds, one cluster</title>
+          <rect x="1010" y="570" width="260" height="72" rx="6" class="c-mask"/>
+          <rect x="1010" y="570" width="260" height="72" rx="6" class="c-cloud" data-animate="node" style="--step:10" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="cloud" class="semantic-sigil s-cloud" transform="translate(1016 576) scale(0.6875)">
             <path d="M4.3 12.5h7.3a2.4 2.4 0 0 0 .2-4.8 4 4 0 0 0-7.5-1.3A3.1 3.1 0 0 0 4.3 12.5Z"/>
           </g>
-          <text data-node-label="" x="1112.5" y="604" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Workloads</text>
-        <text x="1112.5" y="620" class="t-muted" font-size="9" text-anchor="middle">Pods 10.244/16 + Services 10.96/12</text>
+          <text data-node-label="" x="1140" y="604" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Workloads</text>
+        <text x="1140" y="620" class="t-muted" font-size="9" text-anchor="middle">Pods 10.244.0.0/16 + Services 10.96.0.0/12</text>
         </g>
 
         <g id="node-internet" data-node-id="internet" data-node-label="Internet Services" tabindex="0" role="button" aria-label="Focus Internet Services, registries + coordination + DERP, Architecture component" aria-pressed="false" data-node-kind="external" data-node-sublabel="registries + coordination + DERP" data-node-context="Architecture component">
@@ -492,13 +492,13 @@ rect.c-bg-rect { fill: var(--bg); }
           <rect x="642.4" y="381" width="125.19999999999999" height="14" rx="3" class="c-mask"/>
           <text x="705" y="391" class="t-messagebus" font-size="8" text-anchor="middle">client certificate :6443</text>
         </g>
-        <g data-edge-from="controllers" data-edge-to="etcd" data-edge-label="quorum" data-edge-key="6" data-edge-id="controller-quorum">
-          <rect x="948.1" y="218.5" width="38.8" height="14" rx="3" class="c-mask"/>
-          <text x="967.5" y="228.5" class="t-security" font-size="8" text-anchor="middle">quorum</text>
+        <g data-edge-from="controllers" data-edge-to="etcd" data-edge-label="etcd peers over Tailscale" data-edge-key="6" data-edge-id="controller-quorum">
+          <rect x="902.5" y="218.5" width="130" height="14" rx="3" class="c-mask"/>
+          <text x="967.5" y="228.5" class="t-security" font-size="8" text-anchor="middle">etcd peers over Tailscale</text>
         </g>
-        <g data-edge-from="controllers" data-edge-to="workers" data-edge-label="NLLB selects healthy API" data-edge-key="7" data-edge-id="worker-control">
-          <rect x="787.4" y="380" width="125.19999999999999" height="14" rx="3" class="c-mask"/>
-          <text x="850" y="390" class="t-backend" font-size="8" text-anchor="middle">NLLB selects healthy API</text>
+        <g data-edge-from="workers" data-edge-to="controllers" data-edge-label="node-local load balancer forwards API traffic" data-edge-key="7" data-edge-id="worker-control">
+          <rect x="737" y="380" width="226" height="14" rx="3" class="c-mask"/>
+          <text x="850" y="390" class="t-backend" font-size="8" text-anchor="middle">node-local load balancer forwards API traffic</text>
         </g>
         <g data-edge-from="workers" data-edge-to="cilium" data-edge-label="node datapath" data-edge-key="8" data-edge-id="workers-to-cilium">
           <rect x="931.3" y="446" width="72.4" height="14" rx="3" class="c-mask"/>
@@ -512,15 +512,15 @@ rect.c-bg-rect { fill: var(--bg); }
           <rect x="652" y="646" width="106" height="14" rx="3" class="c-mask"/>
           <text x="705" y="656" class="t-messagebus" font-size="8" text-anchor="middle">masqueraded via eth0</text>
         </g>
-        <g data-edge-from="tailnet" data-edge-to="controllers" data-edge-label="encrypted node underlay" data-edge-key="11" data-edge-id="tailscale-underlay">
-          <rect x="499.8" y="380" width="120.39999999999999" height="14" rx="3" class="c-mask"/>
-          <text x="560" y="390" class="t-security" font-size="8" text-anchor="middle">encrypted node underlay</text>
+        <g data-edge-from="tailnet" data-edge-to="controllers" data-edge-label="node, etcd, and VXLAN underlay" data-edge-key="11" data-edge-id="tailscale-underlay">
+          <rect x="483" y="380" width="154" height="14" rx="3" class="c-mask"/>
+          <text x="560" y="390" class="t-security" font-size="8" text-anchor="middle">node, etcd, and VXLAN underlay</text>
         </g>
 
         <!-- Boundary labels (foreground masks keep routes out of titles) -->
-        <g data-graph-role="structural-frame-label" data-composition-frame-id="0" data-composition-frame-kind="security-group" data-composition-frame-label="Identity and policy boundary">
-          <rect data-graph-role="structural-frame-label-mask" x="228" y="95" width="161.2" height="16" rx="3" class="c-mask"/>
-          <text data-boundary-label="" x="232" y="108" class="t-security" font-size="9" font-weight="600">Identity and policy boundary</text>
+        <g data-graph-role="structural-frame-label" data-composition-frame-id="0" data-composition-frame-kind="security-group" data-composition-frame-label="Tailnet identity boundary">
+          <rect data-graph-role="structural-frame-label-mask" x="228" y="95" width="145" height="16" rx="3" class="c-mask"/>
+          <text data-boundary-label="" x="232" y="108" class="t-security" font-size="9" font-weight="600">Tailnet identity boundary</text>
         </g>
 
         <g data-graph-role="structural-frame-label" data-composition-frame-id="1" data-composition-frame-kind="region" data-composition-frame-label="iximiuz Labs: two playgrounds, one cluster">

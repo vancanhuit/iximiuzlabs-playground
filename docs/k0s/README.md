@@ -1,191 +1,151 @@
-# k0s over Tailscale on iximiuz Labs
+# Build and operate a k0s cluster over Tailscale
 
-This runbook builds an eight-node Kubernetes cluster across two iximiuz Labs
-playgrounds. Tailscale is the private node network, `k0sctl` bootstraps k0s, and
-Cilium provides a kube-proxy-free Pod network.
+**Owner:** Lab operator | **Frequency:** As needed
+**Last updated:** 2026-08-29 | **Last run:** Not recorded
 
-Presentation-ready, interactive diagrams are available under
-[`architecture/`](architecture/):
+This runbook builds and operates an eight-node Kubernetes cluster across two iximiuz Labs playgrounds. Use it for initial deployment, validation, upgrades, recovery, and teardown.
 
-- [lab system architecture](architecture/lab-architecture.html)
-- [bootstrap journey](architecture/bootstrap-journey.html)
+## Plan and scope
 
-Both presentations include guided chapters, light and dark themes, searchable
-components, relationship tracing, and export controls.
+This page serves an operator who controls the playgrounds, tailnet, and Kubernetes cluster.
 
-The result has three distinct network layers:
+- **Overview:** Build k0s on a private Tailscale underlay and install Cilium
+- **Goal:** Deploy and verify a recoverable, kube-proxy-free Kubernetes cluster
+- **Audience:** The lab operator responsible for Tailscale and Kubernetes administration
+- **Content plan:** Prepare, secure, bootstrap, verify, operate, and remove the cluster
+- **Open questions:** Record environment-specific contacts and the last successful run before sharing this runbook
 
-| Layer | CIDR or interface | Purpose |
+This page is an operational how-to. Open the [interactive architecture](architecture/lab-architecture.html) to explore the system. Open the [interactive bootstrap journey](architecture/bootstrap-journey.html) to explore the deployment sequence.
+
+## Purpose
+
+The procedure joins eight Debian hosts through Tailscale and bootstraps k0s with `k0sctl`. Cilium supplies the Pod network without kube-proxy.
+
+The cluster uses three network layers:
+
+| Layer | Classless Inter-Domain Routing (CIDR) range or interface | Purpose |
 | --- | --- | --- |
-| Node underlay | `tailscale0`, `100.64.0.0/10` | SSH, etcd, Kubernetes API, kubelet, and Cilium VXLAN |
-| Pod network | `10.244.0.0/16` | Cilium allocates one `/24` to each worker |
-| Service network | `10.96.0.0/12` | Virtual Kubernetes Service addresses |
+| Node underlay | `tailscale0`, `100.64.0.0/10` | Carries Secure Shell (SSH), etcd, the Kubernetes application programming interface (API), kubelet, and Virtual Extensible LAN (VXLAN) traffic |
+| Pod network | `10.244.0.0/16` | Assigns one `/24` range to each worker through Cilium |
+| Service network | `10.96.0.0/12` | Assigns virtual Kubernetes Service addresses |
 
-Do not advertise the Pod or Service CIDR as a Tailscale subnet route. These
-networks are internal to Kubernetes. Tailnet clients should access the API and
-applications through Tailscale identities, not by routing all cluster CIDRs.
+Do not advertise the Pod or Service CIDR through a Tailscale subnet route. Tailnet clients access services through Tailscale identities instead.
 
-## Architecture and invariants
+## Architecture requirements
 
-[![Interactive k0s lab architecture](architecture/lab-architecture.svg)](architecture/lab-architecture.html)
+Keep these requirements true throughout the cluster lifecycle:
 
-Open the [interactive architecture](architecture/lab-architecture.html) to use
-guided chapters, trace relationships, switch themes, present full-screen, or
-export the diagram. The companion
-[bootstrap journey](architecture/bootstrap-journey.html) tells the deployment
-story from eight empty machines to identity-aware shared access.
-
-[![Interactive k0s bootstrap journey](architecture/bootstrap-journey.svg)](architecture/bootstrap-journey.html)
-
-The configuration depends on these invariants:
-
-- every host has a unique, stable hostname and Tailscale IPv4 address
-- all hosts remain in the same tailnet and can reach each other according to
-  tailnet policy
+- Every host has a unique, stable hostname and Tailscale IPv4 address
+- Every host remains in one tailnet with policy-authorized peer connectivity
 - `privateAddress` and `privateInterface` select `tailscale0` for k0s traffic
-- `api.onlyBindToAddress: true` prevents multihomed controllers from selecting
-  an iximiuz Labs `172.16.0.x` address
-- controller certificate SANs contain every controller name and Tailscale IP
-- Pod, Service, playground LAN, and other routed CIDRs do not overlap
-- Cilium uses VXLAN because the Pod CIDR is not routed through Tailscale
-- workers keep ordinary Internet egress for image registries, Tailscale
-  coordination, and DERP
+- `api.onlyBindToAddress: true` excludes iximiuz Labs `172.16.0.x` addresses
+- Every controller name and Tailscale Internet Protocol (IP) address appears in the certificate Subject Alternative Name (SAN) list
+- Pod, Service, playground local area network (LAN), and routed CIDR ranges do not overlap
+- Cilium uses VXLAN because Tailscale does not route the Pod CIDR
+- Workers retain Internet egress for registries, Tailscale coordination, and Designated Encrypted Relay for Packets (DERP)
 
-Controllers are intentionally not workers. `kubectl get nodes` therefore lists
-five workers, not eight hosts. Check controllers with `k0s status` and `k0s etcd
-member-list`.
+Controllers do not run workloads. `kubectl get nodes` lists five workers. Use `k0s status` and `k0s etcd member-list` to inspect controllers.
 
-## Reference versions
+[![k0s lab architecture](architecture/lab-architecture.svg)](architecture/lab-architecture.svg)
 
-The repository pins client tools in [`../../mise.toml`](../../mise.toml). The
-cluster manifests currently use:
+[![k0s bootstrap journey](architecture/bootstrap-journey.svg)](architecture/bootstrap-journey.svg)
+
+## Tested versions
+
+Treat these versions as one tested set. Validate upgrades in a fresh playground before changing a shared cluster.
 
 | Component | Version |
 | --- | --- |
 | k0sctl | `v0.32.2` |
-| k0s / Kubernetes | `v1.36.3+k0s.0` |
+| k0s and Kubernetes | `v1.36.3+k0s.0` |
 | Cilium | `v1.20.0` |
 | Tailscale Kubernetes Operator | `1.98.9` |
 | Sonobuoy | `v0.57.5` |
 
-Treat these as a tested set. Validate upgrades in a fresh playground before
-changing a shared or long-lived cluster.
+The repository pins client tools in [`../../mise.toml`](../../mise.toml).
 
-## 1. Prepare the control host
+## Prerequisites
 
-Run commands from the repository root unless a step says otherwise:
+Complete every prerequisite before changing the cluster:
 
-```bash
-mise install
-mise ls --local
-uv sync --locked
-uv run --locked python -m unittest scripts/test_update_k0s_tailscale_ips.py -v
-```
+- [ ] Start both playgrounds from the repository [deployment guide](../../README.md)
+- [ ] Obtain administrator access to the Tailscale tailnet
+- [ ] Connect the control host to the same tailnet
+- [ ] Obtain SSH root access to all eight hosts
+- [ ] Configure SOPS access for `secrets/lab.sops.yaml`
+- [ ] Install `mise`, `uv`, Tailscale, and the repository tools
+- [ ] Confirm that no accepted route overlaps the Pod or Service CIDR
+- [ ] Schedule an outage and back up data before disruptive changes
 
-The control host needs `k0sctl`, `kubectl`, Helm, Cilium CLI, Python, and a
-Tailscale client connected to the same tailnet as the lab nodes.
-
-Start both iximiuz Labs playgrounds described in the repository root
-[`README.md`](../../README.md). Verify that their machine hostnames exactly match
-[`k0s.yaml`](k0s.yaml):
+The machine hostnames must match [`k0s.yaml`](k0s.yaml):
 
 ```text
 control-plane-01  control-plane-02  control-plane-03
 node-01           node-02           node-03  node-04  node-05
 ```
 
-## 2. Configure the tailnet policy
+## Procedure
 
-Use tags for lab machines so their identity is independent of the person who
-enrolls them. The following HuJSON mirrors the policy used by this personal lab.
-Replace `<TAILSCALE_LOGIN>` with the login name shown by `tailscale status`, such
-as an email address.
+Follow the steps in order for a new deployment. For recurring operations, start at the relevant step and preserve all preceding requirements.
 
-```jsonc
-{
-  "tagOwners": {
-    "tag:lab": [],
-    "tag:k8s-operator": [],
-    "tag:k8s": ["tag:k8s-operator"]
-  },
+### Step 1: Prepare the control host
 
-  "grants": [
-    {
-      "src": ["*"],
-      "dst": ["*"],
-      "ip": ["*"]
-    },
-    {
-      "src": ["<TAILSCALE_LOGIN>"],
-      "dst": ["tag:k8s"],
-      "ip": ["tcp:80", "tcp:443"]
-    }
-  ],
+Install the pinned tools and run the address-updater tests from the repository root:
 
-  "ssh": [
-    {
-      "action": "check",
-      "src": ["autogroup:member"],
-      "dst": ["autogroup:self"],
-      "users": ["autogroup:nonroot", "root"]
-    },
-    {
-      "action": "check",
-      "src": ["<TAILSCALE_LOGIN>"],
-      "dst": ["tag:lab"],
-      "users": ["laborant", "root"]
-    }
-  ],
-
-  "autoApprovers": {
-    "services": {
-      "svc:lab-k0s": ["tag:k8s"]
-    }
-  }
-}
+```bash
+mise install
+mise ls --local
+uv sync --locked
+uv run --locked python -m unittest \
+  scripts/test_update_k0s_tailscale_ips.py -v
 ```
 
-An empty tag-owner list means tags are assigned through an admin-created auth
-key or the scoped operator credentials, not delegated to ordinary tailnet
-members. The operator owns `tag:k8s` and the exact `svc:lab-k0s` auto-approver
-prevents it from advertising arbitrary Tailscale Services.
+**Expected result:** `mise` lists the local tools, and the unit tests pass.
 
-> **Sharing boundary:** The wildcard grant is the convenient default retained
-> by this personal tailnet. It allows every source to reach every destination
-> and makes the narrower API grant redundant for network authorization. Before
-> inviting colleagues into the tailnet, remove the wildcard rule and replace it
-> with reviewed grants for administrators, `tag:lab` node-to-node cluster ports,
-> and the `tag:k8s` API endpoint.
+**If it fails:** Resolve missing tool versions or Python dependencies before continuing. Do not bootstrap with an untested updater.
 
-Tailscale SSH policy and network grants are separate controls. The `check`
-action requires periodic reauthentication before granting `root` access. Use a
-shorter period or a just-in-time access workflow for production
-administration.
+### Step 2: Configure the tailnet policy
 
-## 3. Enroll the playground machines
+Create a policy from [`tailnet-policy.hujson`](tailnet-policy.hujson). Replace `tailscale_login` with the login from `tailscale status`.
 
-Create a pre-approved, tagged auth key for `tag:lab`. This lab stores the key at
-`tailscale.auth_key` in the SOPS-encrypted
-[`../../secrets/lab.sops.yaml`](../../secrets/lab.sops.yaml). Prefer a one-off
-key. If a reusable key is required to enroll all eight machines, revoke it
-immediately afterward.
+The example retains this personal lab's wildcard grant. That grant allows every source to reach every destination. It also makes the narrower API grant redundant for network authorization.
 
-On each machine, place the key in a root-only temporary file and enroll it:
+Before inviting another member, replace the wildcard with reviewed grants for:
+
+- Administrator access
+- `tag:lab` cluster ports between nodes
+- The `tag:k8s` API endpoint
+
+An empty tag-owner list restricts assignment to administrator auth keys or scoped operator credentials. The exact `svc:lab-k0s` approver prevents the operator from advertising other Tailscale Services.
+
+Tailscale SSH policy and network grants are separate controls. The `check` action periodically reauthenticates administrators before granting root access.
+
+**Expected result:** The Tailscale policy editor accepts the policy without warnings.
+
+**If it fails:** Validate the login, tags, and HuJSON syntax. Do not weaken the policy to bypass validation.
+
+### Step 3: Enroll every playground machine
+
+Create a preapproved, one-use auth key for `tag:lab`. Store it at `tailscale.auth_key` in [`../../secrets/lab.sops.yaml`](../../secrets/lab.sops.yaml).
+
+From the control host, enroll one machine at a time. Replace `playground_id` with the playground run ID and `node_name` with the machine name:
 
 ```bash
 sops decrypt --extract '["tailscale"]["auth_key"]' \
-  secrets/lab.sops.yaml | ssh <PLAYGROUND_USER>@<NODE> \
-  'sudo install -m 600 /dev/stdin /run/tailscale-auth-key'
+  secrets/lab.sops.yaml | labctl ssh playground_id \
+  --machine node_name --user root -- \
+  install -m 600 /dev/stdin /run/tailscale-auth-key
 
-ssh <PLAYGROUND_USER>@<NODE> sudo tailscale up \
+labctl ssh playground_id --machine node_name --user root -- \
+  tailscale up \
   --auth-key=file:/run/tailscale-auth-key \
   --advertise-tags=tag:lab \
   --ssh
-ssh <PLAYGROUND_USER>@<NODE> sudo rm -f /run/tailscale-auth-key
+labctl ssh playground_id --machine node_name --user root -- \
+  rm -f /run/tailscale-auth-key
 ```
 
-When already connected to an interactive node shell, the equivalent commands
-are:
+From an interactive node shell, enter the key through standard input. Press `Ctrl-D`, then enroll the node:
 
 ```bash
 sudo install -m 600 /dev/stdin /run/tailscale-auth-key
@@ -196,23 +156,17 @@ sudo tailscale up \
 sudo rm -f /run/tailscale-auth-key
 ```
 
-For the interactive form, enter the auth key on standard input and press
-`Ctrl-D`. Repeat enrollment for all eight nodes. Do not put auth keys in shell
-history, playground manifests, plaintext Git files, or command arguments.
+Repeat enrollment for all eight nodes. Revoke a reusable key immediately after the final enrollment.
 
-Do not enable `--accept-routes` by default. A cluster node does not need other
-subnet routes to communicate with tailnet peers, and an accepted route that
-overlaps `10.244.0.0/16` or `10.96.0.0/12` can break Kubernetes networking. Add
-it only when workloads have an explicit requirement for a routed subnet and all
-CIDRs have been checked.
+Never place auth keys in shell history, manifests, plaintext Git files, or command arguments. Do not enable `--accept-routes` without an explicit routed-subnet requirement and a CIDR review.
 
-Tagged devices normally have key expiry disabled. If tailnet policy enables
-expiry for tags, renew the nodes before expiry; losing the Tailscale underlay
-partitions both etcd and the Kubernetes control plane.
+**Expected result:** `tailscale status` shows eight online devices with `tag:lab`.
 
-## 4. Run the Tailscale preflight
+**If it fails:** Remove the temporary key file. Check key expiry, tag ownership, node time, and Tailscale connectivity before retrying.
 
-All eight nodes must be online before bootstrap. From the control host:
+### Step 4: Verify the Tailscale underlay
+
+Confirm peer discovery and SSH access from the control host:
 
 ```bash
 tailscale status
@@ -224,35 +178,31 @@ ssh root@control-plane-01 hostname
 ssh root@node-01 hostname
 ```
 
-Run a full peer and interface check from one controller and one worker:
+Inspect one controller and one worker:
 
 ```bash
-ssh root@control-plane-01 'tailscale status; tailscale netcheck; ip -br addr show tailscale0'
-ssh root@node-01 'tailscale status; tailscale netcheck; ip -br addr show tailscale0'
+ssh root@control-plane-01 \
+  'tailscale status; tailscale netcheck; ip -br addr show tailscale0'
+ssh root@node-01 \
+  'tailscale status; tailscale netcheck; ip -br addr show tailscale0'
 ```
 
-`tailscale ping` should eventually report a direct path when iximiuz networking
-allows it. A DERP path is functionally valid, but etcd and VXLAN latency and
-throughput will be worse. Do not bootstrap if peers are missing, hostnames are
-duplicated, or connectivity is intermittent.
-
-Confirm the cluster CIDRs do not overlap routes accepted by the control host or
-nodes:
+Check cluster routes on the control host and nodes:
 
 ```bash
 ip route get 10.244.0.1
 ip route get 10.96.0.1
 ```
 
-Before Cilium is installed these addresses must not resolve through another
-VPN or Tailscale subnet router. If they overlap, choose unused Pod and Service
-CIDRs in both [`k0s.yaml`](k0s.yaml) and
-[`cilium-values.yaml`](cilium-values.yaml) before bootstrap.
+Before Cilium installation, neither address may use another virtual private network (VPN) or subnet router.
 
-## 5. Populate Tailscale addresses
+**Expected result:** Every peer responds, hostnames are unique, and `tailscale0` has a `100.x` address. Direct paths offer better latency, but DERP paths remain functional.
 
-Tailscale addresses are tailnet-specific. The checked-in addresses are examples,
-not portable configuration. Preview and apply the discovered addresses:
+**If it fails:** Stop the deployment. Resolve missing peers, duplicate hostnames, intermittent links, or route overlap first.
+
+### Step 5: Populate Tailscale addresses
+
+Discover tailnet-specific addresses and preview the change:
 
 ```bash
 uv run scripts/update_k0s_tailscale_ips.py --dry-run
@@ -260,39 +210,37 @@ uv run scripts/update_k0s_tailscale_ips.py
 git diff -- docs/k0s/k0s.yaml
 ```
 
-The updater reads `tailscale status --json`, requires every configured hostname
-to be online, and rejects duplicate names, reused addresses, and addresses
-outside `100.64.0.0/10`. It updates only:
+The updater requires every configured hostname to be online. It rejects duplicate names, reused addresses, and addresses outside `100.64.0.0/10`.
 
-- each host's `ssh.address`
-- each host's `privateAddress`
-- controller IPs in the API certificate SAN list
+The updater changes only these values:
 
-Review the diff. Hostnames, roles, interfaces, versions, and CIDRs remain manual
-configuration.
+- Each host's `ssh.address`
+- Each host's `privateAddress`
+- Controller IPs in the API certificate SAN list
 
-## 6. Validate and bootstrap k0s
+**Expected result:** The diff changes only the listed address fields.
 
-Always inspect a dry run first:
+**If it fails:** Restore connectivity or correct duplicate identities. Do not manually bypass updater validation.
+
+### Step 6: Validate and bootstrap k0s
+
+Inspect the generated configuration before applying it:
 
 ```bash
 k0sctl apply --config docs/k0s/k0s.yaml --dry-run
 ```
 
-Each generated controller configuration must use that controller's Tailscale IP
-for `spec.api.address`. Join validation must not target an iximiuz Labs
-`172.16.0.x` address.
+Each controller's `spec.api.address` must use its Tailscale IP. Join validation must not use an iximiuz Labs `172.16.0.x` address.
 
-Apply the cluster:
+Apply the validated configuration:
 
 ```bash
 k0sctl apply --config docs/k0s/k0s.yaml
 ```
 
-`spec.options.wait.enabled` is intentionally `false`: k0s uses a custom CNI and
-kube-proxy is disabled, so workers remain `NotReady` until Cilium is installed.
+`spec.options.wait.enabled` remains `false`. Workers stay `NotReady` until Cilium starts because k0s uses a custom Container Network Interface (CNI).
 
-Validate the control plane and etcd:
+Validate the control plane and etcd membership:
 
 ```bash
 ssh root@control-plane-01 k0s status
@@ -302,11 +250,9 @@ ssh root@control-plane-01 k0s etcd member-list
 ssh root@control-plane-01 k0s kubectl get nodes -o wide
 ```
 
-The etcd member list should contain all three controller Tailscale addresses.
-The five workers should exist with `100.x` InternalIP values and be `NotReady`.
+**Expected result:** etcd lists three controller Tailscale addresses. Kubernetes lists five `NotReady` workers with `100.x` InternalIP values.
 
-If only the first controller starts, verify `api.onlyBindToAddress: true` and
-rerun the dry run. `k0sctl` can normally reconcile the partial installation:
+**If it fails:** Check `api.onlyBindToAddress: true`. Inspect the selected API address, then reconcile with `k0sctl`:
 
 ```bash
 ssh root@control-plane-01 \
@@ -315,9 +261,9 @@ k0sctl apply --config docs/k0s/k0s.yaml --dry-run
 k0sctl apply --config docs/k0s/k0s.yaml
 ```
 
-## 7. Configure break-glass API access
+### Step 7: Configure recovery API access
 
-Fetch the admin kubeconfig without overwriting an existing file blindly:
+Create a protected admin kubeconfig without overwriting an existing file:
 
 ```bash
 mkdir -p ~/.kube
@@ -335,56 +281,49 @@ kubectl config current-context
 kubectl get --raw=/readyz
 ```
 
-The expected context is `tailscale-k0s`, and `/readyz` returns `ok`. This
-kubeconfig contains a high-privilege client certificate and points directly to
-the first controller. Protect it as a recovery credential.
+This kubeconfig contains a privileged client certificate. It connects directly to the first controller, so protect it as a recovery credential.
 
-There is no external virtual IP in this design. k0s node-local load balancing
-protects worker components but not clients on the control host. Because every
-controller address is a certificate SAN, an administrator can temporarily set
-the kubeconfig server to another controller during recovery.
+The design has no external virtual IP. Every controller address appears in the certificate SAN list. During recovery, an administrator can point the kubeconfig at another controller.
 
-Do not configure `spec.api.externalAddress` while using k0s node-local load
-balancing; these modes are incompatible.
+Do not set `spec.api.externalAddress` with k0s node-local load balancing. k0s does not support that combination.
 
-## 8. Install Cilium
+**Expected result:** The context is `tailscale-k0s`, and `/readyz` returns `ok`.
+
+**If it fails:** Confirm controller health, certificate SAN entries, Tailscale routes, and file permissions.
+
+### Step 8: Install Cilium
 
 Install Cilium with the checked-in values:
 
 ```bash
-cilium install --version 1.20.0 --values docs/k0s/cilium-values.yaml
+cilium install \
+  --version 1.20.0 \
+  --values docs/k0s/cilium-values.yaml
 cilium status --wait
 ```
 
-Helm may warn that the Hubble Relay server listener is not TLS-enabled. In this
-lab the `hubble-relay` Service remains `ClusterIP`, Hubble UI is the only Relay
-client, and agent-to-Relay traffic uses Cilium's chart-managed Hubble TLS. Do not
-expose the Relay Service outside the cluster without configuring Relay server
-TLS and client authentication.
+These settings bind Cilium to the Tailscale underlay:
 
-The important Tailscale-specific values are:
-
-- `k8sServiceHost: 127.0.0.1` and port `7443` use k0s's worker-local API proxy
+- `k8sServiceHost: 127.0.0.1` and port `7443` use the worker-local API proxy
 - `nodePort.directRoutingDevice: tailscale0` selects the node underlay
-- `devices: [eth0, tailscale0]` explicitly attaches service handling and
-  masquerading to the two stable lab interfaces
-- `routingMode: tunnel` and `tunnelProtocol: vxlan` carry Pod traffic across
-  the tailnet
-- `MTU: 1230` fits VXLAN inside the `1280`-byte Tailscale interface MTU
-- `socketLB.hostNamespaceOnly: true` is required for Tailscale operator proxy
-  Pods when Cilium replaces kube-proxy
+- `devices: [eth0, tailscale0]` selects the stable lab interfaces
+- `routingMode: tunnel` and `tunnelProtocol: vxlan` tunnel Pod traffic
+- `MTU: 1230` fits VXLAN within Tailscale's `1280` byte maximum transmission unit (MTU)
+- `socketLB.hostNamespaceOnly: true` supports Tailscale operator proxy Pods
 
-The values disable the Layer 7 proxy and omit Cilium Gateway API, standalone
-Envoy, eBPF TPROXY, Cluster Mesh, Cilium encryption, and advanced load-balancer
-modes. The lab does not use those features, and `bpf.tproxy` is beta in Cilium
-1.20. Tailscale already encrypts the node underlay, while the Tailscale
-Kubernetes Operator provides the private API endpoint.
+The configuration omits optional Layer 7 routing and encryption features. Tailscale encrypts the node underlay.
 
-Do not raise the Pod MTU unless the effective path MTU has been measured across
-all node pairs. Nested WireGuard and VXLAN encapsulation makes MTU errors appear
-as selective hangs on larger requests while simple health checks still pass.
+Hubble Relay may warn that its server listener lacks Transport Layer Security (TLS). The `ClusterIP` Service limits Relay access to the Hubble user interface (UI). Configure server TLS and client authentication before external exposure.
 
-## 9. Verify cluster networking
+Do not raise the Pod MTU without measurements across every node pair. Encapsulation errors can stall large requests while health checks pass.
+
+**Expected result:** `cilium status --wait` reports healthy agents and operators.
+
+**If it fails:** Check the API proxy, selected devices, MTU, image pulls, and Cilium Pod logs.
+
+### Step 9: Verify cluster networking
+
+Check node readiness and system workloads:
 
 ```bash
 kubectl get nodes -o wide
@@ -393,14 +332,7 @@ kubectl -n kube-system get daemonset kube-proxy
 cilium status --wait
 ```
 
-Expected results:
-
-- all five workers are `Ready` with Tailscale InternalIP addresses
-- Cilium, CoreDNS, Hubble, NLLB, and konnectivity Pods are running
-- the kube-proxy DaemonSet does not exist
-
-Run focused connectivity tests after bootstrap, networking changes, and Cilium
-upgrades:
+Run focused connectivity tests after bootstrap, network changes, and Cilium upgrades:
 
 ```bash
 cilium connectivity test \
@@ -415,16 +347,11 @@ cilium connectivity test \
 cilium connectivity test --cleanup
 ```
 
-These selectors cover baseline Pod connectivity, ClusterIP and NodePort
-Services, DNS resolution, and controlled client egress without enabling
-Cilium's Layer 7 proxy. The `dns-only` test is intentionally excluded because
-it validates DNS-aware L7 policy and requires Envoy, which this lab does not
-use. A successful run currently executes 70 actions across the two selected
-tests, including same-node and cross-node Pod traffic, ClusterIP and NodePort
-Services on every Tailscale node address, DNS, and Internet egress. Always run
-the cleanup command, including after an interrupted or failed test.
+The selectors test Pod traffic, ClusterIP and NodePort Services, Domain Name System (DNS), and client egress. They omit the `dns-only` Layer 7 test because this cluster has no Envoy proxy.
 
-Also inspect the effective MTU and Tailscale paths:
+Always run cleanup after a failed or interrupted test. The tested configuration executes 70 actions.
+
+Inspect the effective MTU and peer path:
 
 ```bash
 ssh root@node-01 ip -d link show tailscale0
@@ -434,26 +361,20 @@ kubectl -n kube-system exec daemonset/cilium -- \
 ssh root@node-01 tailscale ping node-02
 ```
 
-`tailscale0` should report MTU `1280`. With the documented uppercase Helm key,
-the Cilium interfaces and workload routes should report MTU `1230`.
+**Expected result:** Five workers are `Ready`. System Pods run, kube-proxy is absent, `tailscale0` reports MTU `1280`, and Cilium routes report MTU `1230`.
 
-### Run Kubernetes conformance tests
+**If it fails:** Run cleanup, retain the JUnit file, and use the troubleshooting table before changing configuration.
 
-[Sonobuoy](https://sonobuoy.io/docs/v0.57.5/) runs the upstream Kubernetes e2e
-conformance suite without adding a permanent in-cluster component. Install the
-tested CLI version through mise without changing the repository tool pins:
+### Step 10: Run Kubernetes conformance tests
+
+Install the tested Sonobuoy version without changing repository pins:
 
 ```bash
 mise install sonobuoy@0.57.5
 mise exec sonobuoy@0.57.5 -- sonobuoy version
 ```
 
-Use the direct recovery context for the run and result transfer. The Tailscale
-ProxyGroup path is tested separately below; routing a large result archive
-through it adds an unrelated dependency to conformance collection.
-
-Run quick mode after bootstrap to verify the Sonobuoy harness, plugin image
-pulls, scheduling, and result collection:
+After bootstrap, run Sonobuoy's `quick` mode to validate the harness:
 
 ```bash
 (
@@ -470,8 +391,7 @@ pulls, scheduling, and result collection:
 )
 ```
 
-Before accepting a Kubernetes, k0s, or Cilium upgrade, run the broader
-non-disruptive conformance profile. It takes about two hours on this lab:
+Before a Kubernetes, k0s, or Cilium upgrade, run the non-disruptive profile. This lab completes it in about two hours:
 
 ```bash
 (
@@ -481,27 +401,17 @@ non-disruptive conformance profile. It takes about two hours on this lab:
     --context "$context" delete --all --wait' EXIT
 
   mise exec sonobuoy@0.57.5 -- sonobuoy \
-    --context "$context" run --mode non-disruptive-conformance --wait
+    --context "$context" run \
+    --mode non-disruptive-conformance --wait
   results=$(mise exec sonobuoy@0.57.5 -- sonobuoy \
     --context "$context" retrieve /tmp)
   mise exec sonobuoy@0.57.5 -- sonobuoy results "$results"
 )
 ```
 
-The pinned Kubernetes `v1.36.3+k0s` and Sonobuoy `v0.57.5` set passed this
-profile with 451 e2e tests passed, zero failed, and all five node log plugins
-passed. The run took about 1 hour 51 minutes.
+The tested set completed 451 end-to-end (e2e) tests with zero failures. All five `systemd-logs` plugins passed in 1 hour 51 minutes.
 
-Acceptance requires zero failed e2e tests and all five `systemd-logs` plugin
-results to pass. Inspect every failure in the retrieved archive. An isolated
-rerun can distinguish a transient from a repeatable defect, but it does not
-turn a failed full run into a passing upgrade gate. Sonobuoy's log summary also
-counts lines containing words such as `error` or `warning`; those counts are
-diagnostic leads, not failed tests by themselves.
-
-For a fresh cluster without workloads, run the complete certification profile.
-It includes disruptive conformance tests, so do not run it on a shared cluster
-without an outage window and backups:
+Run certification only on an empty cluster with backups and an outage window:
 
 ```bash
 (
@@ -519,86 +429,63 @@ without an outage window and backups:
 )
 ```
 
-The pinned Kubernetes `v1.36.3+k0s` and Sonobuoy `v0.57.5` set passed this
-profile with 453 e2e tests passed, zero failed, and all five node log plugins
-passed. The run took about two hours. The `--all` cleanup removes leaked
-`e2e-*` namespaces in addition to Sonobuoy's own resources. Preserve the result
-archive and checksum when conformance evidence must be retained beyond the
-playground lifetime.
+The tested set completed 453 e2e tests with zero failures. All five node-log plugins passed in about two hours.
 
-Finally, verify both API access paths and the ProxyGroup replicas:
+**Expected result:** The selected profile reports zero failed e2e tests and five passing log plugins.
 
-```bash
-kubectl --context tailscale-k0s get --raw=/readyz
-kubectl --context lab-k0s.<TAILNET_DNS_NAME>.ts.net get --raw=/readyz
-kubectl --context lab-k0s.<TAILNET_DNS_NAME>.ts.net auth whoami
-kubectl --context tailscale-k0s wait proxygroup/lab-k0s \
-  --for=condition=ProxyGroupReady=true \
-  --timeout=30s
-kubectl --context tailscale-k0s -n tailscale get pods \
-  -l tailscale.com/parent-resource=lab-k0s \
-  -o wide
-```
+**If it fails:** Preserve the archive and inspect every failure. A passing isolated rerun does not replace the failed full-run result.
 
-Both readiness requests should return `ok`, `auth whoami` should show the
-expected Tailscale login rather than the direct admin certificate identity, and
-the two proxy Pods should be `Running` on different workers.
+### Step 11: Configure identity-based API access when needed
 
-## 10. Optional: install the Tailscale Kubernetes Operator
+Use the direct kubeconfig for bootstrap and recovery. Install the Tailscale Kubernetes Operator when shared access needs Tailscale identity and Kubernetes role-based access control (RBAC).
 
-The direct kubeconfig is suitable for bootstrap and recovery. For routine
-shared access, the Tailscale Kubernetes Operator can expose an HA API endpoint
-that authenticates users with their Tailscale identity and authorizes them with
-Kubernetes RBAC.
+The tailnet policy must include `tag:k8s-operator`, `tag:k8s`, grants, and the Service approver. Enable Hypertext Transfer Protocol Secure (HTTPS) on the [Tailscale DNS settings page](https://login.tailscale.com/admin/dns).
 
-This path requires the `tag:k8s-operator`, `tag:k8s`, grants, and service
-auto-approver from step 2. Enable HTTPS on the Tailscale admin console DNS page.
-
-Create an OAuth client with these write scopes and assign it
-`tag:k8s-operator`:
+Create an Open Authorization (OAuth) client with `tag:k8s-operator` and these write scopes:
 
 - General / Services
 - Devices / Core
 - Keys / Auth Keys
 
-Store the OAuth values at `tailscale.oauth.client_id` and
-`tailscale.oauth.client_secret` in the SOPS-encrypted secrets file. The API
-access token at `tailscale.access_token` is optional and is used only for the
-manual Service-approval fallback below. Use placeholders when preparing a new
-encrypted file:
+Store the values in the encrypted secrets file:
 
 ```yaml
 tailscale:
-  access_token: <TAILSCALE_API_ACCESS_TOKEN>
-  auth_key: <TAGGED_LAB_AUTH_KEY>
+  access_token: tailscale_api_access_token
+  auth_key: tagged_lab_auth_key
   oauth:
-    client_id: <TAILSCALE_OPERATOR_OAUTH_CLIENT_ID>
-    client_secret: <TAILSCALE_OPERATOR_OAUTH_CLIENT_SECRET>
-  kubernetes_user: <TAILSCALE_LOGIN>
+    client_id: tailscale_operator_oauth_client_id
+    client_secret: tailscale_operator_oauth_client_secret
+  kubernetes_user: tailscale_login
 ```
 
-Edit these values only through `sops secrets/lab.sops.yaml`. Never commit the
-plaintext placeholders after replacing them. The following command decrypts
-only the two OAuth fields into a root-only temporary directory, avoiding command
-arguments and Helm release values:
+Edit secrets only with `sops secrets/lab.sops.yaml`. Disable shell tracing before handling credentials.
+
+Create the namespace:
 
 ```bash
-kubectl create namespace tailscale --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace tailscale \
+  --dry-run=client -o yaml | kubectl apply -f -
+```
 
+Create the OAuth Secret without exposing credentials in command arguments:
+
+```bash
 (
   set -e
   if [[ $- == *x* ]]; then
     printf 'Disable shell tracing before handling OAuth credentials.\n' >&2
     exit 1
   fi
-
   oauth_dir=$(mktemp -d)
   chmod 700 "$oauth_dir"
   trap 'rm -rf "$oauth_dir"' EXIT
   umask 077
-  sops decrypt --extract '["tailscale"]["oauth"]["client_id"]' \
+  sops decrypt --extract \
+    '["tailscale"]["oauth"]["client_id"]' \
     secrets/lab.sops.yaml >"$oauth_dir/client_id"
-  sops decrypt --extract '["tailscale"]["oauth"]["client_secret"]' \
+  sops decrypt --extract \
+    '["tailscale"]["oauth"]["client_secret"]' \
     secrets/lab.sops.yaml >"$oauth_dir/client_secret"
 
   kubectl -n tailscale create secret generic operator-oauth \
@@ -606,22 +493,23 @@ kubectl create namespace tailscale --dry-run=client -o yaml | kubectl apply -f -
     --from-file=client_secret="$oauth_dir/client_secret" \
     --dry-run=client -o yaml | kubectl apply -f -
 )
+```
 
+Kubernetes Secrets need API-server encryption for encryption at rest. Use an external secret controller when the environment provides one.
+
+Install the operator:
+
+```bash
 helm repo add tailscale https://pkgs.tailscale.com/helmcharts
 helm repo update
-helm upgrade --install tailscale-operator tailscale/tailscale-operator \
+helm upgrade --install tailscale-operator \
+  tailscale/tailscale-operator \
   --version 1.98.9 \
   --namespace tailscale \
   --set-string apiServerProxyConfig.allowImpersonation=true \
   --wait
-
 kubectl -n tailscale rollout status deployment/operator --timeout=5m
 ```
-
-For stricter secret handling, render the Secret from a secret-manager plugin or
-an external-secrets controller instead of environment variables. Disable shell
-tracing before handling secrets. Kubernetes Secrets are not encrypted at rest
-unless API-server encryption is configured.
 
 Create a two-replica API proxy:
 
@@ -642,63 +530,50 @@ YAML
 kubectl wait proxygroup/lab-k0s \
   --for=condition=ProxyGroupReady=true \
   --timeout=5m
-kubectl get proxygroup lab-k0s
 ```
 
-Expected URL shape: `https://lab-k0s.<TAILNET_DNS_NAME>.ts.net`. If both proxy
-Pods are running but `ProxyGroupReady` remains false, inspect the advertised
-Service before changing Kubernetes configuration:
+The URL follows `https://lab-k0s.tailnet_dns_name.ts.net`.
+
+If readiness stalls, inspect the advertised Service:
 
 ```bash
-kubectl get proxygroup lab-k0s \
-  -o jsonpath='{range .status.conditions[*]}{.type}{"="}{.status}{": "}{.message}{"\n"}{end}'
+kubectl get proxygroup lab-k0s -o jsonpath='\
+{range .status.conditions[*]}{.type}{"="}{.status}{": "}\
+{.message}{"\n"}{end}'
 ```
 
-The preferred fix is the exact `svc:lab-k0s` auto-approver in step 2. As a
-manual fallback, an owner-generated API access token can approve only the two
-operator-created backends. This command keeps the token in memory and does not
-print it:
+Prefer the exact `svc:lab-k0s` auto-approver. If policy approval is unavailable, approve only the operator-created backends with the encrypted API token:
 
 ```bash
 (
   set -euo pipefail
-  token=$(sops decrypt --extract '["tailscale"]["access_token"]' \
-    secrets/lab.sops.yaml)
+  token=$(sops decrypt --extract \
+    '["tailscale"]["access_token"]' secrets/lab.sops.yaml)
   trap 'unset token' EXIT
-
+  api='https://api.tailscale.com/api/v2/tailnet/-/services'
   hosts=$(curl --fail-with-body --silent --show-error \
     -H "Authorization: Bearer $token" \
-    'https://api.tailscale.com/api/v2/tailnet/-/services/svc%3Alab-k0s/devices')
-
+    "$api/svc%3Alab-k0s/devices")
   while IFS= read -r node_id; do
     curl --fail-with-body --silent --show-error \
       --request POST \
       -H "Authorization: Bearer $token" \
       -H 'Content-Type: application/json' \
       --data '{"approved":true}' \
-      "https://api.tailscale.com/api/v2/tailnet/-/services/svc%3Alab-k0s/device/${node_id}/approved"
+      "$api/svc%3Alab-k0s/device/${node_id}/approved"
   done < <(jq -r '.hosts[].nodeId' <<<"$hosts")
 )
-
-kubectl wait proxygroup/lab-k0s \
-  --for=condition=ProxyGroupReady=true \
-  --timeout=5m
 ```
 
-The API token inherits its owner's authority and expires in at most 90 days.
-Keep it encrypted, rotate or revoke it after use, and do not distribute it with
-the runbook.
+Rotate or revoke the owner-scoped API token after use. Tailscale API tokens expire within 90 days.
 
-Bind Tailscale identities to the least Kubernetes privilege they require. The
-lab owner's login is stored at `tailscale.kubernetes_user`; load it without
-printing it. This personal lab grants that owner `cluster-admin`:
+Grant the owner administrator access without printing the identity:
 
 ```bash
 (
   set -euo pipefail
-  kubernetes_user=$(sops decrypt \
-    --extract '["tailscale"]["kubernetes_user"]' \
-    secrets/lab.sops.yaml)
+  kubernetes_user=$(sops decrypt --extract \
+    '["tailscale"]["kubernetes_user"]' secrets/lab.sops.yaml)
   trap 'unset kubernetes_user' EXIT
 
   kubectl create clusterrolebinding tailscale-lab-k0s-admin \
@@ -708,31 +583,56 @@ printing it. This personal lab grants that owner `cluster-admin`:
 )
 ```
 
-Confirm the exact impersonated identity with `kubectl auth whoami`. Before
-sharing the lab, create separate `view` or namespace-scoped bindings for guest
-logins such as `<GUEST_TAILSCALE_LOGIN>`; do not add guests to the owner
-`cluster-admin` binding.
+Create separate `view` or namespace-scoped bindings for guests. Never add a guest login to the owner binding.
 
-Configure a client and verify its identity:
+Configure the client and verify its identity:
 
 ```bash
-proxy_url=$(kubectl get proxygroup lab-k0s -o jsonpath='{.status.url}')
+proxy_url=$(kubectl get proxygroup lab-k0s \
+  -o jsonpath='{.status.url}')
 tailscale configure kubeconfig "$proxy_url"
 kubectl auth whoami
 kubectl get nodes
 ```
 
-Keep the direct `tailscale-k0s` context. The ProxyGroup depends on working Pod
-scheduling, Cilium, DNS, and the Kubernetes Service; the direct context remains
-the recovery path when those dependencies fail.
+Keep the direct `tailscale-k0s` context. It remains the recovery path when cluster DNS, Cilium, or ProxyGroup fails.
 
-## Operations
+**Expected result:** `ProxyGroupReady` is true. Two proxy Pods run on different workers, and `kubectl auth whoami` reports the Tailscale login.
 
-### Node address changes
+**If it fails:** Check operator logs, Service approval, OAuth scopes, tailnet HTTPS, RBAC bindings, and Pod placement.
 
-Tailscale IPs normally remain stable for a node identity. Recreating a machine
-or deleting and re-enrolling its Tailscale device can assign a new address.
-Before applying k0s changes:
+## Verification
+
+Complete every check before recording a successful run:
+
+- [ ] `kubectl get nodes -o wide` shows five `Ready` workers with Tailscale InternalIP values
+- [ ] `k0s etcd member-list` shows three controller Tailscale addresses
+- [ ] Cilium, CoreDNS, Hubble, node-local load balancing, and konnectivity Pods run
+- [ ] The kube-proxy DaemonSet does not exist
+- [ ] Focused Cilium connectivity tests pass and cleanup completes
+- [ ] `tailscale0` reports MTU `1280`, while Cilium routes report MTU `1230`
+- [ ] The selected Sonobuoy profile reports zero e2e failures
+- [ ] Both API paths return `ok` when the ProxyGroup is installed
+
+Verify both API paths and ProxyGroup replicas:
+
+```bash
+kubectl --context tailscale-k0s get --raw=/readyz
+kubectl --context lab-k0s.tailnet_dns_name.ts.net get --raw=/readyz
+kubectl --context lab-k0s.tailnet_dns_name.ts.net auth whoami
+kubectl --context tailscale-k0s wait proxygroup/lab-k0s \
+  --for=condition=ProxyGroupReady=true --timeout=30s
+kubectl --context tailscale-k0s -n tailscale get pods \
+  -l tailscale.com/parent-resource=lab-k0s -o wide
+```
+
+## Recurring operations
+
+Use these procedures after deployment without repeating the full bootstrap.
+
+### Reconcile a node address change
+
+Refresh addresses before applying k0s changes:
 
 ```bash
 uv run scripts/update_k0s_tailscale_ips.py --dry-run
@@ -740,13 +640,11 @@ uv run scripts/update_k0s_tailscale_ips.py
 k0sctl apply --config docs/k0s/k0s.yaml --dry-run
 ```
 
-Changing a controller address affects etcd membership and API certificates. Do
-not treat it as an ordinary worker replacement; back up etcd and follow the k0s
-controller replacement procedure.
+A controller address change affects etcd membership and certificates. Back up etcd and follow the k0s controller replacement procedure instead of treating it as a worker replacement.
 
-### Connectivity degradation
+### Diagnose degraded connectivity
 
-Use these checks before changing Kubernetes configuration:
+Check the Tailscale path before changing Kubernetes:
 
 ```bash
 tailscale status
@@ -756,23 +654,59 @@ ssh root@node-01 tailscale ping node-02
 ssh root@node-01 ip route
 ```
 
-`tailscale ping` identifies direct versus DERP connectivity. DERP preserves
-encryption and correctness but can reduce throughput and increase latency. If a
-previously direct cluster becomes relayed, investigate iximiuz firewall/NAT
-changes and UDP reachability before tuning Cilium or etcd.
+DERP preserves encryption and connectivity but increases latency. Investigate firewall, Network Address Translation (NAT), and User Datagram Protocol (UDP) reachability when a direct path becomes relayed.
 
-### Safe teardown
+## Troubleshooting
 
-Export data and etcd backups before destroying playgrounds. Removing a
-playground VM also removes its local k0s state. After teardown:
+Use observed symptoms to select the narrowest corrective action:
 
-1. Remove stale machines from the Tailscale admin console.
-2. Revoke any remaining enrollment auth key.
-3. Remove operator-created Tailscale devices and Services if the Kubernetes
-   resources can no longer reconcile their deletion.
-4. Remove obsolete direct kubeconfig credentials from administrator machines.
+| Symptom | Likely cause | Fix |
+| --- | --- | --- |
+| Only the first controller starts | k0s selected a playground address | Set `api.onlyBindToAddress: true`, inspect the dry run, and reconcile |
+| Workers remain `NotReady` after Cilium installation | Cilium cannot reach the API or attach devices | Check Cilium status, logs, `k8sServiceHost`, and `devices` |
+| Large requests stall | MTU exceeds the encapsulated path | Restore MTU `1230` and measure every node pair |
+| `ProxyGroupReady` remains false | Tailscale Service approval is missing | Add the exact auto-approver or approve only the two backends |
+| Tailscale paths use DERP | Direct UDP connectivity is unavailable | Check `tailscale netcheck`, firewall rules, and NAT behavior |
+| Cluster routes use another VPN | Accepted subnet routes overlap cluster CIDR ranges | Remove the route or choose unused Pod and Service ranges |
+| Sonobuoy reports failures | Cluster behavior or the test environment failed | Preserve the archive and inspect each failed test |
 
-## References
+## Rollback and safe teardown
+
+Do not attempt an in-place rollback after partial bootstrap without checking etcd state. `k0sctl apply` can reconcile a partial installation when controller identities remain valid.
+
+Before destroying playgrounds, export workload data and an etcd backup. Then complete these actions:
+
+1. Remove Kubernetes workloads and the ProxyGroup while the cluster can reconcile deletion.
+2. Remove operator-created Tailscale devices and Services.
+3. Destroy the playgrounds through iximiuz Labs.
+4. Remove stale machines from the Tailscale admin console.
+5. Revoke every remaining enrollment key and API token.
+6. Remove obsolete direct kubeconfig credentials from administrator machines.
+
+Destroying a playground removes its local k0s state. Restore from the etcd backup only into a compatible, isolated recovery cluster.
+
+## Escalation
+
+Record environment-specific contacts before another operator uses this runbook:
+
+| Situation | Contact | Method |
+| --- | --- | --- |
+| Tailnet policy, device identity, or Service approval failure | Tailnet owner | Organization-approved operations channel |
+| etcd quorum loss or controller replacement | Kubernetes platform owner | Organization-approved incident channel |
+| iximiuz Labs provisioning or network failure | iximiuz Labs support | [iximiuz Labs documentation](https://labs.iximiuz.com/docs) |
+| Reproducible repository defect | Repository owner | Repository issue tracker |
+
+## Run history
+
+Update this table after every deployment, upgrade, recovery, or teardown:
+
+| Date | Run by | Notes |
+| --- | --- | --- |
+| 2026-08-29 | Not recorded | Converted the deployment guide into an operational runbook |
+
+## Supporting references
+
+Use these sources to validate version-specific behavior:
 
 - [iximiuz Labs playgrounds](https://labs.iximiuz.com/docs/playgrounds)
 - [k0sctl configuration](https://github.com/k0sproject/k0sctl#configuration-file)
@@ -781,7 +715,7 @@ playground VM also removes its local k0s state. After teardown:
 - [Cilium 1.20 Helm reference](https://docs.cilium.io/en/v1.20/helm-reference/)
 - [Cilium 1.20 kube-proxy replacement](https://docs.cilium.io/en/v1.20/network/kubernetes/kubeproxy-free/)
 - [Cilium 1.20 routing](https://docs.cilium.io/en/v1.20/network/concepts/routing/)
-- [Cilium 1.20 cluster-pool IPAM](https://docs.cilium.io/en/v1.20/network/concepts/ipam/cluster-pool/)
+- [Cilium 1.20 cluster-pool IP address management](https://docs.cilium.io/en/v1.20/network/concepts/ipam/cluster-pool/)
 - [Tailscale auth keys](https://tailscale.com/docs/features/access-control/auth-keys)
 - [Tailscale grants](https://tailscale.com/docs/features/access-control/grants)
 - [Tailscale SSH](https://tailscale.com/docs/features/tailscale-ssh)

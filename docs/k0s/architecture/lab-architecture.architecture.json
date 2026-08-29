@@ -26,11 +26,11 @@
         "id": "trusted-access",
         "label": "Identity-first access",
         "focus": ["people", "tailnet", "api_service", "proxygroup", "controllers"],
-        "note": "Routine kubectl access carries a Tailscale identity into Kubernetes RBAC."
+        "note": "Routine kubectl access carries a Tailscale identity into Kubernetes role-based access control."
       },
       {
         "id": "recovery",
-        "label": "Recovery stays simple",
+        "label": "Direct recovery",
         "focus": ["people", "break_glass", "controllers", "etcd"],
         "note": "A direct client-certificate context remains available when in-cluster proxies are unavailable."
       }
@@ -40,8 +40,8 @@
     {
       "id": "people",
       "type": "external",
-      "label": "Lab Owner + Guests",
-      "sublabel": "laptops on the tailnet",
+      "label": "Administrators",
+      "sublabel": "admin laptops",
       "pos": [40, 290],
       "size": [150, 72]
     },
@@ -66,7 +66,7 @@
     {
       "id": "break_glass",
       "type": "security",
-      "label": "Direct Kubeconfig",
+      "label": "Admin Kubeconfig",
       "sublabel": "controller IP + client cert",
       "tag": "recovery path",
       "pos": [490, 440],
@@ -121,9 +121,9 @@
       "id": "workloads",
       "type": "cloud",
       "label": "Workloads",
-      "sublabel": "Pods 10.244/16 + Services 10.96/12",
+      "sublabel": "Pods 10.244.0.0/16 + Services 10.96.0.0/12",
       "pos": [1010, 570],
-      "size": [205, 72]
+      "size": [260, 72]
     },
     {
       "id": "internet",
@@ -137,8 +137,8 @@
   "boundaries": [
     {
       "kind": "security-group",
-      "label": "Identity and policy boundary",
-      "wraps": ["tailnet", "api_service", "break_glass"],
+      "label": "Tailnet identity boundary",
+      "wraps": ["tailnet", "api_service"],
       "pad": 26
     },
     {
@@ -198,14 +198,14 @@
       "id": "controller-quorum",
       "from": "controllers",
       "to": "etcd",
-      "label": "quorum",
+      "label": "etcd peers over Tailscale",
       "variant": "security"
     },
     {
       "id": "worker-control",
-      "from": "controllers",
-      "to": "workers",
-      "label": "NLLB selects healthy API",
+      "from": "workers",
+      "to": "controllers",
+      "label": "node-local load balancer forwards API traffic",
       "variant": "emphasis",
       "labelAt": [850, 390]
     },
@@ -235,7 +235,7 @@
       "id": "tailscale-underlay",
       "from": "tailnet",
       "to": "controllers",
-      "label": "encrypted node underlay",
+      "label": "node, etcd, and VXLAN underlay",
       "variant": "security",
       "labelAt": [560, 390]
     }

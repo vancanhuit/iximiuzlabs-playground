@@ -323,9 +323,9 @@ rect.c-bg-rect { fill: var(--bg); }
         <path data-edge-from="identity" data-edge-to="preflight" data-edge-label="verify all eight" data-edge-key="1" data-edge-id="verify" data-composition-points="345,281;370,281" d="M 345 281 L 370 281" class="a-security" data-animate="edge" style="--step:1" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
         <path data-edge-from="preflight" data-edge-to="k0s" data-edge-label="reviewed plan" data-edge-key="2" data-edge-id="plan" data-composition-points="515,281;540,281" d="M 515 281 L 540 281" class="a-emphasis" data-animate="edge" style="--step:2" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
         <path data-edge-from="k0s" data-edge-to="cilium" data-edge-label="add data plane" data-edge-key="3" data-edge-id="network" data-composition-points="685,281;710,281" d="M 685 281 L 710 281" class="a-emphasis" data-animate="edge" style="--step:3" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="cilium" data-edge-to="proof" data-edge-label="test reality" data-edge-key="4" data-edge-id="test" data-composition-points="855,281;880,281" d="M 855 281 L 880 281" class="a-emphasis" data-animate="edge" style="--step:4" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="proof" data-edge-to="identity_api" data-edge-label="ready to share" data-edge-key="5" data-edge-id="publish" data-composition-points="1025,281;1050,281" d="M 1025 281 L 1050 281" class="a-security" data-animate="edge" style="--step:5" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
-        <path data-edge-from="identity_api" data-edge-to="shared_lab" data-edge-label="authorized access" data-edge-key="6" data-edge-id="authorize" data-composition-points="1195,281;1220,281" d="M 1195 281 L 1220 281" class="a-emphasis" data-animate="edge" style="--step:6" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="cilium" data-edge-to="proof" data-edge-label="run verification" data-edge-key="4" data-edge-id="test" data-composition-points="855,281;880,281" d="M 855 281 L 880 281" class="a-emphasis" data-animate="edge" style="--step:4" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="proof" data-edge-to="identity_api" data-edge-label="zero failures" data-edge-key="5" data-edge-id="publish" data-composition-points="1025,281;1050,281" d="M 1025 281 L 1050 281" class="a-security" data-animate="edge" style="--step:5" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
+        <path data-edge-from="identity_api" data-edge-to="shared_lab" data-edge-label="least-privilege access" data-edge-key="6" data-edge-id="authorize" data-composition-points="1195,281;1220,281" d="M 1195 281 L 1220 281" class="a-emphasis" data-animate="edge" style="--step:6" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
         <path data-edge-from="preflight" data-edge-to="stop_repair" data-edge-label="red stops here" data-edge-key="7" data-edge-id="stop" data-composition-points="442.5,317;442.5,430" d="M 442.5 317 L 442.5 430" class="a-security" data-animate="edge" style="--step:7" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
         <path data-edge-from="k0s" data-edge-to="direct_recovery" data-edge-label="preserve recovery" data-edge-key="8" data-edge-id="recover" data-composition-points="612.5,317;612.5,430" d="M 612.5 317 L 612.5 430" class="a-dashed" data-animate="edge" style="--step:8" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
 
@@ -341,8 +341,8 @@ rect.c-bg-rect { fill: var(--bg); }
         <text x="102.5" y="295" class="t-muted" font-size="9" text-anchor="middle">two playgrounds</text>
         </g>
 
-        <g id="node-identity" data-node-id="identity" data-node-label="Private Identity" tabindex="0" role="button" aria-label="Focus Private Identity, tag:lab + Tailscale SSH, Create + identify" aria-pressed="false" data-node-kind="security" data-node-sublabel="tag:lab + Tailscale SSH" data-node-tag="no open ports" data-node-context="Create + identify">
-          <title>Private Identity · tag:lab + Tailscale SSH · Create + identify · no open ports</title>
+        <g id="node-identity" data-node-id="identity" data-node-label="Private Identity" tabindex="0" role="button" aria-label="Focus Private Identity, tag:lab + Tailscale SSH, Create + identify" aria-pressed="false" data-node-kind="security" data-node-sublabel="tag:lab + Tailscale SSH" data-node-tag="no public ingress" data-node-context="Create + identify">
+          <title>Private Identity · tag:lab + Tailscale SSH · Create + identify · no public ingress</title>
           <rect x="200" y="245" width="145" height="72" rx="6" class="c-mask"/>
           <rect x="200" y="245" width="145" height="72" rx="6" class="c-security" data-animate="node" style="--step:1" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(206 251) scale(0.6875)">
@@ -351,7 +351,7 @@ rect.c-bg-rect { fill: var(--bg); }
           </g>
           <text data-node-label="" x="272.5" y="279" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Private Identity</text>
         <text x="272.5" y="295" class="t-muted" font-size="9" text-anchor="middle">tag:lab + Tailscale SSH</text>
-        <text x="272.5" y="309" class="t-security" font-size="7" text-anchor="middle">no open ports</text>
+        <text x="272.5" y="309" class="t-security" font-size="7" text-anchor="middle">no public ingress</text>
         </g>
 
         <g id="node-preflight" data-node-id="preflight" data-node-label="Green Preflight" tabindex="0" role="button" aria-label="Focus Green Preflight, online, unique, reachable, Create + identify" aria-pressed="false" data-node-kind="security" data-node-sublabel="online, unique, reachable" data-node-tag="blocking gate" data-node-context="Create + identify">
@@ -379,8 +379,8 @@ rect.c-bg-rect { fill: var(--bg); }
         <text x="612.5" y="309" class="t-backend" font-size="7" text-anchor="middle">etcd quorum</text>
         </g>
 
-        <g id="node-cilium" data-node-id="cilium" data-node-label="Living Network" tabindex="0" role="button" aria-label="Focus Living Network, Cilium VXLAN + eBPF, Build + prove" aria-pressed="false" data-node-kind="messagebus" data-node-sublabel="Cilium VXLAN + eBPF" data-node-tag="5 nodes Ready" data-node-context="Build + prove">
-          <title>Living Network · Cilium VXLAN + eBPF · Build + prove · 5 nodes Ready</title>
+        <g id="node-cilium" data-node-id="cilium" data-node-label="Cilium Data Plane" tabindex="0" role="button" aria-label="Focus Cilium Data Plane, VXLAN + eBPF, Build + prove" aria-pressed="false" data-node-kind="messagebus" data-node-sublabel="VXLAN + eBPF" data-node-tag="5 workers Ready" data-node-context="Build + prove">
+          <title>Cilium Data Plane · VXLAN + eBPF · Build + prove · 5 workers Ready</title>
           <rect x="710" y="245" width="145" height="72" rx="6" class="c-mask"/>
           <rect x="710" y="245" width="145" height="72" rx="6" class="c-messagebus" data-animate="node" style="--step:4" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="messagebus" class="semantic-sigil s-messagebus" transform="translate(716 251) scale(0.6875)">
@@ -389,39 +389,39 @@ rect.c-bg-rect { fill: var(--bg); }
             <circle cx="10.5" cy="8" r="1" class="sigil-fill"/>
             <circle cx="7" cy="11.5" r="1" class="sigil-fill"/>
           </g>
-          <text data-node-label="" x="782.5" y="279" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Living Network</text>
-        <text x="782.5" y="295" class="t-muted" font-size="9" text-anchor="middle">Cilium VXLAN + eBPF</text>
-        <text x="782.5" y="309" class="t-messagebus" font-size="7" text-anchor="middle">5 nodes Ready</text>
+          <text data-node-label="" x="782.5" y="279" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Cilium Data Plane</text>
+        <text x="782.5" y="295" class="t-muted" font-size="9" text-anchor="middle">VXLAN + eBPF</text>
+        <text x="782.5" y="309" class="t-messagebus" font-size="7" text-anchor="middle">5 workers Ready</text>
         </g>
 
-        <g id="node-proof" data-node-id="proof" data-node-label="Evidence" tabindex="0" role="button" aria-label="Focus Evidence, L3/L4 connectivity, Build + prove" aria-pressed="false" data-node-kind="security" data-node-sublabel="L3/L4 connectivity" data-node-tag="all green" data-node-context="Build + prove">
-          <title>Evidence · L3/L4 connectivity · Build + prove · all green</title>
+        <g id="node-proof" data-node-id="proof" data-node-label="Verification" tabindex="0" role="button" aria-label="Focus Verification, network + conformance, Build + prove" aria-pressed="false" data-node-kind="security" data-node-sublabel="network + conformance" data-node-tag="zero test failures" data-node-context="Build + prove">
+          <title>Verification · network + conformance · Build + prove · zero test failures</title>
           <rect x="880" y="245" width="145" height="72" rx="6" class="c-mask"/>
           <rect x="880" y="245" width="145" height="72" rx="6" class="c-security" data-animate="node" style="--step:5" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(886 251) scale(0.6875)">
             <path d="M8 2.2 13 4v3.5c0 3.1-1.8 5.4-5 6.5-3.2-1.1-5-3.4-5-6.5V4Z"/>
             <path d="m5.8 8 1.5 1.5 3-3"/>
           </g>
-          <text data-node-label="" x="952.5" y="279" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Evidence</text>
-        <text x="952.5" y="295" class="t-muted" font-size="9" text-anchor="middle">L3/L4 connectivity</text>
-        <text x="952.5" y="309" class="t-security" font-size="7" text-anchor="middle">all green</text>
+          <text data-node-label="" x="952.5" y="279" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Verification</text>
+        <text x="952.5" y="295" class="t-muted" font-size="9" text-anchor="middle">network + conformance</text>
+        <text x="952.5" y="309" class="t-security" font-size="7" text-anchor="middle">zero test failures</text>
         </g>
 
-        <g id="node-identity_api" data-node-id="identity_api" data-node-label="Identity API" tabindex="0" role="button" aria-label="Focus Identity API, lab-k0s, two proxies, Share through identity" aria-pressed="false" data-node-kind="security" data-node-sublabel="lab-k0s, two proxies" data-node-tag="HTTPS + RBAC" data-node-context="Share through identity">
-          <title>Identity API · lab-k0s, two proxies · Share through identity · HTTPS + RBAC</title>
+        <g id="node-identity_api" data-node-id="identity_api" data-node-label="Tailscale API Proxy" tabindex="0" role="button" aria-label="Focus Tailscale API Proxy, lab-k0s, two replicas, Share through identity" aria-pressed="false" data-node-kind="security" data-node-sublabel="lab-k0s, two replicas" data-node-tag="HTTPS + RBAC" data-node-context="Share through identity">
+          <title>Tailscale API Proxy · lab-k0s, two replicas · Share through identity · HTTPS + RBAC</title>
           <rect x="1050" y="245" width="145" height="72" rx="6" class="c-mask"/>
           <rect x="1050" y="245" width="145" height="72" rx="6" class="c-security" data-animate="node" style="--step:6" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(1056 251) scale(0.6875)">
             <path d="M8 2.2 13 4v3.5c0 3.1-1.8 5.4-5 6.5-3.2-1.1-5-3.4-5-6.5V4Z"/>
             <path d="m5.8 8 1.5 1.5 3-3"/>
           </g>
-          <text data-node-label="" x="1122.5" y="279" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Identity API</text>
-        <text x="1122.5" y="295" class="t-muted" font-size="9" text-anchor="middle">lab-k0s, two proxies</text>
+          <text data-node-label="" x="1122.5" y="279" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Tailscale API Proxy</text>
+        <text x="1122.5" y="295" class="t-muted" font-size="9" text-anchor="middle">lab-k0s, two replicas</text>
         <text x="1122.5" y="309" class="t-security" font-size="7" text-anchor="middle">HTTPS + RBAC</text>
         </g>
 
-        <g id="node-shared_lab" data-node-id="shared_lab" data-node-label="Share the Lab" tabindex="0" role="button" aria-label="Focus Share the Lab, private, observable, real, Share through identity" aria-pressed="false" data-node-kind="frontend" data-node-sublabel="private, observable, real" data-node-tag="inspire safely" data-node-context="Share through identity">
-          <title>Share the Lab · private, observable, real · Share through identity · inspire safely</title>
+        <g id="node-shared_lab" data-node-id="shared_lab" data-node-label="Guest Access" tabindex="0" role="button" aria-label="Focus Guest Access, scoped RBAC, Share through identity" aria-pressed="false" data-node-kind="frontend" data-node-sublabel="scoped RBAC" data-node-tag="wildcard grant removed" data-node-context="Share through identity">
+          <title>Guest Access · scoped RBAC · Share through identity · wildcard grant removed</title>
           <rect x="1220" y="245" width="145" height="72" rx="6" class="c-mask"/>
           <rect x="1220" y="245" width="145" height="72" rx="6" class="c-frontend" data-animate="node" style="--step:7" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="frontend" class="semantic-sigil s-frontend" transform="translate(1226 251) scale(0.6875)">
@@ -430,9 +430,9 @@ rect.c-bg-rect { fill: var(--bg); }
             <circle cx="4.1" cy="4.8" r=".7" class="sigil-fill"/>
             <circle cx="6.3" cy="4.8" r=".7" class="sigil-fill"/>
           </g>
-          <text data-node-label="" x="1292.5" y="279" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Share the Lab</text>
-        <text x="1292.5" y="295" class="t-muted" font-size="9" text-anchor="middle">private, observable, real</text>
-        <text x="1292.5" y="309" class="t-frontend" font-size="7" text-anchor="middle">inspire safely</text>
+          <text data-node-label="" x="1292.5" y="279" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Guest Access</text>
+        <text x="1292.5" y="295" class="t-muted" font-size="9" text-anchor="middle">scoped RBAC</text>
+        <text x="1292.5" y="309" class="t-frontend" font-size="7" text-anchor="middle">wildcard grant removed</text>
         </g>
 
         <g id="node-stop_repair" data-node-id="stop_repair" data-node-label="Stop + Repair" tabindex="0" role="button" aria-label="Focus Stop + Repair, never build on red, Stop + recovery paths" aria-pressed="false" data-node-kind="security" data-node-sublabel="never build on red" data-node-context="Stop + recovery paths">
@@ -477,17 +477,17 @@ rect.c-bg-rect { fill: var(--bg); }
           <rect x="658.9" y="229" width="77.2" height="14" rx="3" class="c-mask"/>
           <text x="697.5" y="239" class="t-backend" font-size="8" text-anchor="middle">add data plane</text>
         </g>
-        <g data-edge-from="cilium" data-edge-to="proof" data-edge-label="test reality" data-edge-key="4" data-edge-id="test">
-          <rect x="833.7" y="229" width="67.6" height="14" rx="3" class="c-mask"/>
-          <text x="867.5" y="239" class="t-backend" font-size="8" text-anchor="middle">test reality</text>
+        <g data-edge-from="cilium" data-edge-to="proof" data-edge-label="run verification" data-edge-key="4" data-edge-id="test">
+          <rect x="824.1" y="229" width="86.8" height="14" rx="3" class="c-mask"/>
+          <text x="867.5" y="239" class="t-backend" font-size="8" text-anchor="middle">run verification</text>
         </g>
-        <g data-edge-from="proof" data-edge-to="identity_api" data-edge-label="ready to share" data-edge-key="5" data-edge-id="publish">
-          <rect x="999.4" y="321" width="77.2" height="14" rx="3" class="c-mask"/>
-          <text x="1038" y="331" class="t-security" font-size="8" text-anchor="middle">ready to share</text>
+        <g data-edge-from="proof" data-edge-to="identity_api" data-edge-label="zero failures" data-edge-key="5" data-edge-id="publish">
+          <rect x="1001.8" y="321" width="72.4" height="14" rx="3" class="c-mask"/>
+          <text x="1038" y="331" class="t-security" font-size="8" text-anchor="middle">zero failures</text>
         </g>
-        <g data-edge-from="identity_api" data-edge-to="shared_lab" data-edge-label="authorized access" data-edge-key="6" data-edge-id="authorize">
-          <rect x="1161.7" y="229" width="91.6" height="14" rx="3" class="c-mask"/>
-          <text x="1207.5" y="239" class="t-backend" font-size="8" text-anchor="middle">authorized access</text>
+        <g data-edge-from="identity_api" data-edge-to="shared_lab" data-edge-label="least-privilege access" data-edge-key="6" data-edge-id="authorize">
+          <rect x="1149.2" y="321" width="115.6" height="14" rx="3" class="c-mask"/>
+          <text x="1207" y="331" class="t-backend" font-size="8" text-anchor="middle">least-privilege access</text>
         </g>
         <g data-edge-from="preflight" data-edge-to="stop_repair" data-edge-label="red stops here" data-edge-key="7" data-edge-id="stop">
           <rect x="361.4" y="355" width="77.2" height="14" rx="3" class="c-mask"/>
