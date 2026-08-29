@@ -11,3 +11,4 @@ secrets/**
 !secrets/lab.sops.yaml
 # CocoIndex Code (ccc)
 /.cocoindex_code/
+/.codegraph/
