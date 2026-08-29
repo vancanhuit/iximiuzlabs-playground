@@ -5,11 +5,11 @@ disable_backends = ["asdf", "vfox"]
 
 [tools]
 python = "3.14.7"
-uv = { version = "0.12.4", depends = ["python"] }
-"pipx:ansible" = { version = "14.3.0", uvx_args = "--with-executables-from ansible-core,ansible-lint", depends = ["uv"] }
-kubectl = "1.36.3"
-cilium-cli = "0.19.7"
-gh = "2.97.0"
+uv = { version = "0.12.7", depends = ["python"] }
+"pipx:ansible" = { version = "14.3.1", uvx_args = "--with-executables-from ansible-core,ansible-lint", depends = ["uv"] }
+kubectl = "1.37.0"
+cilium-cli = "0.20.0"
+gh = "2.98.0"
 k0sctl = "0.32.2"
 helm = "4.2.4"
 sops = "3.13.3"
