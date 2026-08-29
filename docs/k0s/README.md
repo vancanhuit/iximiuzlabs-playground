@@ -66,6 +66,7 @@ cluster manifests currently use:
 | k0s / Kubernetes | `v1.36.3+k0s.0` |
 | Cilium | `v1.20.0` |
 | Tailscale Kubernetes Operator | `1.98.9` |
+| Sonobuoy | `v0.57.5` |
 
 Treat these as a tested set. Validate upgrades in a fresh playground before
 changing a shared or long-lived cluster.
@@ -398,7 +399,8 @@ Expected results:
 - Cilium, CoreDNS, Hubble, NLLB, and konnectivity Pods are running
 - the kube-proxy DaemonSet does not exist
 
-Run focused connectivity tests:
+Run focused connectivity tests after bootstrap, networking changes, and Cilium
+upgrades:
 
 ```bash
 cilium connectivity test \
@@ -407,6 +409,7 @@ cilium connectivity test \
   --test '^client-egress/' \
   --hubble=false \
   --flow-validation disabled \
+  --junit-file /tmp/cilium-connectivity-junit.xml \
   --timeout 15m
 
 cilium connectivity test --cleanup
@@ -416,7 +419,10 @@ These selectors cover baseline Pod connectivity, ClusterIP and NodePort
 Services, DNS resolution, and controlled client egress without enabling
 Cilium's Layer 7 proxy. The `dns-only` test is intentionally excluded because
 it validates DNS-aware L7 policy and requires Envoy, which this lab does not
-use.
+use. A successful run currently executes 70 actions across the two selected
+tests, including same-node and cross-node Pod traffic, ClusterIP and NodePort
+Services on every Tailscale node address, DNS, and Internet egress. Always run
+the cleanup command, including after an interrupted or failed test.
 
 Also inspect the effective MTU and Tailscale paths:
 
@@ -430,6 +436,109 @@ ssh root@node-01 tailscale ping node-02
 
 `tailscale0` should report MTU `1280`. With the documented uppercase Helm key,
 the Cilium interfaces and workload routes should report MTU `1230`.
+
+### Run Kubernetes conformance tests
+
+[Sonobuoy](https://sonobuoy.io/docs/v0.57.5/) runs the upstream Kubernetes e2e
+conformance suite without adding a permanent in-cluster component. Install the
+tested CLI version through mise without changing the repository tool pins:
+
+```bash
+mise install sonobuoy@0.57.5
+mise exec sonobuoy@0.57.5 -- sonobuoy version
+```
+
+Use the direct recovery context for the run and result transfer. The Tailscale
+ProxyGroup path is tested separately below; routing a large result archive
+through it adds an unrelated dependency to conformance collection.
+
+Run quick mode after bootstrap to verify the Sonobuoy harness, plugin image
+pulls, scheduling, and result collection:
+
+```bash
+(
+  set -euo pipefail
+  context=tailscale-k0s
+  trap 'mise exec sonobuoy@0.57.5 -- sonobuoy \
+    --context "$context" delete --wait' EXIT
+
+  mise exec sonobuoy@0.57.5 -- sonobuoy \
+    --context "$context" run --mode quick --wait
+  results=$(mise exec sonobuoy@0.57.5 -- sonobuoy \
+    --context "$context" retrieve /tmp)
+  mise exec sonobuoy@0.57.5 -- sonobuoy results "$results"
+)
+```
+
+Before accepting a Kubernetes, k0s, or Cilium upgrade, run the broader
+non-disruptive conformance profile. It takes about two hours on this lab:
+
+```bash
+(
+  set -euo pipefail
+  context=tailscale-k0s
+  trap 'mise exec sonobuoy@0.57.5 -- sonobuoy \
+    --context "$context" delete --wait' EXIT
+
+  mise exec sonobuoy@0.57.5 -- sonobuoy \
+    --context "$context" run --mode non-disruptive-conformance --wait
+  results=$(mise exec sonobuoy@0.57.5 -- sonobuoy \
+    --context "$context" retrieve /tmp)
+  mise exec sonobuoy@0.57.5 -- sonobuoy results "$results"
+)
+```
+
+Acceptance requires zero failed e2e tests and all five `systemd-logs` plugin
+results to pass. Inspect every failure in the retrieved archive. An isolated
+rerun can distinguish a transient from a repeatable defect, but it does not
+turn a failed full run into a passing upgrade gate. Sonobuoy's log summary also
+counts lines containing words such as `error` or `warning`; those counts are
+diagnostic leads, not failed tests by themselves.
+
+For a fresh cluster without workloads, run the complete certification profile.
+It includes disruptive conformance tests, so do not run it on a shared cluster
+without an outage window and backups:
+
+```bash
+(
+  set -euo pipefail
+  context=tailscale-k0s
+  trap 'mise exec sonobuoy@0.57.5 -- sonobuoy \
+    --context "$context" delete --all --wait' EXIT
+
+  mise exec sonobuoy@0.57.5 -- sonobuoy \
+    --context "$context" run --mode certified-conformance --wait
+  results=$(mise exec sonobuoy@0.57.5 -- sonobuoy \
+    --context "$context" retrieve /tmp)
+  sha256sum "$results"
+  mise exec sonobuoy@0.57.5 -- sonobuoy results "$results"
+)
+```
+
+The pinned Kubernetes `v1.36.3+k0s` and Sonobuoy `v0.57.5` set passed this
+profile with 453 e2e tests passed, zero failed, and all five node log plugins
+passed. The run took about two hours. The `--all` cleanup removes leaked
+`e2e-*` namespaces in addition to Sonobuoy's own resources. Preserve the result
+archive and checksum when conformance evidence must be retained beyond the
+playground lifetime.
+
+Finally, verify both API access paths and the ProxyGroup replicas:
+
+```bash
+kubectl --context tailscale-k0s get --raw=/readyz
+kubectl --context lab-k0s.<TAILNET_DNS_NAME>.ts.net get --raw=/readyz
+kubectl --context lab-k0s.<TAILNET_DNS_NAME>.ts.net auth whoami
+kubectl --context tailscale-k0s wait proxygroup/lab-k0s \
+  --for=condition=ProxyGroupReady=true \
+  --timeout=30s
+kubectl --context tailscale-k0s -n tailscale get pods \
+  -l tailscale.com/parent-resource=lab-k0s \
+  -o wide
+```
+
+Both readiness requests should return `ok`, `auth whoami` should show the
+expected Tailscale login rather than the direct admin certificate identity, and
+the two proxy Pods should be `Running` on different workers.
 
 ## 10. Optional: install the Tailscale Kubernetes Operator
 
