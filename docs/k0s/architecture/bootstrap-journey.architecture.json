@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "From Empty Machines to a Trusted Kubernetes Lab",
+    "subtitle": "Every layer earns the right to support the next.",
+    "output": "docs/k0s/architecture/bootstrap-journey.html",
+    "animation": "trace",
+    "visual_preset": "editorial",
+    "quality_profile": "showcase",
+    "viewBox": [1390, 700],
+    "views": [
+      {
+        "id": "identity-first",
+        "label": "Identity first",
+        "focus": ["machines", "identity", "preflight"],
+        "note": "Bootstrap starts only after eight named machines have verified private paths."
+      },
+      {
+        "id": "build-the-core",
+        "label": "Build the core",
+        "focus": ["preflight", "k0s", "cilium", "proof"],
+        "note": "A reviewed plan creates the control plane; tested networking makes it useful."
+      },
+      {
+        "id": "share-safely",
+        "label": "Share safely",
+        "focus": ["proof", "identity_api", "shared_lab"],
+        "note": "Tailscale identity and Kubernetes RBAC replace a public API endpoint."
+      },
+      {
+        "id": "recover",
+        "label": "Keep a way back",
+        "focus": ["stop_repair", "direct_recovery", "k0s"],
+        "note": "Bad preflight stops the build; direct controller access survives proxy failure."
+      }
+    ]
+  },
+  "components": [
+    {"id": "machines", "type": "cloud", "label": "Eight Machines", "sublabel": "two playgrounds", "pos": [30, 245], "size": [145, 72]},
+    {"id": "identity", "type": "security", "label": "Private Identity", "sublabel": "tag:lab + Tailscale SSH", "tag": "no open ports", "pos": [200, 245], "size": [145, 72]},
+    {"id": "preflight", "type": "security", "label": "Green Preflight", "sublabel": "online, unique, reachable", "tag": "blocking gate", "pos": [370, 245], "size": [145, 72]},
+    {"id": "k0s", "type": "backend", "label": "Resilient Core", "sublabel": "3 controllers + 5 workers", "tag": "etcd quorum", "pos": [540, 245], "size": [145, 72]},
+    {"id": "cilium", "type": "messagebus", "label": "Living Network", "sublabel": "Cilium VXLAN + eBPF", "tag": "5 nodes Ready", "pos": [710, 245], "size": [145, 72]},
+    {"id": "proof", "type": "security", "label": "Evidence", "sublabel": "L3/L4 connectivity", "tag": "all green", "pos": [880, 245], "size": [145, 72]},
+    {"id": "identity_api", "type": "security", "label": "Identity API", "sublabel": "lab-k0s, two proxies", "tag": "HTTPS + RBAC", "pos": [1050, 245], "size": [145, 72]},
+    {"id": "shared_lab", "type": "frontend", "label": "Share the Lab", "sublabel": "private, observable, real", "tag": "inspire safely", "pos": [1220, 245], "size": [145, 72]},
+    {"id": "stop_repair", "type": "security", "label": "Stop + Repair", "sublabel": "never build on red", "pos": [370, 430], "size": [145, 72]},
+    {"id": "direct_recovery", "type": "security", "label": "Direct Recovery", "sublabel": "controller kubeconfig", "tag": "independent path", "pos": [540, 430], "size": [145, 72]}
+  ],
+  "boundaries": [
+    {"kind": "region", "label": "Create + identify", "wraps": ["machines", "identity", "preflight"], "pad": 24},
+    {"kind": "region", "label": "Build + prove", "wraps": ["k0s", "cilium", "proof"], "pad": 24},
+    {"kind": "security-group", "label": "Share through identity", "wraps": ["identity_api", "shared_lab"], "pad": 24},
+    {"kind": "security-group", "label": "Stop + recovery paths", "wraps": ["stop_repair", "direct_recovery"], "pad": 24}
+  ],
+  "connections": [
+    {"id": "enroll", "from": "machines", "to": "identity", "label": "enroll", "variant": "security", "labelDy": -32},
+    {"id": "verify", "from": "identity", "to": "preflight", "label": "verify all eight", "variant": "security", "labelDy": -32},
+    {"id": "plan", "from": "preflight", "to": "k0s", "label": "reviewed plan", "variant": "emphasis", "labelAt": [528, 331]},
+    {"id": "network", "from": "k0s", "to": "cilium", "label": "add data plane", "variant": "emphasis", "labelDy": -32},
+    {"id": "test", "from": "cilium", "to": "proof", "label": "test reality", "variant": "emphasis", "labelDy": -32},
+    {"id": "publish", "from": "proof", "to": "identity_api", "label": "ready to share", "variant": "security", "labelAt": [1038, 331]},
+    {"id": "authorize", "from": "identity_api", "to": "shared_lab", "label": "authorized access", "variant": "emphasis", "labelDy": -32},
+    {"id": "stop", "from": "preflight", "to": "stop_repair", "label": "red stops here", "variant": "security", "fromSide": "bottom", "toSide": "top", "labelAt": [400, 365]},
+    {"id": "recover", "from": "k0s", "to": "direct_recovery", "label": "preserve recovery", "variant": "dashed", "fromSide": "bottom", "toSide": "top", "labelAt": [675, 365]}
+  ]
+}

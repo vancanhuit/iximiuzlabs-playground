@@ -1,0 +1,243 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "One Private Kubernetes Lab, Built Across Boundaries",
+    "subtitle": "Two disposable playgrounds become one resilient learning platform through identity-first networking.",
+    "output": "docs/k0s/architecture/lab-architecture.html",
+    "animation": "trace",
+    "visual_preset": "editorial",
+    "quality_profile": "showcase",
+    "viewBox": [1320, 760],
+    "views": [
+      {
+        "id": "big-idea",
+        "label": "The big idea",
+        "focus": ["people", "tailnet", "controllers", "workers"],
+        "note": "Tailscale joins machines from separate playgrounds into one private node network."
+      },
+      {
+        "id": "cluster-network",
+        "label": "Network layers",
+        "focus": ["tailnet", "workers", "cilium", "workloads", "internet"],
+        "note": "Tailscale is the node underlay; Cilium builds the Pod and Service data plane above it."
+      },
+      {
+        "id": "trusted-access",
+        "label": "Identity-first access",
+        "focus": ["people", "tailnet", "api_service", "proxygroup", "controllers"],
+        "note": "Routine kubectl access carries a Tailscale identity into Kubernetes RBAC."
+      },
+      {
+        "id": "recovery",
+        "label": "Recovery stays simple",
+        "focus": ["people", "break_glass", "controllers", "etcd"],
+        "note": "A direct client-certificate context remains available when in-cluster proxies are unavailable."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "people",
+      "type": "external",
+      "label": "Lab Owner + Guests",
+      "sublabel": "laptops on the tailnet",
+      "pos": [40, 290],
+      "size": [150, 72]
+    },
+    {
+      "id": "tailnet",
+      "type": "security",
+      "label": "Tailscale Tailnet",
+      "sublabel": "identity + encrypted underlay",
+      "tag": "tag:lab",
+      "pos": [250, 290],
+      "size": [170, 72]
+    },
+    {
+      "id": "api_service",
+      "type": "security",
+      "label": "lab-k0s Service",
+      "sublabel": "HTTPS + Tailscale identity",
+      "tag": "routine path",
+      "pos": [490, 115],
+      "size": [175, 72]
+    },
+    {
+      "id": "break_glass",
+      "type": "security",
+      "label": "Direct Kubeconfig",
+      "sublabel": "controller IP + client cert",
+      "tag": "recovery path",
+      "pos": [490, 440],
+      "size": [175, 72]
+    },
+    {
+      "id": "proxygroup",
+      "type": "backend",
+      "label": "API ProxyGroup",
+      "sublabel": "2 replicas inside the cluster",
+      "tag": "lab-k0s",
+      "pos": [745, 115],
+      "size": [180, 72]
+    },
+    {
+      "id": "controllers",
+      "type": "backend",
+      "label": "k0s Controllers",
+      "sublabel": "3 control-plane-only hosts",
+      "tag": "API :6443",
+      "pos": [745, 290],
+      "size": [180, 72]
+    },
+    {
+      "id": "etcd",
+      "type": "database",
+      "label": "etcd Quorum",
+      "sublabel": "3 members over Tailscale",
+      "tag": "TCP 2380",
+      "pos": [1010, 115],
+      "size": [170, 72]
+    },
+    {
+      "id": "workers",
+      "type": "backend",
+      "label": "k0s Workers",
+      "sublabel": "5 Kubernetes Nodes",
+      "tag": "100.x InternalIP",
+      "pos": [1010, 290],
+      "size": [170, 72]
+    },
+    {
+      "id": "cilium",
+      "type": "messagebus",
+      "label": "Cilium Data Plane",
+      "sublabel": "VXLAN + eBPF Services",
+      "tag": "MTU 1230",
+      "pos": [745, 570],
+      "size": [180, 72]
+    },
+    {
+      "id": "workloads",
+      "type": "cloud",
+      "label": "Workloads",
+      "sublabel": "Pods 10.244/16 + Services 10.96/12",
+      "pos": [1010, 570],
+      "size": [205, 72]
+    },
+    {
+      "id": "internet",
+      "type": "external",
+      "label": "Internet Services",
+      "sublabel": "registries + coordination + DERP",
+      "pos": [490, 570],
+      "size": [175, 72]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "security-group",
+      "label": "Identity and policy boundary",
+      "wraps": ["tailnet", "api_service", "break_glass"],
+      "pad": 26
+    },
+    {
+      "kind": "region",
+      "label": "iximiuz Labs: two playgrounds, one cluster",
+      "wraps": ["proxygroup", "controllers", "etcd", "workers", "cilium", "workloads"],
+      "pad": 30
+    }
+  ],
+  "connections": [
+    {
+      "id": "join-tailnet",
+      "from": "people",
+      "to": "tailnet",
+      "label": "authenticate",
+      "variant": "security",
+      "labelAt": [220, 376]
+    },
+    {
+      "id": "routine-api",
+      "from": "tailnet",
+      "to": "api_service",
+      "label": "kubectl HTTPS :443",
+      "variant": "emphasis"
+    },
+    {
+      "id": "service-to-proxies",
+      "from": "api_service",
+      "to": "proxygroup",
+      "label": "available replica",
+      "variant": "emphasis",
+      "labelAt": [705, 201]
+    },
+    {
+      "id": "proxy-to-api",
+      "from": "proxygroup",
+      "to": "controllers",
+      "label": "impersonated identity",
+      "variant": "security",
+      "labelAt": [835, 201]
+    },
+    {
+      "id": "direct-recovery",
+      "from": "tailnet",
+      "to": "break_glass",
+      "label": "recover",
+      "variant": "dashed"
+    },
+    {
+      "id": "recovery-to-api",
+      "from": "break_glass",
+      "to": "controllers",
+      "label": "client certificate :6443",
+      "variant": "dashed"
+    },
+    {
+      "id": "controller-quorum",
+      "from": "controllers",
+      "to": "etcd",
+      "label": "quorum",
+      "variant": "security"
+    },
+    {
+      "id": "worker-control",
+      "from": "controllers",
+      "to": "workers",
+      "label": "NLLB selects healthy API",
+      "variant": "emphasis",
+      "labelAt": [850, 390]
+    },
+    {
+      "id": "workers-to-cilium",
+      "from": "workers",
+      "to": "cilium",
+      "label": "node datapath"
+    },
+    {
+      "id": "cilium-to-workloads",
+      "from": "cilium",
+      "to": "workloads",
+      "label": "Pod + Service networking",
+      "variant": "emphasis",
+      "labelAt": [968, 656]
+    },
+    {
+      "id": "pod-egress",
+      "from": "cilium",
+      "to": "internet",
+      "label": "masqueraded via eth0",
+      "variant": "dashed",
+      "labelAt": [705, 656]
+    },
+    {
+      "id": "tailscale-underlay",
+      "from": "tailnet",
+      "to": "controllers",
+      "label": "encrypted node underlay",
+      "variant": "security",
+      "labelAt": [560, 390]
+    }
+  ]
+}

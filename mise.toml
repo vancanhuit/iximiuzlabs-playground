@@ -5,9 +5,6 @@ lockfile = true
 [tools]
 python = "3.14.7"
 uv = { version = "0.12.7", depends = ["python"] }
-"pipx:ansible" = { version = "14.3.1", uvx_args = "--with-executables-from ansible-core,ansible-lint", depends = [
-  "uv",
-] }
 kubectl = "1.37.0"
 cilium-cli = "0.20.0"
 gh = "2.98.0"

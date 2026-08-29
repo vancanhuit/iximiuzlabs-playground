@@ -1,17 +1,11 @@
-cluster:
-  name: tailscale-k0s
-
 kubeProxyReplacement: true
-rollOutCiliumPods: true
+l7Proxy: false
 
 socketLB:
   hostNamespaceOnly: true
 
 bpf:
-  datapathMode: veth
   masquerade: true
-  hostLegacyRouting: false
-  tproxy: true
 
 nodePort:
   directRoutingDevice: tailscale0
@@ -21,12 +15,14 @@ k8sServiceHost: "127.0.0.1"
 k8sServicePort: "7443"
 
 devices:
+  - eth0
   - tailscale0
-forceDeviceDetection: true
 
 routingMode: tunnel
 tunnelProtocol: vxlan
 underlayProtocol: ipv4
+# tailscale0 uses MTU 1280; reserve 50 bytes for the Cilium VXLAN envelope.
+MTU: 1230
 
 ipam:
   mode: cluster-pool
@@ -37,21 +33,8 @@ ipam:
 
 operator:
   replicas: 2
-  rollOutPods: true
-
-envoy:
-  enabled: true
-  rollOutPods: true
-
-gatewayAPI:
-  enabled: true
-  gatewayClass:
-    create: true
-  hostNetwork:
-    enabled: false
 
 hubble:
-  enabled: true
   relay:
     enabled: true
   ui:

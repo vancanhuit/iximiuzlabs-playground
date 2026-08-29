@@ -29,8 +29,7 @@ This repository provides:
 - single-machine Debian playgrounds for testing those images
 - two multi-machine playgrounds that form an eight-node Kubernetes lab over
   Tailscale
-- a `k0s` cluster definition with Cilium, Gateway API, Envoy, and Hubble
-- Ansible automation for an alternative kubeadm-based setup
+- a `k0s` cluster definition with Cilium, Hubble, and private Tailscale API access
 
 ## Repository map
 
@@ -45,7 +44,6 @@ This repository provides:
 | [`docs/k0s/k0s.yaml`](docs/k0s/k0s.yaml) | Eight-node `k0sctl` cluster definition |
 | [`docs/k0s/cilium-values.yaml`](docs/k0s/cilium-values.yaml) | Cilium Helm values for the `k0s` cluster |
 | [`docs/k0s/README.md`](docs/k0s/README.md) | Full `k0s` and Cilium runbook |
-| [`ansible/README.md`](ansible/README.md) | Ansible and kubeadm runbook |
 
 ## 1. Prepare the control host
 
@@ -75,8 +73,8 @@ labctl auth login
 labctl auth whoami
 ```
 
-`mise.toml` pins Python, `uv`, Ansible, `kubectl`, Cilium CLI, GitHub CLI,
-`k0sctl`, and Helm. Docker and `labctl` are installed separately.
+`mise.toml` pins Python, `uv`, `kubectl`, Cilium CLI, GitHub CLI, `k0sctl`,
+Helm, SOPS, and age. Docker, Tailscale, and `labctl` are installed separately.
 
 Verify access before changing infrastructure:
 
@@ -254,26 +252,20 @@ ssh root@node-01 hostname
 The manifests install and start `tailscaled`; the enrollment command joins each
 machine to the tailnet and enables Tailscale SSH.
 
-## 6. Bootstrap Kubernetes
+## 6. Bootstrap Kubernetes with k0s
 
-Choose one cluster workflow. Do not run both against the same machines.
-
-> **Recommendation:** Use the `k0s` workflow for this lab. It is the fully
-> tested and reproducible path documented in this repository. `k0s` provides
-> more deployment flexibility here than the integrated RKE2 stack, while
-> `k0sctl` makes the multi-controller setup easier to reproduce than the manual
-> kubeadm workflow.
-
-### `k0s` with Cilium
+The k0s workflow is the repository's single supported Kubernetes path. It is
+tested end to end across both playgrounds and uses `k0sctl` to reproduce the
+multi-controller cluster.
 
 Use the dedicated [`k0s` runbook](docs/k0s/README.md) for:
 
 1. `k0sctl` dry-run and bootstrap
 2. multihomed controller API binding through `tailscale0`
 3. local kubeconfig installation
-4. Gateway API CRD installation
-5. Cilium kube-proxy replacement, Envoy, and Hubble
-6. cluster and connectivity verification
+4. Cilium kube-proxy replacement and Hubble
+5. cluster and connectivity verification
+6. private Kubernetes API access through the Tailscale operator
 
 Quick entry point:
 
@@ -284,22 +276,6 @@ k0sctl apply --config docs/k0s/k0s.yaml
 
 Workers remain `NotReady` until Cilium is installed. Continue through the full
 runbook before evaluating cluster health.
-
-### Ansible and kubeadm
-
-> **Experimental:** The Ansible roles and kubeadm runbook are not fully tested.
-> Treat them as development references, not the supported deployment path for
-> this lab.
-
-Use the [Ansible runbook](ansible/README.md) for host preparation and the
-alternative kubeadm workflow:
-
-```bash
-cd ansible
-ansible-playbook k8s.yaml
-```
-
-This path also disables kube-proxy and installs Cilium separately.
 
 ## 7. Operate playground sessions
 
@@ -375,9 +351,9 @@ ssh root@control-plane-01 tailscale status
 ssh root@node-01 tailscale status
 ```
 
-See the [`k0s` Tailscale notes](docs/k0s/README.md#tailscale-networking-notes)
-for ports, MTU, address stability, API availability, and Gateway listener
-caveats.
+See the [`k0s` runbook](docs/k0s/README.md) for tailnet policy, required ports,
+MTU, address stability, API availability, connectivity diagnostics, and
+recovery procedures.
 
 ## References
 
@@ -389,4 +365,3 @@ caveats.
 - [`tailscale up`](https://tailscale.com/docs/reference/tailscale-cli/up)
 - [Tailscale SSH](https://tailscale.com/docs/features/tailscale-ssh)
 - [`k0s` cluster runbook](docs/k0s/README.md)
-- [Ansible and kubeadm runbook](ansible/README.md)
