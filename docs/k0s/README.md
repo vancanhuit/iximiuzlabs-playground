@@ -478,7 +478,7 @@ non-disruptive conformance profile. It takes about two hours on this lab:
   set -euo pipefail
   context=tailscale-k0s
   trap 'mise exec sonobuoy@0.57.5 -- sonobuoy \
-    --context "$context" delete --wait' EXIT
+    --context "$context" delete --all --wait' EXIT
 
   mise exec sonobuoy@0.57.5 -- sonobuoy \
     --context "$context" run --mode non-disruptive-conformance --wait
@@ -487,6 +487,10 @@ non-disruptive conformance profile. It takes about two hours on this lab:
   mise exec sonobuoy@0.57.5 -- sonobuoy results "$results"
 )
 ```
+
+The pinned Kubernetes `v1.36.3+k0s` and Sonobuoy `v0.57.5` set passed this
+profile with 451 e2e tests passed, zero failed, and all five node log plugins
+passed. The run took about 1 hour 51 minutes.
 
 Acceptance requires zero failed e2e tests and all five `systemd-logs` plugin
 results to pass. Inspect every failure in the retrieved archive. An isolated
