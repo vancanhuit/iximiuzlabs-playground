@@ -27,13 +27,15 @@ applications through Tailscale identities, not by routing all cluster CIDRs.
 
 ## Architecture and invariants
 
-[![Interactive k0s lab architecture](architecture/lab-architecture.visual-check.1440x900.light.png)](architecture/lab-architecture.html)
+[![Interactive k0s lab architecture](architecture/lab-architecture.svg)](architecture/lab-architecture.html)
 
 Open the [interactive architecture](architecture/lab-architecture.html) to use
 guided chapters, trace relationships, switch themes, present full-screen, or
 export the diagram. The companion
 [bootstrap journey](architecture/bootstrap-journey.html) tells the deployment
 story from eight empty machines to identity-aware shared access.
+
+[![Interactive k0s bootstrap journey](architecture/bootstrap-journey.svg)](architecture/bootstrap-journey.html)
 
 The configuration depends on these invariants:
 
