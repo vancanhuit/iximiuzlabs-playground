@@ -1,3 +1,7 @@
 creation_rules:
   - path_regex: ^secrets/.*\.sops\.ya?ml$
     age: age134tr568at5vanpnt2f29925cxflwtzy2cmxrvcwt2e9tupm48vusvrl2t0
+
+stores:
+  yaml:
+    indent: 2
