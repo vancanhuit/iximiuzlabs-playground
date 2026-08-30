@@ -88,6 +88,9 @@ Treat these versions as one tested set. Validate upgrades in a fresh playground 
 | Tailscale Kubernetes Operator | `1.102.3` |
 | cert-manager | `v1.21.1` |
 | ingress-nginx | chart `4.15.1`, controller `v1.15.1` |
+| Envoy Gateway | `v1.9.1` |
+| ExternalDNS | chart `1.21.1`, controller `v0.21.0` |
+| Echo Server | `0.9.2` |
 | Sonobuoy | `v0.57.5` |
 
 The repository pins client tools in [`../../mise.toml`](../../mise.toml).
@@ -774,6 +777,145 @@ openssl s_client \
 
 **If it fails:** Inspect `Certificate`, `Order`, and `Challenge` events; verify the Cloudflare token permissions and public TXT propagation; check ingress-nginx, the `hubble-ui` endpoints, the Tailscale Service and operator logs, the tailnet grant for `tag:k8s` on TCP ports `80` and `443`, and that the application `A` record remains DNS-only.
 
+### Deploy Echo Server through Gateway API
+
+Deploy Envoy Gateway as the Gateway API implementation, expose its managed Envoy Service through the Tailscale operator, and let ExternalDNS maintain the DNS-only Cloudflare record for `echo.playground.canhdinh.com`. The application address remains private: Cloudflare is authoritative for DNS and ACME DNS-01 only, while tailnet policy controls access to the Envoy gateway.
+
+Install the pinned Envoy Gateway release. Its chart installs the Gateway API and Envoy Gateway CRDs before starting the controller:
+
+```bash
+helm upgrade --install envoy-gateway \
+  oci://docker.io/envoyproxy/gateway-helm \
+  --version v1.9.1 \
+  --namespace envoy-gateway-system \
+  --create-namespace \
+  --kube-context tailscale-k0s \
+  --wait
+
+kubectl --context tailscale-k0s apply \
+  -f docs/k0s/envoy-gateway-tailscale.yaml
+kubectl --context tailscale-k0s wait gatewayclass/tailscale \
+  --for=condition=Accepted=True --timeout=2m
+```
+
+Enable cert-manager's Gateway API controller after the CRDs exist, then create the application and controller namespaces:
+
+```bash
+helm upgrade cert-manager \
+  oci://quay.io/jetstack/charts/cert-manager \
+  --version v1.21.1 \
+  --namespace cert-manager \
+  --set crds.enabled=true \
+  --set config.gatewayAPI.enabled=true \
+  --kube-context tailscale-k0s \
+  --wait
+
+kubectl --context tailscale-k0s create namespace echo \
+  --dry-run=client -o yaml | kubectl --context tailscale-k0s apply -f -
+kubectl --context tailscale-k0s create namespace external-dns \
+  --dry-run=client -o yaml | kubectl --context tailscale-k0s apply -f -
+```
+
+Create separate least-privilege Cloudflare Secrets for cert-manager and ExternalDNS. Both tokens need `Zone - DNS - Edit` and `Zone - Zone - Read` for `canhdinh.com`. Keep the ClusterIssuer token in cert-manager's cluster resource namespace so application workloads cannot mount it:
+
+```bash
+(
+  set -euo pipefail
+  if [[ $- == *x* ]]; then
+    printf 'Disable shell tracing before handling Cloudflare credentials.\n' >&2
+    exit 1
+  fi
+  cert_token_file=$(mktemp)
+  dns_token_file=$(mktemp)
+  trap 'rm -f "$cert_token_file" "$dns_token_file"' EXIT
+  umask 077
+  sops decrypt --extract \
+    '["cloudflare"]["cert_manager_api_token"]' \
+    secrets/lab.sops.yaml >"$cert_token_file"
+  sops decrypt --extract \
+    '["cloudflare"]["external_dns_api_token"]' \
+    secrets/lab.sops.yaml >"$dns_token_file"
+
+  kubectl --context tailscale-k0s -n cert-manager \
+    create secret generic cloudflare-api-token \
+    --from-file=api-token="$cert_token_file" \
+    --dry-run=client -o yaml | \
+    kubectl --context tailscale-k0s apply -f -
+  kubectl --context tailscale-k0s -n external-dns \
+    create secret generic cloudflare-api-token \
+    --from-file=api-token="$dns_token_file" \
+    --dry-run=client -o yaml | \
+    kubectl --context tailscale-k0s apply -f -
+)
+```
+
+Render the shared ClusterIssuer's ACME contact without writing it to the repository:
+
+```bash
+(
+  set -euo pipefail
+  ACME_EMAIL=$(sops decrypt --extract \
+    '["acme"]["email"]' secrets/lab.sops.yaml)
+  export ACME_EMAIL
+  trap 'unset ACME_EMAIL' EXIT
+  envsubst <docs/k0s/cert-manager-cloudflare.yaml | \
+    kubectl --context tailscale-k0s apply -f -
+)
+
+kubectl --context tailscale-k0s wait \
+  clusterissuer/letsencrypt-cloudflare \
+  --for=condition=Ready=True --timeout=2m
+```
+
+Install ExternalDNS with a `sync` policy, a route and Gateway label filter, a unique TXT owner ID, and an exact Cloudflare zone ID filter. The controller deletes only records it owns when their source routes disappear:
+
+```bash
+helm upgrade --install external-dns \
+  external-dns \
+  --repo https://kubernetes-sigs.github.io/external-dns \
+  --version 1.21.1 \
+  --namespace external-dns \
+  --values docs/k0s/external-dns-values.yaml \
+  --kube-context tailscale-k0s \
+  --wait
+```
+
+Deploy Echo Server `0.9.2`, then wait for the workload, route, certificate, and Tailscale-backed Gateway address:
+
+```bash
+kubectl --context tailscale-k0s apply \
+  -f docs/k0s/echo-server.yaml
+
+kubectl --context tailscale-k0s -n echo \
+  rollout status deployment/echo-server --timeout=5m
+kubectl --context tailscale-k0s -n echo \
+  wait gateway/echo --for=condition=Programmed=True --timeout=5m
+kubectl --context tailscale-k0s -n echo \
+  wait certificate/echo-playground-canhdinh-com-tls \
+  --for=condition=Ready=True --timeout=5m
+kubectl --context tailscale-k0s -n echo \
+  wait httproute/echo \
+  --for=jsonpath='{.status.parents[0].conditions[?(@.type=="Accepted")].status}'=True \
+  --timeout=5m
+```
+
+Verify from a policy-authorized tailnet client:
+
+```bash
+dig +short echo.playground.canhdinh.com A
+tailscale ping gateway-envoy
+curl --fail --show-error \
+  'https://echo.playground.canhdinh.com/?echo_body=gateway-api'
+openssl s_client \
+  -connect echo.playground.canhdinh.com:443 \
+  -servername echo.playground.canhdinh.com </dev/null 2>/dev/null | \
+  openssl x509 -noout -issuer -subject -dates
+```
+
+**Expected result:** ExternalDNS creates a DNS-only `A` record containing the Gateway's private `100.x` Tailscale address, cert-manager obtains an ECDSA certificate through Cloudflare DNS-01, the `HTTPRoute` is accepted, and HTTPS returns `"gateway-api"` from Echo Server. Cloudflare never proxies application traffic.
+
+**If it fails:** Check Gateway and `HTTPRoute` conditions first, then inspect the Envoy Gateway, Tailscale operator, ExternalDNS, and cert-manager logs. Confirm both Cloudflare tokens are limited to the expected zone, the Gateway address is present, the DNS record is not proxied, and tailnet grants permit clients to reach `gateway-envoy` on TCP `443`.
+
 ## Verification
 
 Complete every check before recording a successful run:
@@ -787,6 +929,7 @@ Complete every check before recording a successful run:
 - [ ] The selected Sonobuoy profile reports zero e2e failures
 - [ ] Both API paths return `ok` when the ProxyGroup is installed
 - [ ] `hubble-ui.playground.canhdinh.com` presents a valid certificate and reaches Hubble UI only from the tailnet
+- [ ] The Echo Gateway and route are accepted, its Certificate is ready, and private HTTPS returns the expected body
 
 Verify both API paths and ProxyGroup replicas:
 
@@ -998,6 +1141,10 @@ Use observed symptoms to select the narrowest corrective action:
 | HTTPS presents the ingress default certificate | `hubble-ui-tls` is missing, invalid, or not loaded by ingress-nginx | Check the Certificate condition, Secret type, Ingress TLS reference, and ingress-nginx events and logs |
 | Hubble hostname resolves but TCP 443 fails | The DNS record points to a stale Tailscale Service IP or tailnet policy denies access | Compare the DNS-only `A` record with the Service external IP and verify the TCP 443 grant |
 | HTTPS returns `503 Service Temporarily Unavailable` | The Ingress cannot reach Cilium's `hubble-ui` Service endpoints | Check the Ingress backend, `hubble-ui` endpoints, Hubble UI Pod readiness, and ingress-nginx logs |
+| Echo Gateway remains unprogrammed | Envoy could not provision its data plane or the Tailscale LoadBalancer | Inspect Gateway conditions, Envoy Gateway Pods, the generated Service, and Tailscale operator logs |
+| Echo `HTTPRoute` is not accepted | Its hostname, parent reference, listener, or namespace policy does not match | Inspect `status.parents` and keep the route in the `echo` namespace unless the Gateway policy is intentionally broadened |
+| Echo DNS resolves to a stale address | ExternalDNS is unhealthy or cannot update the Cloudflare zone | Compare the Gateway address with the DNS-only `A` record; inspect ExternalDNS logs, token scope, zone filter, and TXT ownership record |
+| Echo Certificate remains `Ready=False` | The ClusterIssuer, cert-manager namespace token, or DNS-01 propagation failed | Inspect the ClusterIssuer, Certificate, Order, and Challenge without printing the token |
 | `_acme-challenge` TXT remains after issuance | Challenge cleanup failed or another ACME flow owns the record | Inspect active Challenges before deleting anything; let cert-manager reconcile first |
 
 ## Rollback and safe teardown
@@ -1016,11 +1163,42 @@ kubectl --context tailscale-k0s -n kube-system \
   delete secret cloudflare-api-token
 helm --kube-context tailscale-k0s -n ingress-nginx \
   uninstall ingress-nginx
-helm --kube-context tailscale-k0s -n cert-manager \
-  uninstall cert-manager
 ```
 
-Delete the DNS-only `hubble-ui.playground.canhdinh.com` `A` record after the Tailscale Service is gone. Do not delete `_acme-challenge` TXT records manually until active cert-manager Challenges have been inspected. Helm intentionally retains cert-manager custom resource definitions to prevent accidental data loss; remove them only when no certificate resources remain anywhere in the cluster and permanent cert-manager removal is intended.
+Delete the DNS-only `hubble-ui.playground.canhdinh.com` `A` record after the Tailscale Service is gone. Do not delete `_acme-challenge` TXT records manually until active cert-manager Challenges have been inspected. Preserve cert-manager while Echo or any other certificate consumer remains. If no `Certificate`, `Issuer`, or `ClusterIssuer` resources remain and permanent removal is intended, uninstall cert-manager separately. Helm intentionally retains cert-manager custom resource definitions to prevent accidental data loss; remove them only after confirming no certificate resources remain anywhere in the cluster.
+
+To remove Echo Server while preserving shared Gateway API, DNS, and certificate controllers, delete the route and Gateway first. Wait for ExternalDNS to remove its owned Cloudflare records before removing the namespace:
+
+```bash
+kubectl --context tailscale-k0s -n echo \
+  delete httproute echo gateway echo
+
+until [[ -z $(dig +short echo.playground.canhdinh.com A) ]]; do
+  sleep 5
+done
+
+kubectl --context tailscale-k0s delete namespace echo
+```
+
+The Tailscale operator removes the Envoy LoadBalancer proxy after the Gateway disappears. If the DNS record remains after two ExternalDNS reconciliation intervals, inspect the controller logs and remove only `echo.playground.canhdinh.com` plus its ExternalDNS ownership TXT record after confirming their owner ID is `lab-k0s-gateway`. Do not uninstall shared controllers merely to remove Echo Server.
+
+Remove the shared components only when no other Gateways, routes, certificates, or managed DNS records depend on them:
+
+```bash
+kubectl --context tailscale-k0s delete \
+  -f docs/k0s/envoy-gateway-tailscale.yaml
+helm --kube-context tailscale-k0s -n external-dns \
+  uninstall external-dns
+kubectl --context tailscale-k0s delete namespace external-dns
+kubectl --context tailscale-k0s delete \
+  clusterissuer letsencrypt-cloudflare
+kubectl --context tailscale-k0s -n cert-manager \
+  delete secret cloudflare-api-token
+helm --kube-context tailscale-k0s -n envoy-gateway-system \
+  uninstall envoy-gateway
+```
+
+The Envoy Gateway Helm release owns Gateway API and Envoy CRDs. Helm does not remove CRDs during uninstall; delete them only after confirming no resources of those APIs remain and permanent removal is intended.
 
 Before destroying playgrounds, export workload data and an etcd backup. Then complete these actions:
 
@@ -1053,6 +1231,7 @@ Update this table after every deployment, upgrade, recovery, or teardown:
 | 2026-08-29 | Not recorded | Converted the deployment guide into an operational runbook |
 | 2026-08-30 | Repository owner and OpenCode | Rebuilt two playgrounds from scratch; verified k0s, Cilium connectivity, Sonobuoy quick mode, and both Kubernetes API paths |
 | 2026-08-30 | Repository owner and OpenCode | Exposed Hubble UI through a private Tailscale LoadBalancer; installed cert-manager and ingress-nginx; issued and verified a Let's Encrypt ECDSA certificate with Cloudflare DNS-01 |
+| 2026-08-30 | Repository owner and OpenCode | Deployed Echo Server through Envoy Gateway and a private Tailscale LoadBalancer; automated Cloudflare DNS with ExternalDNS and issued a Let's Encrypt ECDSA certificate with DNS-01 |
 
 ## Supporting references
 
@@ -1074,6 +1253,11 @@ Use these sources to validate version-specific behavior:
 - [Kubernetes API access over Tailscale](https://tailscale.com/docs/kubernetes-operator/api-server-access/setup-api-over-tailscale)
 - [Tailscale and Cilium compatibility](https://tailscale.com/docs/kubernetes-operator/reference/compatibility)
 - [Tailscale Layer 3 workload exposure](https://tailscale.com/docs/kubernetes-operator/ingress/expose-workload-to-tailnet-l3)
+- [Tailscale custom domains with Gateway API](https://tailscale.com/docs/solutions/kubernetes-operator-byod-gateway-api)
+- [Envoy Gateway Helm installation](https://gateway.envoyproxy.io/docs/install/install-helm/)
+- [ExternalDNS Gateway sources](https://kubernetes-sigs.github.io/external-dns/latest/docs/sources/gateway/)
+- [ExternalDNS Cloudflare provider](https://kubernetes-sigs.github.io/external-dns/latest/docs/tutorials/cloudflare/)
 - [cert-manager installation with Helm](https://cert-manager.io/docs/installation/helm/)
 - [cert-manager Cloudflare DNS-01](https://cert-manager.io/docs/configuration/acme/dns01/cloudflare/)
+- [cert-manager Gateway certificates](https://cert-manager.io/docs/usage/gateway/)
 - [ingress-nginx installation](https://kubernetes.github.io/ingress-nginx/deploy/)

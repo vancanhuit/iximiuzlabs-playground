@@ -1,0 +1,20 @@
+provider:
+  name: cloudflare
+env:
+  - name: CF_API_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: cloudflare-api-token
+        key: api-token
+sources:
+  - gateway-httproute
+policy: sync
+registry: txt
+txtOwnerId: lab-k0s-gateway
+domainFilters:
+  - playground.canhdinh.com
+extraArgs:
+  - --gateway-label-filter=external-dns==enabled
+  - --zone-id-filter=2185aa72445518dc56956cc797c7786a
+  - --cloudflare-dns-records-per-page=5000
+  - --cloudflare-record-comment=Managed by external-dns on lab-k0s
