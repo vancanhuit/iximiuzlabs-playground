@@ -7,7 +7,7 @@
 
 Use this runbook to publish the Debian Trixie images and deploy their custom [iximiuz Labs playgrounds](https://labs.iximiuz.com). It also prepares the eight Kubernetes hosts for the separate k0s cluster runbook.
 
-Use [`docs/k0s/README.md`](docs/k0s/README.md) after both Kubernetes playgrounds are running and every host is connected to Tailscale. That runbook owns k0s, Cilium, conformance testing, and private Kubernetes API access.
+Use [`docs/k0s/README.md`](docs/k0s/README.md) after both Kubernetes playgrounds are running. That runbook owns tailnet policy, machine enrollment, k0s, Cilium, conformance testing, and private Kubernetes API access.
 
 > **Reference environment**: This repository records one tested lab. It is not a drop-in configuration for another account or network. Before running commands, review these values:
 >
@@ -52,7 +52,7 @@ Complete these checks before changing images or playgrounds:
 - [ ] Authenticate `gh` with permission to publish packages to `ghcr.io/vancanhuit`
 - [ ] Authenticate `labctl` to the target iximiuz Labs account
 - [ ] Confirm the repository-specific registry paths, machine names, resources, subnets, and cluster ranges
-- [ ] Obtain a Tailscale authentication key that can assign `tag:lab` when deploying Kubernetes playgrounds
+- [ ] Obtain administrator access to the Tailscale tailnet before deploying Kubernetes playgrounds
 
 ## Secret management with SOPS and age
 
@@ -294,7 +294,7 @@ Replace the manifest path with `dev.manifest.yaml` for the development playgroun
 
 ### Step 5: Create the Kubernetes playgrounds
 
-Create both multi-machine playgrounds before enrolling their eight hosts in Tailscale.
+Create both multi-machine playgrounds. The k0s runbook enrolls their eight hosts in Tailscale after applying the checked-in tailnet policy.
 
 Tailscale connects the hosts in two iximiuz Labs playgrounds:
 
@@ -317,65 +317,28 @@ labctl playground create kubernetes-02 \
 
 Start one session for each generated playground.
 
-### Enroll machines in Tailscale
+Do not enroll the machines from this runbook. Continue with the k0s runbook so its tailnet policy, SOPS credential handling, duplicate-hostname checks, route review, and address discovery remain in order. In particular, do not enable `--accept-routes` without the explicit routed-subnet requirement and CIDR review described there.
 
-For repeatable lab provisioning, create a reusable Tailscale authentication key that assigns `tag:lab`:
+**Expected result:** Both playground sessions run, and their eight machines are available for the enrollment procedure.
 
-1. Define `tag:lab` and its owners in the tailnet policy.
-2. Add network and Tailscale SSH policy rules that let the control host reach `tag:lab` machines as `root`.
-3. Generate a reusable authentication key in the Tailscale admin console. Assign `tag:lab`. Preapprove the key if your tailnet requires device approval.
-
-Store the key in `/run/secrets/tailscale-auth-key` with mode `600`. Then run this command on each machine:
-
-```bash
-sudo tailscale up \
-  --auth-key=file:/run/secrets/tailscale-auth-key \
-  --ssh \
-  --accept-routes \
-  --advertise-tags=tag:lab
-```
-
-Reusable authentication keys can enroll multiple machines, so handle them as secrets. Never commit the key or add it to a manifest. Remove the temporary key file after enrollment.
-
-`--accept-routes` accepts subnet routes that other tailnet nodes advertise. Omit it when this lab shouldn’t consume those routes. Revoke the key after provisioning the final machine. Revocation doesn’t deauthorize enrolled machines.
-
-Verify that every host responds through its Tailscale name and Internet Protocol (IP) address:
-
-```bash
-tailscale status
-ssh root@control-plane-01 hostname
-ssh root@control-plane-02 hostname
-ssh root@control-plane-03 hostname
-ssh root@node-01 hostname
-```
-
-The manifests install and start `tailscaled`. The enrollment command connects each machine to the tailnet and enables Tailscale SSH.
-
-**Expected result:** Both playground sessions run, and all eight unique hostnames respond through Tailscale and SSH.
-
-**If it fails:** Stop before running k0s. Check the authentication key, tag ownership, device approval, duplicate hostnames, and tailnet ACLs.
+**If it fails:** Resolve playground creation or startup before configuring Tailscale or running k0s.
 
 ### Step 6: Hand off to the k0s runbook
 
-Follow the dedicated runbook to bootstrap and verify the supported Kubernetes configuration.
+Follow the dedicated runbook from Step 1 to bootstrap and verify the supported Kubernetes configuration. Do not skip directly to `k0sctl apply`: the preceding steps establish tailnet policy, enroll and verify every host, reject conflicting routes, and populate the current Tailscale addresses in `docs/k0s/k0s.yaml`.
 
 The k0s workflow is the repository’s supported Kubernetes path. The tested workflow uses `k0sctl` across both playgrounds to reproduce the multi-controller cluster.
 
 Use the dedicated [`k0s` runbook](docs/k0s/README.md) for:
 
-1. `k0sctl` dry-run and bootstrap
-2. multihomed controller API binding through `tailscale0`
-3. local kubeconfig installation
-4. Cilium kube-proxy replacement and Hubble
-5. cluster and connectivity verification
-6. private Kubernetes API access through the Tailscale operator
-
-Preview the k0s changes, then apply them:
-
-```bash
-k0sctl apply --config docs/k0s/k0s.yaml --dry-run
-k0sctl apply --config docs/k0s/k0s.yaml
-```
+1. tailnet policy and secure enrollment of all eight machines
+2. Tailscale underlay, route, hostname, and address verification
+3. `k0sctl` dry-run and bootstrap
+4. multihomed controller API binding through `tailscale0`
+5. local kubeconfig installation
+6. Cilium kube-proxy replacement and Hubble
+7. cluster and connectivity verification
+8. private Kubernetes API access through the Tailscale operator
 
 Workers remain `NotReady` until you install Cilium. Complete the runbook before evaluating cluster health.
 
