@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Hubble UI Certificate Issuance with Cloudflare DNS-01",
+    "output": "docs/k0s/architecture/hubble-dns01.html",
+    "quality_profile": "showcase",
+    "column_fit": "spread",
+    "viewBox": [1080, 560],
+    "views": [
+      {
+        "id": "secure-inputs",
+        "label": "Secure inputs",
+        "focus": ["operator", "sops", "kubernetes", "cert_manager"],
+        "note": "The runbook decrypts only into protected temporary input and Kubernetes Secrets; plaintext is not committed."
+      },
+      {
+        "id": "dns01-validation",
+        "label": "DNS-01 validation",
+        "focus": ["cert_manager", "cloudflare", "letsencrypt"],
+        "note": "cert-manager presents a temporary TXT record and waits for public DNS propagation before validation."
+      },
+      {
+        "id": "certificate-delivery",
+        "label": "Certificate delivery",
+        "focus": ["letsencrypt", "cert_manager", "kubernetes", "ingress"],
+        "note": "The signed keypair is stored in kube-system and ingress-nginx reloads it for subsequent HTTPS requests."
+      }
+    ]
+  },
+  "participants": [
+    {"id": "operator", "type": "external", "label": "Operator", "sublabel": "tailscale-k0s context"},
+    {"id": "sops", "type": "security", "label": "SOPS", "sublabel": "encrypted lab secrets"},
+    {"id": "kubernetes", "type": "database", "label": "Kubernetes", "sublabel": "Issuer + TLS Secret"},
+    {"id": "cert_manager", "type": "security", "label": "cert-manager", "sublabel": "ACME controller"},
+    {"id": "cloudflare", "type": "cloud", "label": "Cloudflare DNS", "sublabel": "canhdinh.com zone"},
+    {"id": "letsencrypt", "type": "external", "label": "Let's Encrypt", "sublabel": "ACME v2"},
+    {"id": "ingress", "type": "backend", "label": "ingress-nginx", "sublabel": "TLS termination"}
+  ],
+  "messages": [
+    {
+      "id": "decrypt_token",
+      "from": "operator",
+      "to": "sops",
+      "y": 170,
+      "label": "decrypt cloudflare.cert_manager_api_token",
+      "variant": "security"
+    },
+    {
+      "id": "create_token_secret",
+      "from": "operator",
+      "to": "kubernetes",
+      "y": 200,
+      "label": "create cloudflare-api-token Secret",
+      "variant": "security",
+      "note": "The token is passed through a mode-0600 temporary file, not a command argument."
+    },
+    {
+      "id": "render_acme_email",
+      "from": "operator",
+      "to": "sops",
+      "y": 230,
+      "label": "decrypt acme.email for Issuer rendering",
+      "variant": "security"
+    },
+    {
+      "id": "observe_certificate",
+      "from": "cert_manager",
+      "to": "kubernetes",
+      "y": 270,
+      "label": "observe Certificate request",
+      "variant": "default"
+    },
+    {
+      "id": "create_order",
+      "from": "cert_manager",
+      "to": "letsencrypt",
+      "y": 300,
+      "label": "create ACME order",
+      "variant": "emphasis"
+    },
+    {
+      "id": "present_challenge",
+      "from": "cert_manager",
+      "to": "cloudflare",
+      "y": 330,
+      "label": "create _acme-challenge TXT",
+      "variant": "security"
+    },
+    {
+      "id": "validate_txt",
+      "from": "letsencrypt",
+      "to": "cloudflare",
+      "y": 360,
+      "label": "query public TXT proof",
+      "variant": "dashed"
+    },
+    {
+      "id": "issue_certificate",
+      "from": "letsencrypt",
+      "to": "cert_manager",
+      "y": 390,
+      "label": "return signed ECDSA certificate",
+      "variant": "return"
+    },
+    {
+      "id": "write_tls_secret",
+      "from": "cert_manager",
+      "to": "kubernetes",
+      "y": 420,
+      "label": "write hubble-ui-tls Secret",
+      "variant": "security"
+    },
+    {
+      "id": "cleanup_challenge",
+      "from": "cert_manager",
+      "to": "cloudflare",
+      "y": 445,
+      "label": "remove challenge TXT",
+      "variant": "dashed"
+    },
+    {
+      "id": "reload_tls",
+      "from": "kubernetes",
+      "to": "ingress",
+      "y": 477,
+      "label": "reload renewed TLS Secret",
+      "variant": "emphasis"
+    }
+  ],
+  "activations": [
+    {"participant": "cert_manager", "from": 260, "to": 460, "type": "security"},
+    {"participant": "cloudflare", "from": 320, "to": 460, "type": "cloud"},
+    {"participant": "letsencrypt", "from": 290, "to": 400, "type": "external"}
+  ]
+}

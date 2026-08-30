@@ -1,0 +1,62 @@
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: letsencrypt-cloudflare
+  namespace: kube-system
+spec:
+  acme:
+    email: ${ACME_EMAIL}
+    privateKeySecretRef:
+      name: letsencrypt-cloudflare-account-key
+    server: https://acme-v02.api.letsencrypt.org/directory
+    solvers:
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              key: api-token
+              name: cloudflare-api-token
+        selector:
+          dnsZones:
+            - canhdinh.com
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: hubble-ui
+  namespace: kube-system
+spec:
+  dnsNames:
+    - hubble-ui.playground.canhdinh.com
+  issuerRef:
+    group: cert-manager.io
+    kind: Issuer
+    name: letsencrypt-cloudflare
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  secretName: hubble-ui-tls
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hubble-ui
+  namespace: kube-system
+  annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: hubble-ui.playground.canhdinh.com
+      http:
+        paths:
+          - backend:
+              service:
+                name: hubble-ui
+                port:
+                  name: http
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - hubble-ui.playground.canhdinh.com
+      secretName: hubble-ui-tls

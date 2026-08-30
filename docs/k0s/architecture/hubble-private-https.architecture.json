@@ -1,0 +1,207 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Private Hubble UI over Tailscale with Browser-Trusted TLS",
+    "output": "docs/k0s/architecture/hubble-private-https.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/vancanhuit/iximiuzlabs-playground",
+      "revision": "70ea935e6dbb251a9272d0dc4392e6e4e262a140"
+    },
+    "viewBox": [1320, 720],
+    "views": [
+      {
+        "id": "request-path",
+        "label": "HTTPS request path",
+        "focus": ["browser", "cloudflare_dns", "tailnet", "tailscale_service", "ingress_nginx", "hubble_ui"],
+        "note": "DNS returns a private Tailscale IP; HTTPS remains inside the tailnet and terminates at ingress-nginx."
+      },
+      {
+        "id": "certificate-ownership",
+        "label": "Certificate ownership",
+        "focus": ["cert_manager", "cloudflare_dns", "tls_secret", "ingress_nginx"],
+        "note": "cert-manager completes DNS-01 out of band, stores the certificate, and renews it before expiry."
+      },
+      {
+        "id": "security-boundaries",
+        "label": "Security boundaries",
+        "focus": ["browser", "tailnet", "tailscale_service", "ingress_nginx", "hubble_ui"],
+        "note": "Tailnet policy gates network reachability; TLS authenticates the custom hostname to the browser."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "browser",
+      "type": "external",
+      "label": "Tailnet Browser",
+      "sublabel": "policy-authorized client",
+      "pos": [45, 300],
+      "size": [175, 72]
+    },
+    {
+      "id": "cloudflare_dns",
+      "type": "cloud",
+      "label": "Cloudflare DNS",
+      "sublabel": "authoritative A + ACME TXT records",
+      "tag": "DNS only",
+      "pos": [45, 90],
+      "size": [220, 76]
+    },
+    {
+      "id": "tailnet",
+      "type": "security",
+      "label": "Tailscale Tailnet",
+      "sublabel": "identity policy + WireGuard",
+      "tag": "private 100.64.0.0/10",
+      "pos": [290, 300],
+      "size": [205, 72]
+    },
+    {
+      "id": "tailscale_service",
+      "type": "security",
+      "label": "hubble-ui Service",
+      "sublabel": "Tailscale LoadBalancer",
+      "tag": "TCP 80 / 443",
+      "pos": [565, 300],
+      "size": [205, 72]
+    },
+    {
+      "id": "ingress_nginx",
+      "type": "backend",
+      "label": "ingress-nginx",
+      "sublabel": "redirect + TLS termination",
+      "tag": "Ingress class nginx",
+      "pos": [840, 300],
+      "size": [205, 72]
+    },
+    {
+      "id": "hubble_ui",
+      "type": "frontend",
+      "label": "Hubble UI",
+      "sublabel": "Cilium-managed ClusterIP Service",
+      "tag": "HTTP :80",
+      "pos": [1110, 300],
+      "size": [180, 72],
+      "sources": [{"path": "docs/k0s/cilium-values.yaml", "line": 37, "end_line": 41, "label": "Hubble enabled"}]
+    },
+    {
+      "id": "cert_manager",
+      "type": "security",
+      "label": "cert-manager",
+      "sublabel": "Issuer + Certificate controller",
+      "tag": "DNS-01 renewal",
+      "pos": [430, 520],
+      "size": [220, 76]
+    },
+    {
+      "id": "tls_secret",
+      "type": "database",
+      "label": "hubble-ui-tls Secret",
+      "sublabel": "ECDSA certificate + private key",
+      "tag": "kube-system",
+      "pos": [780, 520],
+      "size": [230, 76]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "security-group",
+      "label": "Tailnet-only application path",
+      "wraps": ["tailnet", "tailscale_service", "ingress_nginx", "hubble_ui"],
+      "pad": 26
+    },
+    {
+      "kind": "region",
+      "label": "Kubernetes cluster",
+      "wraps": ["tailscale_service", "ingress_nginx", "hubble_ui", "cert_manager", "tls_secret"],
+      "pad": 24
+    }
+  ],
+  "connections": [
+    {
+      "id": "resolve_private_ip",
+      "from": "browser",
+      "to": "cloudflare_dns",
+      "label": "resolve DNS-only A record",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "join_tailnet",
+      "from": "browser",
+      "to": "tailnet",
+      "label": "authenticated device",
+      "variant": "security",
+      "labelAt": [255, 386]
+    },
+    {
+      "id": "private_https",
+      "from": "tailnet",
+      "to": "tailscale_service",
+      "label": "WireGuard-encrypted HTTPS :443",
+      "variant": "security",
+      "labelDy": 60
+    },
+    {
+      "id": "service_forward",
+      "from": "tailscale_service",
+      "to": "ingress_nginx",
+      "label": "TCP 443 to controller Pod",
+      "variant": "emphasis",
+      "labelDy": -30
+    },
+    {
+      "id": "hubble_route",
+      "from": "ingress_nginx",
+      "to": "hubble_ui",
+      "label": "decrypted HTTP to ClusterIP",
+      "variant": "emphasis",
+      "labelDy": 60
+    },
+    {
+      "id": "store_certificate",
+      "from": "cert_manager",
+      "to": "tls_secret",
+      "label": "write renewed keypair",
+      "variant": "security"
+    },
+    {
+      "id": "reload_certificate",
+      "from": "tls_secret",
+      "to": "ingress_nginx",
+      "label": "watch and reload certificate",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "bottom"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "violet",
+      "title": "Request invariant",
+      "items": [
+        "Cloudflare answers DNS but never proxies application traffic",
+        "Only a tailnet-authorized client can route to the 100.x Service address"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Certificate lifecycle",
+      "items": [
+        "DNS-01 validates the hostname without exposing Hubble UI publicly",
+        "cert-manager renews the Secret and ingress-nginx reloads it automatically"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Ownership",
+      "items": [
+        "Cilium owns Hubble UI; ingress-nginx owns TLS termination",
+        "Tailscale owns private reachability; cert-manager owns ACME state"
+      ]
+    }
+  ]
+}

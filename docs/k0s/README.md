@@ -15,7 +15,7 @@ This page serves an operator who controls the playgrounds, tailnet, and Kubernet
 - **Content plan:** Prepare, secure, bootstrap, verify, operate, and remove the cluster
 - **Open questions:** Record environment-specific contacts and the last successful run before sharing this runbook
 
-This page is an operational how-to. Open the [interactive architecture](architecture/lab-architecture.html) to explore the system, the [interactive network data paths](architecture/network-data-paths.html) to trace packet flows, or the [interactive bootstrap journey](architecture/bootstrap-journey.html) to explore the deployment sequence.
+This page is an operational how-to. Open the [interactive architecture](architecture/lab-architecture.html) to explore the system, the [interactive network data paths](architecture/network-data-paths.html) to trace packet flows, the [private Hubble HTTPS architecture](architecture/hubble-private-https.html) to inspect service and certificate ownership, the [DNS-01 issuance sequence](architecture/hubble-dns01.html) to follow certificate provisioning, or the [interactive bootstrap journey](architecture/bootstrap-journey.html) to explore the deployment sequence.
 
 ## Purpose
 
@@ -86,6 +86,8 @@ Treat these versions as one tested set. Validate upgrades in a fresh playground 
 | k0s and Kubernetes | `v1.36.3+k0s.0` |
 | Cilium | `v1.20.0` |
 | Tailscale Kubernetes Operator | `1.102.3` |
+| cert-manager | `v1.21.1` |
+| ingress-nginx | chart `4.15.1`, controller `v1.15.1` |
 | Sonobuoy | `v0.57.5` |
 
 The repository pins client tools in [`../../mise.toml`](../../mise.toml).
@@ -672,6 +674,106 @@ Keep the direct `tailscale-k0s` context. It remains the recovery path when clust
 
 **If it fails:** Check operator logs, Service approval, OAuth scopes, tailnet HTTPS, RBAC bindings, and Pod placement.
 
+### Step 12: Expose Hubble UI through Tailscale with HTTPS
+
+Hubble Relay and Hubble UI are enabled by [`cilium-values.yaml`](cilium-values.yaml). Install cert-manager and ingress-nginx to terminate browser-trusted TLS without changing Cilium's Helm-owned `hubble-ui` ClusterIP Service:
+
+[![Private Hubble UI HTTPS architecture](architecture/hubble-private-https.svg)](architecture/hubble-private-https.html)
+
+The request and certificate paths are deliberately separate. Cloudflare is authoritative for the public DNS records used by the custom hostname and ACME validation, but it does not proxy Hubble UI traffic. The DNS-only `A` record returns a private Tailscale address; a policy-authorized tailnet client then connects through the Tailscale Service to ingress-nginx, which terminates TLS and forwards HTTP to Cilium's `hubble-ui` Service.
+
+```bash
+helm upgrade --install cert-manager \
+  oci://quay.io/jetstack/charts/cert-manager \
+  --version v1.21.1 \
+  --namespace cert-manager \
+  --create-namespace \
+  --set crds.enabled=true \
+  --kube-context tailscale-k0s \
+  --wait
+
+helm upgrade --install ingress-nginx \
+  ingress-nginx \
+  --repo https://kubernetes.github.io/ingress-nginx \
+  --version 4.15.1 \
+  --namespace ingress-nginx \
+  --create-namespace \
+  --set controller.service.enabled=false \
+  --kube-context tailscale-k0s \
+  --wait
+```
+
+Create the Cloudflare API token Secret without exposing the credential in command arguments. The token needs `Zone - DNS - Edit` and `Zone - Zone - Read` for `canhdinh.com`:
+
+```bash
+(
+  set -e
+  if [[ $- == *x* ]]; then
+    printf 'Disable shell tracing before handling Cloudflare credentials.\n' >&2
+    exit 1
+  fi
+  token_file=$(mktemp)
+  trap 'rm -f "$token_file"' EXIT
+  umask 077
+  sops decrypt --extract \
+    '["cloudflare"]["cert_manager_api_token"]' \
+    secrets/lab.sops.yaml >"$token_file"
+
+  kubectl --context tailscale-k0s -n kube-system \
+    create secret generic cloudflare-api-token \
+    --from-file=api-token="$token_file" \
+    --dry-run=client -o yaml | \
+    kubectl --context tailscale-k0s apply -f -
+)
+```
+
+Render the ACME email from SOPS, apply the issuer, certificate, ingress, and Tailscale Service, then wait for issuance:
+
+[![Cloudflare DNS-01 certificate sequence](architecture/hubble-dns01.svg)](architecture/hubble-dns01.html)
+
+```bash
+(
+  set -euo pipefail
+  ACME_EMAIL=$(sops decrypt --extract \
+    '["acme"]["email"]' secrets/lab.sops.yaml)
+  export ACME_EMAIL
+  trap 'unset ACME_EMAIL' EXIT
+  envsubst <docs/k0s/hubble-ui-tls.yaml | \
+    kubectl --context tailscale-k0s apply -f -
+)
+
+kubectl --context tailscale-k0s apply \
+  -f docs/k0s/hubble-ui-tailscale.yaml
+kubectl --context tailscale-k0s -n kube-system \
+  wait certificate/hubble-ui --for=condition=Ready=True \
+  --timeout=5m
+kubectl --context tailscale-k0s -n ingress-nginx \
+  wait service/hubble-ui-tailscale \
+  --for=jsonpath='{.status.loadBalancer.ingress[0].ip}' \
+  --timeout=5m
+```
+
+The Tailscale operator preserves the existing `hubble-ui` endpoint and stable `100.x` Service address while routing ports `80` and `443` to ingress-nginx. The Cloudflare `A` record for `hubble-ui.playground.canhdinh.com` must point to that address with **DNS only** proxy status. Cloudflare's public reverse proxy cannot reach a tailnet-only `100.64.0.0/10` origin. DNS-01 uses temporary `_acme-challenge` TXT records and does not make the application public.
+
+Verify certificate identity, redirect behavior, and private HTTPS access from a tailnet client:
+
+```bash
+dig +short hubble-ui.playground.canhdinh.com A
+tailscale ping hubble-ui
+curl --fail --show-error \
+  --head http://hubble-ui.playground.canhdinh.com/
+curl --fail --show-error \
+  --head https://hubble-ui.playground.canhdinh.com/
+openssl s_client \
+  -connect hubble-ui.playground.canhdinh.com:443 \
+  -servername hubble-ui.playground.canhdinh.com </dev/null 2>/dev/null | \
+  openssl x509 -noout -issuer -subject -dates
+```
+
+**Expected result:** DNS returns the Service's `100.x` address, HTTP redirects to HTTPS, the certificate subject covers `hubble-ui.playground.canhdinh.com`, and HTTPS returns the Hubble UI only from a policy-authorized tailnet client. cert-manager renews the certificate and ingress-nginx reloads the updated Secret automatically.
+
+**If it fails:** Inspect `Certificate`, `Order`, and `Challenge` events; verify the Cloudflare token permissions and public TXT propagation; check ingress-nginx, the `hubble-ui` endpoints, the Tailscale Service and operator logs, the tailnet grant for `tag:k8s` on TCP ports `80` and `443`, and that the application `A` record remains DNS-only.
+
 ## Verification
 
 Complete every check before recording a successful run:
@@ -684,6 +786,7 @@ Complete every check before recording a successful run:
 - [ ] `tailscale0` reports MTU `1280`, while Cilium routes report MTU `1230`
 - [ ] The selected Sonobuoy profile reports zero e2e failures
 - [ ] Both API paths return `ok` when the ProxyGroup is installed
+- [ ] `hubble-ui.playground.canhdinh.com` presents a valid certificate and reaches Hubble UI only from the tailnet
 
 Verify both API paths and ProxyGroup replicas:
 
@@ -838,6 +941,44 @@ ssh root@node-01 ip route
 
 DERP preserves encryption and connectivity but increases latency. Investigate firewall, Network Address Translation (NAT), and User Datagram Protocol (UDP) reachability when a direct path becomes relayed.
 
+### Inspect Hubble UI certificate renewal
+
+Check the certificate condition and renewal schedule without reading the private key:
+
+```bash
+kubectl --context tailscale-k0s -n kube-system \
+  get certificate hubble-ui
+kubectl --context tailscale-k0s -n kube-system \
+  get certificate hubble-ui -o jsonpath='{range .status.conditions[*]}\
+{.type}{"="}{.status}{": "}{.message}{"\n"}{end}\
+{"notAfter="}{.status.notAfter}{"\n"}\
+{"renewalTime="}{.status.renewalTime}{"\n"}'
+kubectl --context tailscale-k0s -n kube-system \
+  get orders.acme.cert-manager.io,challenges.acme.cert-manager.io
+```
+
+`Ready=True` is the steady state. No active `Order` or `Challenge` is required between issuance and renewal. During renewal, cert-manager creates a temporary `_acme-challenge.hubble-ui.playground.canhdinh.com` TXT record, validates it through public DNS, replaces `hubble-ui-tls`, and removes the TXT record. ingress-nginx watches the Secret and reloads the keypair without changing the Tailscale Service address.
+
+Compare the live Issuer email to the encrypted source without printing either value:
+
+```bash
+(
+  set -euo pipefail
+  expected_file=$(mktemp)
+  live_file=$(mktemp)
+  trap 'rm -f "$expected_file" "$live_file"' EXIT
+  umask 077
+  sops decrypt --extract '["acme"]["email"]' \
+    secrets/lab.sops.yaml >"$expected_file"
+  kubectl --context tailscale-k0s -n kube-system \
+    get issuer letsencrypt-cloudflare \
+    -o jsonpath='{.spec.acme.email}' >"$live_file"
+  cmp --silent "$expected_file" "$live_file"
+)
+```
+
+An exit status of zero confirms that `acme.email` in `secrets/lab.sops.yaml` remains the source of truth.
+
 ## Troubleshooting
 
 Use observed symptoms to select the narrowest corrective action:
@@ -853,10 +994,33 @@ Use observed symptoms to select the narrowest corrective action:
 | Canonical hostnames resolve to stale addresses or fresh devices receive `-1` suffixes | Destroyed playground devices remain registered in the tailnet | Remove only the confirmed offline records, restore the fresh devices' canonical names, and wait for MagicDNS convergence |
 | `tailscale ping` prints `pong` but exits nonzero | DERP works but no direct peer path was established | Verify SSH succeeds, inspect `tailscale netcheck`, and troubleshoot UDP or NAT without blocking bootstrap on a functional DERP path |
 | Sonobuoy reports failures | Cluster behavior or the test environment failed | Preserve the archive and inspect each failed test |
+| `Certificate/hubble-ui` remains `Ready=False` | Cloudflare token permissions, ACME account, or DNS propagation failed | Inspect the related `Order` and `Challenge`; confirm `Zone - DNS - Edit` and `Zone - Zone - Read` for `canhdinh.com` without printing the token |
+| HTTPS presents the ingress default certificate | `hubble-ui-tls` is missing, invalid, or not loaded by ingress-nginx | Check the Certificate condition, Secret type, Ingress TLS reference, and ingress-nginx events and logs |
+| Hubble hostname resolves but TCP 443 fails | The DNS record points to a stale Tailscale Service IP or tailnet policy denies access | Compare the DNS-only `A` record with the Service external IP and verify the TCP 443 grant |
+| HTTPS returns `503 Service Temporarily Unavailable` | The Ingress cannot reach Cilium's `hubble-ui` Service endpoints | Check the Ingress backend, `hubble-ui` endpoints, Hubble UI Pod readiness, and ingress-nginx logs |
+| `_acme-challenge` TXT remains after issuance | Challenge cleanup failed or another ACME flow owns the record | Inspect active Challenges before deleting anything; let cert-manager reconcile first |
 
 ## Rollback and safe teardown
 
 Do not attempt an in-place rollback after partial bootstrap without checking etcd state. `k0sctl apply` can reconcile a partial installation when controller identities remain valid.
+
+To roll back only Hubble UI HTTPS while preserving Cilium and the cluster, remove resources in dependency order:
+
+```bash
+kubectl --context tailscale-k0s -n ingress-nginx \
+  delete service hubble-ui-tailscale
+kubectl --context tailscale-k0s -n kube-system \
+  delete ingress hubble-ui certificate hubble-ui \
+  issuer letsencrypt-cloudflare
+kubectl --context tailscale-k0s -n kube-system \
+  delete secret cloudflare-api-token
+helm --kube-context tailscale-k0s -n ingress-nginx \
+  uninstall ingress-nginx
+helm --kube-context tailscale-k0s -n cert-manager \
+  uninstall cert-manager
+```
+
+Delete the DNS-only `hubble-ui.playground.canhdinh.com` `A` record after the Tailscale Service is gone. Do not delete `_acme-challenge` TXT records manually until active cert-manager Challenges have been inspected. Helm intentionally retains cert-manager custom resource definitions to prevent accidental data loss; remove them only when no certificate resources remain anywhere in the cluster and permanent cert-manager removal is intended.
 
 Before destroying playgrounds, export workload data and an etcd backup. Then complete these actions:
 
@@ -888,6 +1052,7 @@ Update this table after every deployment, upgrade, recovery, or teardown:
 | --- | --- | --- |
 | 2026-08-29 | Not recorded | Converted the deployment guide into an operational runbook |
 | 2026-08-30 | Repository owner and OpenCode | Rebuilt two playgrounds from scratch; verified k0s, Cilium connectivity, Sonobuoy quick mode, and both Kubernetes API paths |
+| 2026-08-30 | Repository owner and OpenCode | Exposed Hubble UI through a private Tailscale LoadBalancer; installed cert-manager and ingress-nginx; issued and verified a Let's Encrypt ECDSA certificate with Cloudflare DNS-01 |
 
 ## Supporting references
 
@@ -908,3 +1073,7 @@ Use these sources to validate version-specific behavior:
 - [Install the Tailscale Kubernetes Operator](https://tailscale.com/docs/kubernetes-operator/install-operator)
 - [Kubernetes API access over Tailscale](https://tailscale.com/docs/kubernetes-operator/api-server-access/setup-api-over-tailscale)
 - [Tailscale and Cilium compatibility](https://tailscale.com/docs/kubernetes-operator/reference/compatibility)
+- [Tailscale Layer 3 workload exposure](https://tailscale.com/docs/kubernetes-operator/ingress/expose-workload-to-tailnet-l3)
+- [cert-manager installation with Helm](https://cert-manager.io/docs/installation/helm/)
+- [cert-manager Cloudflare DNS-01](https://cert-manager.io/docs/configuration/acme/dns01/cloudflare/)
+- [ingress-nginx installation](https://kubernetes.github.io/ingress-nginx/deploy/)
