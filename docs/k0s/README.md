@@ -685,6 +685,18 @@ Hubble Relay and Hubble UI are enabled by [`cilium-values.yaml`](cilium-values.y
 
 The request and certificate paths are deliberately separate. Cloudflare is authoritative for the public DNS records used by the custom hostname and ACME validation, but it does not proxy Hubble UI traffic. The DNS-only `A` record returns a private Tailscale address; a policy-authorized tailnet client then connects through the Tailscale Service to ingress-nginx, which terminates TLS and forwards HTTP to Cilium's `hubble-ui` Service.
 
+#### How ingress-nginx and its load balancer are provisioned
+
+This deployment separates the ingress controller from its external entry point:
+
+1. Helm installs the `IngressClass/nginx`, the ingress-nginx controller `Deployment`, its admission webhook, RBAC, and controller `ConfigMap`. `controller.service.enabled=false` deliberately prevents the chart from creating its usual public-facing controller Service.
+2. The hand-authored `Ingress/hubble-ui` declares host and path routing. The ingress-nginx controller watches resources whose `ingressClassName` is `nginx`, resolves the referenced `hubble-ui` Service endpoints, reads `Secret/hubble-ui-tls`, and renders those objects into its running NGINX configuration.
+3. The separate `Service/ingress-nginx/hubble-ui-tailscale` selects the ingress-nginx controller Pod and declares `type: LoadBalancer` with `loadBalancerClass: tailscale`. Kubernetes itself does not allocate an external address for this class.
+4. The Tailscale operator watches that Service, creates a dedicated proxy `StatefulSet` and state Secret in the `tailscale` namespace, registers the proxy as the `hubble-ui` tailnet device, and writes its `100.x` address and `*.ts.net` name into the Service status.
+5. The proxy forwards ports 80 and 443 to the Service ClusterIP. Kubernetes service routing selects the ingress-nginx Pod; ingress-nginx terminates TLS, matches the host and path from the Ingress, and connects directly to a Hubble UI endpoint.
+
+The `LoadBalancer` Service therefore represents desired state, not an external appliance. The actual load-balancer implementation is the operator-created Tailscale proxy Pod. Removing the Service causes the operator to remove that proxy and tailnet endpoint; changing the Ingress only changes NGINX routing and does not provision another Tailscale device.
+
 ```bash
 helm upgrade --install cert-manager \
   oci://quay.io/jetstack/charts/cert-manager \
@@ -786,6 +798,20 @@ Native Tailscale Layer 7 Ingress (`ingressClassName: tailscale`) uses Tailscale 
 Deploy Envoy Gateway as the Gateway API implementation, expose its managed Envoy Service through the Tailscale operator, and let ExternalDNS maintain the DNS-only Cloudflare record for `echo.playground.canhdinh.com`. The application address remains private: Cloudflare is authoritative for DNS and ACME DNS-01 only, while tailnet policy controls access to the Envoy gateway.
 
 [![Echo Server private Gateway API architecture](architecture/echo-gateway-api.svg)](architecture/echo-gateway-api.html)
+
+#### How Envoy Gateway and its load balancer are provisioned
+
+Gateway API separates infrastructure selection, listener configuration, and application routing:
+
+1. Helm installs the Gateway API and Envoy Gateway CRDs plus the Envoy Gateway controller. `GatewayClass/tailscale` selects that controller and references `EnvoyProxy/envoy-gateway-system/tailscale-proxy` as its infrastructure parameters.
+2. The `EnvoyProxy` resource tells Envoy Gateway to create its managed data-plane Service as `type: LoadBalancer` with `loadBalancerClass: tailscale` and the requested Tailscale hostname `gateway-envoy`.
+3. `Gateway/echo` requests an HTTPS listener for `echo.playground.canhdinh.com`, references its TLS Secret, and allows routes only from the same namespace. `HTTPRoute/echo` attaches to that listener and maps `/` to `Service/echo-server:80`.
+4. The Envoy Gateway controller validates those references, creates and owns an Envoy proxy `Deployment` and its `Service` in `envoy-gateway-system`, and continuously translates the Gateway and HTTPRoute into xDS listener, TLS, route, cluster, and endpoint configuration for Envoy.
+5. The generated Service has `loadBalancerClass: tailscale`. The Tailscale operator independently observes it, creates a dedicated proxy `StatefulSet` and state Secret in the `tailscale` namespace, registers `gateway-envoy`, and publishes the resulting `100.x` address and `*.ts.net` name to the Service status.
+6. Envoy Gateway copies that Service address into `Gateway.status.addresses`. ExternalDNS reads the accepted Gateway and HTTPRoute and synchronizes the custom DNS-only Cloudflare record. cert-manager reads the Gateway annotations and listener certificate reference, completes DNS-01, and maintains the TLS Secret consumed by Envoy.
+7. At request time, the client resolves the custom hostname to the private `100.x` address, crosses the tailnet to the Tailscale proxy, reaches the generated Envoy Service and Pod, terminates TLS at Envoy, and follows the HTTPRoute to an Echo Server endpoint.
+
+Unlike the ingress-nginx deployment, the Envoy data-plane Deployment and LoadBalancer Service are generated resources. Change the `Gateway`, `HTTPRoute`, or referenced `EnvoyProxy`; do not hand-edit the generated `envoy-echo-*` resources because the Envoy Gateway controller will reconcile them back to declared state.
 
 Install the pinned Envoy Gateway release. Its chart installs the Gateway API and Envoy Gateway CRDs before starting the controller:
 

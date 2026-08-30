@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="generator" content="archify 2.16.0-dev.0">
-  <title>Private Hubble UI over Tailscale with Browser-Trusted TLS Diagram</title>
+  <title>ingress-nginx Provisioning and Private Hubble Request Path Diagram</title>
   <script>
     // Resolve the theme before first paint so light-preference users don't
     // see a dark flash. The toolbar script below re-applies with UI state.
@@ -4955,12 +4955,12 @@
            data-preset-badge-blueprint="BLUEPRINT / REV 01"
            data-preset-badge-editorial="EDITORIAL / FIELD NOTE">
         <div class="pulse-dot"></div>
-        <h1>Private Hubble UI over Tailscale with Browser-Trusted TLS</h1>
+        <h1>ingress-nginx Provisioning and Private Hubble Request Path</h1>
       </div>
     </div>
 
-    <script id="archify-guided-views-data" type="application/json">[{"id":"request-path","label":"HTTPS request path","focus":["browser","cloudflare_dns","tailnet","tailscale_service","ingress_nginx","hubble_ui"],"note":"DNS returns a private Tailscale IP; HTTPS remains inside the tailnet and terminates at ingress-nginx."},{"id":"certificate-ownership","label":"Certificate ownership","focus":["cert_manager","cloudflare_dns","tls_secret","ingress_nginx"],"note":"cert-manager completes DNS-01 out of band, stores the certificate, and renews it before expiry."},{"id":"security-boundaries","label":"Security boundaries","focus":["browser","tailnet","tailscale_service","ingress_nginx","hubble_ui"],"note":"Tailnet policy gates network reachability; TLS authenticates the custom hostname to the browser."}]</script>
-    <script id="archify-source-evidence-data" type="application/json">{"schemaVersion":1,"verified":true,"repository":{"url":"https://github.com/vancanhuit/iximiuzlabs-playground","revision":"70ea935e6dbb251a9272d0dc4392e6e4e262a140","shortRevision":"70ea935"},"referenceCount":1,"nodes":{"hubble_ui":[{"path":"docs/k0s/cilium-values.yaml","line":37,"endLine":41,"label":"Hubble enabled","href":"https://github.com/vancanhuit/iximiuzlabs-playground/blob/70ea935e6dbb251a9272d0dc4392e6e4e262a140/docs/k0s/cilium-values.yaml#L37-L41"}]}}</script>
+    <script id="archify-guided-views-data" type="application/json">[{"id":"request-path","label":"HTTPS request path","focus":["browser","cloudflare_dns","tailnet","tailscale_proxy","lb_service","ingress_nginx","hubble_ui"],"note":"HTTPS crosses the tailnet proxy and Kubernetes Service before ingress-nginx terminates TLS."},{"id":"certificate-ownership","label":"Certificate ownership","focus":["cert_manager","cloudflare_dns","tls_secret","ingress_nginx"],"note":"cert-manager completes DNS-01 out of band, stores the certificate, and renews it before expiry."},{"id":"provisioning","label":"Controller provisioning","focus":["ingress_resources","ingress_nginx","lb_service","tailscale_operator","tailscale_proxy"],"note":"Helm creates ingress-nginx; the hand-authored LoadBalancer Service causes Tailscale to create its proxy."}]</script>
+    <script id="archify-source-evidence-data" type="application/json">{"schemaVersion":1,"verified":true,"repository":{"url":"https://github.com/vancanhuit/iximiuzlabs-playground","revision":"fbe2671ceebad17b658a3ea2647054f53363bd31","shortRevision":"fbe2671"},"referenceCount":3,"nodes":{"lb_service":[{"path":"docs/k0s/hubble-ui-tailscale.yaml","line":1,"endLine":23,"label":"Tailscale Service","href":"https://github.com/vancanhuit/iximiuzlabs-playground/blob/fbe2671ceebad17b658a3ea2647054f53363bd31/docs/k0s/hubble-ui-tailscale.yaml#L1-L23"}],"hubble_ui":[{"path":"docs/k0s/cilium-values.yaml","line":37,"endLine":41,"label":"Hubble enabled","href":"https://github.com/vancanhuit/iximiuzlabs-playground/blob/fbe2671ceebad17b658a3ea2647054f53363bd31/docs/k0s/cilium-values.yaml#L37-L41"}],"ingress_resources":[{"path":"docs/k0s/hubble-ui-tls.yaml","line":39,"endLine":62,"label":"Hubble Ingress","href":"https://github.com/vancanhuit/iximiuzlabs-playground/blob/fbe2671ceebad17b658a3ea2647054f53363bd31/docs/k0s/hubble-ui-tls.yaml#L39-L62"}]}}</script>
     <script id="archify-i18n-data" type="application/json">{"locale":"en","messages":{"viewer.kind.frontend":"Frontend","viewer.kind.backend":"Backend","viewer.kind.database":"Database","viewer.kind.cloud":"Cloud","viewer.kind.security":"Security","viewer.kind.messagebus":"Message bus","viewer.kind.external":"External","viewer.kind.neutral":"Neutral","viewer.kind.node":"Node","viewer.kind.start":"Start","viewer.kind.active":"Active","viewer.kind.waiting":"Waiting","viewer.kind.decision":"Decision","viewer.kind.success":"Success","viewer.kind.failure":"Failure","viewer.toolbar.actions":"Diagram actions","viewer.theme.toggle.title":"Toggle theme (T)","viewer.theme.toggle":"Toggle color theme","viewer.theme.dark":"Dark","viewer.theme.light":"Light","viewer.preset.choose.title":"Choose visual style (S cycles)","viewer.preset.choose":"Choose visual style","viewer.preset.style":"Style","viewer.preset.menu":"Visual style","viewer.preset.identity":"Visual identity","viewer.preset.cycles":"S cycles","viewer.preset.classic":"Classic","viewer.preset.classic.short":"Classic","viewer.preset.classic.hint":"Stable technical default","viewer.preset.flow":"Signal Flow","viewer.preset.flow.short":"Flow","viewer.preset.flow.hint":"Motion-forward presentation","viewer.preset.blueprint":"Blueprint","viewer.preset.blueprint.hint":"Engineering review","viewer.preset.editorial":"Editorial","viewer.preset.editorial.hint":"Publication and launch notes","viewer.preset.badge.signalFlow":"SIGNAL FLOW","viewer.preset.badge.blueprint":"BLUEPRINT / REV 01","viewer.preset.badge.editorial":"EDITORIAL / FIELD NOTE","viewer.preset.badge.editorialPlate":"ARCHIFY / PLATE 04","viewer.preset.current":"Visual style: {style}. Choose visual style","viewer.motion.live":"Live","viewer.motion.still":"Still","viewer.motion.pause":"Pause motion","viewer.motion.resume":"Resume motion","viewer.motion.reduced":"Motion paused by reduced-motion preference","viewer.motion.hidden":"Motion paused while this page is hidden","viewer.motion.yielding":"Pause motion; currently yielding to {owner}","viewer.motion.yielding.title":"Live preview enabled · yielding to {owner}","viewer.owner.story":"the guided story","viewer.owner.chapter":"the active chapter","viewer.owner.chapterPreview":"the chapter delta preview","viewer.owner.handoff":"the chapter handoff","viewer.owner.route":"Route Probe","viewer.owner.lens":"Semantic Lens","viewer.owner.relationship":"Relationship Preview","viewer.owner.intent":"Intent Trace","viewer.owner.focus":"semantic focus","viewer.owner.legend":"legend preview","viewer.owner.reader":"reader interaction","viewer.present.enter":"Enter presentation stage","viewer.present.enter.title":"Presentation stage (F)","viewer.present.exit":"Exit presentation stage","viewer.present.exit.title":"Exit presentation stage (F or Escape)","viewer.present.present":"Present","viewer.present.exit.label":"Exit","viewer.export.button":"Export","viewer.export.button.title":"Export diagram (E)","viewer.export.diagram":"Export diagram","viewer.export.menu":"Export","viewer.export.subtitle":"Portable, clean outputs","viewer.export.share":"Share","viewer.export.shareCard":"Share Card","viewer.export.routeShareCard":"Route Share Card","viewer.export.reachShareCard":"Reach Share Card","viewer.export.copyShareCard":"Copy Share Card","viewer.export.copyDiagram":"Copy diagram","viewer.export.clipboardPng":"PNG to clipboard","viewer.export.raster":"Raster images","viewer.export.image":"Image","viewer.export.lossless":"Lossless image","viewer.export.compact":"Compact image","viewer.export.modern":"Modern image","viewer.export.vectorMotion":"Vector and motion","viewer.export.vectorMotion.heading":"Vector \u0026 motion","viewer.export.editable":"Editable vector","viewer.export.motion6s":"6s motion","viewer.export.unsupported":"Not supported by this browser","viewer.export.clipboardUnsupported":"Clipboard image write not supported by this browser","viewer.export.clipboardUnsupported.period":"Clipboard image write not supported by this browser.","viewer.export.clipboardUnsupported.short":"Clipboard image write not supported in this browser.","viewer.export.motionUnavailable":"Motion capture unavailable in this browser","viewer.export.webmUnavailable":"WebM unavailable in this browser","viewer.export.failed":"Export failed: {message}","viewer.export.unknownVariant":"Unknown Share Card variant: {variant}","viewer.export.routeRequired":"Trace a route before exporting a Route Share Card","viewer.export.reachRequired":"Trace authored reach before exporting a Reach Share Card","viewer.export.unknown":"unknown","viewer.export.routeFailed":"Route Share Card export failed: {message}","viewer.export.reachFailed":"Reach Share Card export failed: {message}","viewer.export.copyFailed":"Copy failed: {message}","viewer.export.copiedPng":"Copied PNG to clipboard","viewer.export.copiedShare":"Copied Share Card","viewer.export.downloadedShare":"Downloaded Share Card","viewer.export.downloadedRoute":"Downloaded Route Share Card","viewer.export.downloadedReach":"Downloaded Reach Share Card","viewer.export.downloadedWebm":"Downloaded WebM","viewer.export.recording":"Recording 6 seconds of motion…","viewer.export.card.routeSummary.one":"Route: {source} → {target} · {count} directed hop","viewer.export.card.routeSummary.other":"Route: {source} → {target} · {count} directed hops","viewer.export.card.reachSummary":"Authored {direction} from {origin} · {nodes} · {links} · max {hops}","viewer.export.card.node.one":"{count} node","viewer.export.card.node.other":"{count} nodes","viewer.export.card.link.one":"{count} link","viewer.export.card.link.other":"{count} links","viewer.export.card.hop.one":"{count} hop","viewer.export.card.hop.other":"{count} hops","viewer.export.card.routeBadge":"ARCHIFY · ROUTE · {hops}","viewer.export.card.reachBadge":"ARCHIFY · {direction} REACH","viewer.export.card.defaultBadge":"ARCHIFY · {preset} · {theme}","viewer.export.direction.upstream":"Upstream","viewer.export.direction.downstream":"Downstream","viewer.export.error.canvasUnavailable":"Canvas unavailable for {label}","viewer.export.error.contextUnavailable":"2D canvas context unavailable for {label}","viewer.export.error.toBlobUnavailable":"canvas.toBlob unavailable for {label}","viewer.export.error.toBlobNull":"canvas.toBlob returned no data for {label}","viewer.export.error.variantsCombined":"Share Card variants cannot be combined","viewer.export.error.viewerState":"Share Card export could not remove temporary viewer state","viewer.export.error.routeState":"Route Card export could not preserve the resolved route safely","viewer.export.error.reachState":"Reach Card export could not preserve authored reach safely","viewer.export.error.webmRequirements":"WebM motion export requires a trace animation and browser MediaRecorder support","viewer.export.error.mediaRecorder":"MediaRecorder failed","viewer.export.error.emptyWebm":"MediaRecorder produced an empty WebM","viewer.export.error.webmBackground":"SVG background could not be loaded for WebM export","viewer.guided.region":"Guided diagram views","viewer.guided.previous":"Previous guided view","viewer.guided.previous.title":"Previous guided view ([)","viewer.guided.next":"Next guided view","viewer.guided.next.title":"Next guided view (])","viewer.guided.views":"Guided views","viewer.guided.explore":"Explore this system","viewer.guided.intro":"Step through curated paths without changing the source diagram.","viewer.guided.trail":"Story trail","viewer.guided.beat":"Beat","viewer.guided.nextBeat":"Next","viewer.guided.play":"Play guided story","viewer.guided.play.title":"Play guided story (P)","viewer.guided.pause":"Pause guided story","viewer.guided.pause.title":"Pause guided story (P)","viewer.guided.replay":"Replay guided story","viewer.guided.replay.title":"Replay guided story (P)","viewer.guided.playStory":"Play story","viewer.guided.pauseStory":"Pause","viewer.guided.replayStory":"Replay story","viewer.guided.motionUnavailable":"Story playback unavailable while motion is Still","viewer.guided.enableMotion":"Switch motion to Live to play the guided story","viewer.guided.selectBeatLink":"Select a Story Beat to copy its exact link","viewer.guided.copyMoment":"Copy moment","viewer.guided.momentCopied":"Moment link copied","viewer.guided.momentCopyFailed":"Could not copy story moment link","viewer.guided.copied":"Copied","viewer.guided.copyFailed":"Copy failed","viewer.guided.showAll":"Show all","viewer.guided.showAll.aria":"Show entire diagram","viewer.guided.chapters":"Story chapters","viewer.guided.storyTrail":"Story trail for {label}: {count} beats","viewer.guided.chapter.open":"Open chapter {index} of {total}: {label}, {count} stops","viewer.guided.chapter.current":"Current chapter {index} of {total}: {label}, {count} stops","viewer.guided.chapter.selectedNodes":"{count} selected nodes","viewer.guided.chapter.stops":"{count} stops","viewer.guided.chapter.stop.one":"{count} stop","viewer.guided.chapter.stop.other":"{count} stops","viewer.guided.chapter.current.title":"{label} — current chapter, {count} stops","viewer.guided.chapter.delta.expanded":"{stay} stay, {enter} enter, {leave} leave","viewer.guided.chapter.delta.aria":"Open chapter {index} of {total}: {label}. Chapter focus delta: {delta}","viewer.guided.chapter.delta.title":"{label} — {delta} chapter focus","viewer.guided.handoff":"{from} → {to} · via {label}","viewer.guided.share.chapter":"Chapter {index} / {total}","viewer.guided.share.initial":"Chapter 01 / 01","viewer.guided.share.default":"Guided chapter","viewer.guided.state.ready":"Ready","viewer.guided.state.playing":"Playing","viewer.guided.state.settled":"Settled","viewer.guided.state.paused":"Paused","viewer.guided.state.pinned":"Pinned","viewer.guided.state.still":"Still","viewer.guided.share.step":"Step {index} / {total} · {label}","viewer.guided.share.staticMoment":"{step} · Static moment","viewer.guided.share.complete":"{count} steps complete · {note}","viewer.guided.share.settled":"Path settled for reading.","viewer.guided.share.staticPath":"{count} steps · Static path","viewer.guided.share.ready":"{count} steps · Ready","viewer.guided.share.aria":"{state} chapter {index} of {total}: {label}. {beat}. {route}","viewer.guided.beat.start":"Beat {index} / {total} · {label} · starting point","viewer.guided.beat.forward":"Beat {index} / {total} · {from} → {to}","viewer.guided.beat.reverse":"Beat {index} / {total} · {from} → {to} · reverse authored link","viewer.guided.beat.multiple":"Beat {index} / {total} · {from} ⇄ {to} · {count} authored links","viewer.guided.beat.group":"Beat {index} / {total} · {from} · {to} · grouped · no direct link","viewer.guided.beat.aria.prefix":"Story beat {index} of {total}: {label}. ","viewer.guided.beat.aria.start":"Starting point.","viewer.guided.beat.aria.forward":"From {from} through one authored forward relationship.","viewer.guided.beat.aria.reverse":"From {from}; the authored relationship points from {to} to {from}.","viewer.guided.beat.aria.multiple":"From {from} through {count} authored relationships; shown without arbitrary motion.","viewer.guided.beat.aria.group":"Grouped from {from} with no direct authored relationship.","viewer.guided.caption.start":"Starting point","viewer.guided.caption.grouped":"Grouped transition · no direct authored link","viewer.guided.caption.more":" +{count} more","viewer.guided.caption.reverse":"Reverse authored relationship","viewer.guided.caption.relationships":"{count} authored relationships","viewer.guided.caption.relationship":"Authored relationship","viewer.guided.caption.direction":"authored direction: {from} → {to}","viewer.guided.caption.starting":"Authored starting point","viewer.guided.beatLink":"Copy link to current story moment: Beat {index} of {total}: {label}","viewer.guided.noStory":"This diagram has no authored guided story.","viewer.guide.eyebrow":"Diagram guide","viewer.guide.close":"Close diagram guide","viewer.guide.inspecting":"Inspecting compiled semantics","viewer.guide.actions":"Diagram exploration actions","viewer.guide.find":"Find any node","viewer.guide.find.hint":"Search labels, responsibilities, kinds, and stable IDs.","viewer.guide.route":"Trace a route","viewer.guide.route.aria":"Trace a directed route","viewer.guide.route.hint":"Ask how two semantic nodes connect in authored direction.","viewer.guide.map":"See the whole system","viewer.guide.map.hint":"Open Semantic Radar with a live viewport and stable nodes.","viewer.guide.lens":"Compare semantic kinds","viewer.guide.lens.hint":"Count roles, reveal their traffic, and compare direct authored links.","viewer.guide.story":"Play the guided story","viewer.guide.story.hint":"Walk the authored chapters and real relationships.","viewer.guide.present":"Enter Presentation Stage","viewer.guide.present.hint":"Give the live diagram the viewport without changing export.","viewer.guide.shortcuts":"Additional keyboard shortcuts","viewer.guide.shortcut.export":"Export","viewer.guide.shortcut.theme":"Theme","viewer.guide.shortcut.style":"Style","viewer.guide.shortcut.reset":"Reset","viewer.guide.shortcut.zoomIn":"Zoom in","viewer.guide.shortcut.zoomOut":"Zoom out","viewer.guide.shortcut.close":"Close","viewer.guide.facts":"{nodes} · {relationships} · {views}","viewer.guide.fact.node.one":"{count} semantic node","viewer.guide.fact.node.other":"{count} semantic nodes","viewer.guide.fact.relationship.one":"{count} relationship","viewer.guide.fact.relationship.other":"{count} relationships","viewer.guide.fact.view.one":"{count} guided view","viewer.guide.fact.view.other":"{count} guided views","viewer.guide.story.available.one":"Walk {count} authored chapter and its real relationships.","viewer.guide.story.available.other":"Walk {count} authored chapters and their real relationships.","viewer.guide.story.unavailable":"No authored guided story in this diagram.","viewer.guide.open":"Open diagram guide","viewer.guide.noStory":"This diagram has no authored guided story.","viewer.finder.title":"Find a node","viewer.finder.close":"Close node finder","viewer.finder.placeholder":"Search labels or IDs","viewer.finder.search":"Search diagram nodes","viewer.finder.results":"Diagram nodes","viewer.finder.empty":"No matching nodes","viewer.finder.result.focus":"Focus {label}","viewer.finder.result.routeStart":"Choose {label} as route start","viewer.finder.result.routeTarget":"Choose {label} as route destination, {links}","viewer.finder.status.empty":"No matching nodes","viewer.finder.status.count.one":"{count} matching node","viewer.finder.status.count.other":"{count} matching nodes","viewer.finder.noun.nodes":"nodes","viewer.finder.link.one":"{count} link","viewer.finder.link.other":"{count} links","viewer.finder.result.focus.one":"Focus {label}, {count} related connection","viewer.finder.result.focus.other":"Focus {label}, {count} related connections","viewer.finder.status.filtered":"{visible} of {available} {noun}","viewer.finder.status.all":"{available} {noun}","viewer.passport.eyebrow":"Semantic passport","viewer.passport.metadata":"Node metadata","viewer.passport.evidence":"Verified source evidence","viewer.passport.verified":"Verified source","viewer.passport.reach":"Authored reach","viewer.passport.reach.trace":"Trace authored reachability","viewer.passport.upstream":"Upstream","viewer.passport.downstream":"Downstream","viewer.passport.upstream.trace":"Trace upstream authored reachability","viewer.passport.downstream.trace":"Trace downstream authored reachability","viewer.passport.close":"Close semantic passport","viewer.passport.copy":"Copy link","viewer.passport.copy.focus":"Copy link to focused node","viewer.passport.relations":"Relations","viewer.passport.relations.show":"Show connected relationships","viewer.passport.relations.hide":"Hide connected relationships","viewer.passport.relations.list":"Connected relationships","viewer.passport.copyRelation":"Copy relation","viewer.passport.copyNode":"Copy node","viewer.passport.copyPinned":"Copy link to pinned relationship","viewer.passport.copySource":"Copy link to source node","viewer.passport.copy.focused.success":"Focused node link copied","viewer.passport.copy.pinned.success":"Pinned relationship link copied","viewer.passport.copy.focused.failed":"Could not copy focused node link","viewer.passport.copy.pinned.failed":"Could not copy pinned relationship link","viewer.passport.relationship.none":"No connected relationships","viewer.passport.relationship.count.one":"{count} relation","viewer.passport.relationship.count.other":"{count} relations","viewer.passport.relationship.show.one":"Show {count} connected relationship","viewer.passport.relationship.show.other":"Show {count} connected relationships","viewer.passport.relationship.summary":"{out} outgoing · {in} incoming{loops}","viewer.passport.relationship.loops":" · {count} loop","viewer.passport.relationship.explorer":"Direct relationship explorer","viewer.passport.relationship.help":"Use arrow keys to explore relationships. Press Enter or Space to pin details; Escape clears.","viewer.passport.relationship.loopsBack":"loops back","viewer.passport.relationship.connectsTo":"connects to","viewer.passport.relationship.connectsFrom":"connects from","viewer.passport.relationship.pinned":"Pinned relationship · {from} → {to} · {label}","viewer.passport.relationship.inspect":"Inspect relationship {index} of {total}: {from} to {to}, {label}. Press Enter for details.","viewer.passport.relationship.group.out":"Outgoing","viewer.passport.relationship.group.in":"Incoming","viewer.passport.relationship.group.loop":"Self loops","viewer.passport.relationship.row":"{group}: {relationship}, {neighbor}","viewer.passport.relationship.direction.out":"OUT →","viewer.passport.relationship.direction.in":"← IN","viewer.passport.relationship.direction.loop":"LOOP","viewer.passport.sourceCount.one":"{count} verified source reference","viewer.passport.sourceCount.other":"{count} verified source references","viewer.passport.sourceMarker":"SRC","viewer.passport.beacon.one":"{count} verified source; focus this node to inspect","viewer.passport.beacon.other":"{count} verified sources; focus this node to inspect","viewer.passport.repository.open":"Open verified repository revision {revision}","viewer.passport.source.open":"Open verified source {path} at revision {revision}","viewer.passport.source.openLink":"Open ↗","viewer.passport.reach.upstream.one":"Trace {count} upstream authored node","viewer.passport.reach.upstream.other":"Trace {count} upstream authored nodes","viewer.passport.reach.downstream.one":"Trace {count} downstream authored node","viewer.passport.reach.downstream.other":"Trace {count} downstream authored nodes","viewer.passport.reach.noUpstream":"No upstream authored nodes","viewer.passport.reach.noDownstream":"No downstream authored nodes","viewer.passport.reach.status":"{direction} · {nodes} nodes · {links} links · max {hops} hops","viewer.route.eyebrow":"Route probe","viewer.route.start":"Choose a start node","viewer.route.start.find":"Find start","viewer.route.start.find.aria":"Find a route start","viewer.route.copy":"Copy link","viewer.route.copy.aria":"Copy link to traced route","viewer.route.clear":"Clear","viewer.route.clear.aria":"Clear route probe","viewer.route.traced":"Traced route","viewer.route.pickTwo":"Pick two semantic nodes on the diagram","viewer.route.pickOne":"Pick a semantic node on the diagram","viewer.route.controls":"Route journey controls","viewer.route.previous":"Previous route position","viewer.route.play":"Play route journey","viewer.route.pause":"Pause route journey","viewer.route.replay":"Replay route journey","viewer.route.next":"Next route position","viewer.route.journey":"Journey","viewer.route.pause.label":"Pause","viewer.route.replay.label":"Replay","viewer.route.overview":"Overview","viewer.route.overview.aria":"Show complete route overview","viewer.route.instructions":"Choose the source, then the destination. Direction matters.","viewer.route.destination":"Choose a destination from {label}","viewer.route.destination.find":"Find target","viewer.route.destination.find.aria":"Find a reachable route destination","viewer.route.differentDestination":"Choose a different destination","viewer.route.distinct":"A route needs two distinct semantic nodes.","viewer.route.unreachable":"No directed route to {label}","viewer.route.unreachable.detail":"{target} is not reachable from {source}. Pick a highlighted destination.","viewer.route.start.instructions":"Select the source. The next step will reveal only directed destinations.","viewer.route.copy.success":"Traced route link copied","viewer.route.copy.failed":"Could not copy traced route link","viewer.route.position":"Route position {index} of {total}: {label}","viewer.route.step":"Step {index} of {total} · {phase} · {label}","viewer.route.motionRequired":"Automatic journey requires Live motion","viewer.route.trigger.clear":"Clear traced route","viewer.route.overview.status":"{nodes} · {hops} · shortest authored route","viewer.route.overview.node.one":"{count} node","viewer.route.overview.node.other":"{count} nodes","viewer.route.overview.hop.one":"{count} directed hop","viewer.route.overview.hop.other":"{count} directed hops","viewer.route.phase.playing":"Playing","viewer.route.phase.complete":"Complete","viewer.route.phase.inspecting":"Inspecting","viewer.route.destination.count.one":"{count} directed destination available. Pick a highlighted node.","viewer.route.destination.count.other":"{count} directed destinations available. Pick a highlighted node.","viewer.route.noOutgoing":"No outgoing route starts here. Clear and choose another source.","viewer.route.result.title":"{source} to {target}","viewer.route.finder.source.title":"Choose route start","viewer.route.finder.source.placeholder":"Search route sources","viewer.route.finder.source.empty":"No matching route sources","viewer.route.finder.source.results":"Nodes that can start a route","viewer.route.finder.source.noun":"route sources","viewer.route.finder.source.badge":"start","viewer.route.finder.target.title":"Destination from {label}","viewer.route.finder.target.placeholder":"Search reachable destinations","viewer.route.finder.target.empty":"No matching reachable destinations","viewer.route.finder.target.results":"Reachable route destinations","viewer.route.finder.target.noun":"reachable destinations","viewer.route.hop.one":"{count} hop","viewer.route.hop.other":"{count} hops","viewer.lens.eyebrow":"Semantic lens","viewer.lens.title":"Compare system roles","viewer.lens.close":"Close semantic lens","viewer.lens.instruction":"Choose up to two semantic kinds. One reveals its real traffic; two compare only direct authored relationships.","viewer.lens.kinds":"Semantic kinds","viewer.lens.choose":"Choose a kind to inspect its nodes and touching relationships.","viewer.lens.copy":"Copy link to semantic lens","viewer.lens.clear":"Clear semantic lens","viewer.lens.open":"Open semantic lens","viewer.lens.openActive":"Open active semantic lens","viewer.lens.legend":"Semantic legend","viewer.lens.legend.inspect.one":"Inspect {label}, {count} node","viewer.lens.legend.inspect.other":"Inspect {label}, {count} nodes","viewer.lens.kind.count.one":"{label}, {count} node","viewer.lens.kind.count.other":"{label}, {count} nodes","viewer.lens.compare.one":"{first} → {second}: {forward} · {second} → {first}: {reverse} · {count} direct relationship","viewer.lens.compare.other":"{first} → {second}: {forward} · {second} → {first}: {reverse} · {count} direct relationships","viewer.lens.single":"{nodes} · {relationships} · connected peers remain visible","viewer.lens.node.one":"{count} {label} node","viewer.lens.node.other":"{count} {label} nodes","viewer.lens.relationship.one":"{count} touching relationship","viewer.lens.relationship.other":"{count} touching relationships","viewer.radar.title":"Semantic radar","viewer.radar.building":"Building overview","viewer.radar.openFull":"Open full semantic radar","viewer.radar.open":"Open radar","viewer.radar.close":"Close semantic radar","viewer.radar.surface":"Diagram overview. Click a node to focus it, or use arrow keys to pan.","viewer.radar.click":"Click node","viewer.radar.drag":"Drag to pan","viewer.radar.space":"Semantic radar needs more MAP space.","viewer.radar.nodes":"Semantic diagram radar nodes","viewer.radar.focus":"Focus {label} from Semantic Radar","viewer.radar.status":"{count} nodes · {viewport}","viewer.radar.fullMap":"{count} nodes · full map","viewer.radar.compacted":"Radar compacted to avoid covering the Semantic Passport or MAP controls.","viewer.radar.cancelWaiting":"Cancel semantic radar waiting for more MAP space","viewer.radar.needsSpace":"Semantic radar needs more visible MAP space","viewer.radar.viewport.full":"full map","viewer.radar.viewport.width":"{percent}% width","viewer.radar.viewport.scale":"{percent}% viewport","viewer.nav.controls":"Diagram view controls","viewer.nav.route":"Trace a directed route","viewer.nav.route.title":"Trace route (R)","viewer.nav.route.short":"PATH","viewer.nav.radar":"Open semantic radar","viewer.nav.radar.title":"Semantic radar (M)","viewer.nav.radar.short":"MAP","viewer.nav.lens":"Open semantic lens","viewer.nav.lens.title":"Semantic lens (L)","viewer.nav.lens.short":"LENS","viewer.nav.find":"Find a node","viewer.nav.find.title":"Find a node (/)","viewer.nav.guide":"Open diagram guide","viewer.nav.guide.title":"Diagram guide (?)","viewer.nav.zoomOut":"Zoom out","viewer.nav.zoomOut.title":"Zoom out (-)","viewer.nav.reset":"Reset diagram view","viewer.nav.reset.title":"Reset view (0)","viewer.nav.read":"READ","viewer.nav.zoomIn":"Zoom in","viewer.nav.zoomIn.title":"Zoom in (+)","viewer.nav.camera":"{hint}. Reset diagram view","viewer.nav.camera.title":"{semantic}{hint} · reset view (0)","viewer.nav.camera.semantic":"Semantic camera active · ","viewer.nav.level.map":"MAP","viewer.nav.level.read":"READ","viewer.nav.level.full":"FULL","viewer.nav.level.auto":"AUTO","viewer.nav.detail.map":"Zoom in to reveal relationship labels and node context","viewer.nav.detail.read":"Zoom in again to reveal tags and annotations","viewer.nav.detail.full":"Full diagram detail","viewer.intent.summary":"{label}. {out} outgoing, {in} incoming{loops}. {total} connections. Press Enter for details.","viewer.intent.loops":", {count} self loop","viewer.common.copied":"Copied","viewer.common.copyFailed":"Copy failed","viewer.common.copyLink":"Copy link","viewer.common.clear":"Clear","viewer.common.close":"Close"}}</script>
     <div class="guided-views no-print" id="guided-views" hidden aria-label="Guided diagram views">
       <button id="guided-view-prev" type="button" aria-label="Previous guided view" title="Previous guided view ([)">&#8592;</button>
@@ -5004,8 +5004,8 @@
     <!-- Main Diagram -->
     <div class="diagram-container" data-detail-level="read"
          data-preset-badge-editorial-plate="ARCHIFY / PLATE 04">
-      <svg viewBox="0 0 1320 720" role="img" lang="en" aria-labelledby="archify-diagram-title archify-diagram-description" data-preset="classic" data-quality-profile="showcase">
-        <title id="archify-diagram-title">Private Hubble UI over Tailscale with Browser-Trusted TLS</title>
+      <svg viewBox="0 0 1380 900" role="img" lang="en" aria-labelledby="archify-diagram-title archify-diagram-description" data-preset="classic" data-quality-profile="showcase">
+        <title id="archify-diagram-title">ingress-nginx Provisioning and Private Hubble Request Path</title>
         <desc id="archify-diagram-description">An architecture diagram generated by Archify.</desc>
         <!-- Definitions -->
         <defs>
@@ -5030,190 +5030,246 @@
         <rect width="100%" height="100%" fill="url(#grid)" />
 
         <!-- Boundaries (behind everything) -->
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="security-group" data-composition-frame-id="0" data-composition-frame-label="Tailnet-only application path" x="264" y="274" width="1052" height="118" rx="8" class="c-security-group" stroke-width="1"/>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="security-group" data-composition-frame-id="0" data-composition-frame-label="Tailnet-only application path" x="204" y="424" width="1087" height="118" rx="8" class="c-security-group" stroke-width="1"/>
 
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="region" data-composition-frame-id="1" data-composition-frame-label="Kubernetes cluster" x="406" y="258" width="908" height="358" rx="12" class="c-region" stroke-width="1"/>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="region" data-composition-frame-id="1" data-composition-frame-label="Kubernetes cluster" x="416" y="176" width="908" height="600" rx="12" class="c-region" stroke-width="1"/>
 
         <!-- Connection paths (before components for correct z-order) -->
-        <path data-edge-from="browser" data-edge-to="cloudflare_dns" data-edge-label="resolve DNS-only A record" data-edge-key="0" data-edge-id="resolve_private_ip" data-composition-points="132.5,300;132.5,233;155,233;155,166" d="M 132.5 300 L 132.5 241 Q 132.5 233 140.5 233 L 147 233 Q 155 233 155 225 L 155 166" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
-        <path data-edge-from="browser" data-edge-to="tailnet" data-edge-label="authenticated device" data-edge-key="1" data-edge-id="join_tailnet" data-composition-points="220,336;290,336" d="M 220 336 L 290 336" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
-        <path data-edge-from="tailnet" data-edge-to="tailscale_service" data-edge-label="WireGuard-encrypted HTTPS :443" data-edge-key="2" data-edge-id="private_https" data-composition-points="495,336;565,336" d="M 495 336 L 565 336" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
-        <path data-edge-from="tailscale_service" data-edge-to="ingress_nginx" data-edge-label="TCP 443 to controller Pod" data-edge-key="3" data-edge-id="service_forward" data-composition-points="770,336;840,336" d="M 770 336 L 840 336" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="ingress_nginx" data-edge-to="hubble_ui" data-edge-label="decrypted HTTP to ClusterIP" data-edge-key="4" data-edge-id="hubble_route" data-composition-points="1045,336;1110,336" d="M 1045 336 L 1110 336" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="cert_manager" data-edge-to="tls_secret" data-edge-label="write renewed keypair" data-edge-key="5" data-edge-id="store_certificate" data-composition-points="650,558;780,558" d="M 650 558 L 780 558" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
-        <path data-edge-from="tls_secret" data-edge-to="ingress_nginx" data-edge-label="watch and reload certificate" data-edge-key="6" data-edge-id="reload_certificate" data-composition-points="895,520;895,446;942.5,446;942.5,372" d="M 895 520 L 895 454 Q 895 446 903 446 L 934.5 446 Q 942.5 446 942.5 438 L 942.5 372" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
+        <path data-edge-from="browser" data-edge-to="cloudflare_dns" data-edge-label="resolve DNS-only A record" data-edge-key="0" data-edge-id="resolve_private_ip" data-composition-points="112.5,450;112.5,313;140,313;140,176" d="M 112.5 450 L 112.5 321 Q 112.5 313 120.5 313 L 132 313 Q 140 313 140 305 L 140 176" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
+        <path data-edge-from="browser" data-edge-to="tailnet" data-edge-label="authenticated device" data-edge-key="1" data-edge-id="join_tailnet" data-composition-points="200,486;230,486" d="M 200 486 L 230 486" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
+        <path data-edge-from="tailnet" data-edge-to="tailscale_proxy" data-edge-label="WireGuard-encrypted HTTPS :443" data-edge-key="2" data-edge-id="private_https" data-composition-points="410,486;440,486" d="M 410 486 L 440 486" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
+        <path data-edge-from="tailscale_proxy" data-edge-to="lb_service" data-edge-label="DNAT to ClusterIP" data-edge-key="3" data-edge-id="service_forward" data-composition-points="625,486;655,486" d="M 625 486 L 655 486" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="lb_service" data-edge-to="ingress_nginx" data-edge-label="select controller Pod" data-edge-key="4" data-edge-id="service_to_ingress" data-composition-points="840,486;870,486" d="M 840 486 L 870 486" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="ingress_nginx" data-edge-to="hubble_ui" data-edge-label="decrypted HTTP to ClusterIP" data-edge-key="5" data-edge-id="hubble_route" data-composition-points="1055,486;1085,486" d="M 1055 486 L 1085 486" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="cert_manager" data-edge-to="tls_secret" data-edge-label="write renewed keypair" data-edge-key="6" data-edge-id="store_certificate" data-composition-points="1050,718;1080,718" d="M 1050 718 L 1080 718" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
+        <path data-edge-from="tls_secret" data-edge-to="ingress_nginx" data-edge-label="watch and reload certificate" data-edge-key="7" data-edge-id="reload_certificate" data-composition-points="1190,680;1190,601;962.5,601;962.5,522" d="M 1190 680 L 1190 609 Q 1190 601 1182 601 L 970.5 601 Q 962.5 601 962.5 593 L 962.5 522" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
+        <path data-edge-from="ingress_resources" data-edge-to="ingress_nginx" data-edge-label="render NGINX config" data-edge-key="8" data-edge-id="watch_ingress" data-composition-points="962.5,272;962.5,450" d="M 962.5 272 L 962.5 450" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="lb_service" data-edge-to="tailscale_operator" data-edge-label="watch class: tailscale" data-edge-key="9" data-edge-id="watch_lb_service" data-composition-points="747.5,450;747.5,361;532.5,361;532.5,272" d="M 747.5 450 L 747.5 369 Q 747.5 361 739.5 361 L 540.5 361 Q 532.5 361 532.5 353 L 532.5 272" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
+        <path data-edge-from="tailscale_operator" data-edge-to="tailscale_proxy" data-edge-label="create StatefulSet + identity" data-edge-key="10" data-edge-id="provision_proxy" data-composition-points="532.5,272;532.5,450" d="M 532.5 272 L 532.5 450" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
 
         <!-- Components -->
         <g id="node-browser" data-node-id="browser" data-node-label="Tailnet Browser" tabindex="0" role="button" aria-label="Focus Tailnet Browser, policy-authorized client, Architecture component" aria-pressed="false" data-node-kind="external" data-node-sublabel="policy-authorized client" data-node-context="Architecture component">
           <title>Tailnet Browser · policy-authorized client · Architecture component</title>
-          <rect x="45" y="300" width="175" height="72" rx="6" class="c-mask"/>
-          <rect x="45" y="300" width="175" height="72" rx="6" class="c-external" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(51 306) scale(0.6875)">
+          <rect x="25" y="450" width="175" height="72" rx="6" class="c-mask"/>
+          <rect x="25" y="450" width="175" height="72" rx="6" class="c-external" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(31 456) scale(0.6875)">
             <rect x="2.5" y="5" width="8.5" height="8" rx="1.5"/>
             <path d="M8 2.5h5.5V8M13.5 2.5 7.5 8.5"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="132.5" y="334" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Tailnet Browser</text>
-        <text data-detail="context" x="132.5" y="350" class="t-muted" font-size="9" text-anchor="middle">policy-authorized client</text>
+          <text data-node-label="" data-detail-anchor="" x="112.5" y="484" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Tailnet Browser</text>
+        <text data-detail="context" x="112.5" y="500" class="t-muted" font-size="9" text-anchor="middle">policy-authorized client</text>
         </g>
 
         <g id="node-cloudflare_dns" data-node-id="cloudflare_dns" data-node-label="Cloudflare DNS" tabindex="0" role="button" aria-label="Focus Cloudflare DNS, authoritative A + ACME TXT records, Architecture component" aria-pressed="false" data-node-kind="cloud" data-node-sublabel="authoritative A + ACME TXT records" data-node-tag="DNS only" data-node-context="Architecture component">
           <title>Cloudflare DNS · authoritative A + ACME TXT records · Architecture component · DNS only</title>
-          <rect x="45" y="90" width="220" height="76" rx="6" class="c-mask"/>
-          <rect x="45" y="90" width="220" height="76" rx="6" class="c-cloud" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="cloud" class="semantic-sigil s-cloud" transform="translate(51 96) scale(0.6875)">
+          <rect x="30" y="100" width="220" height="76" rx="6" class="c-mask"/>
+          <rect x="30" y="100" width="220" height="76" rx="6" class="c-cloud" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="cloud" class="semantic-sigil s-cloud" transform="translate(36 106) scale(0.6875)">
             <path d="M4.3 12.5h7.3a2.4 2.4 0 0 0 .2-4.8 4 4 0 0 0-7.5-1.3A3.1 3.1 0 0 0 4.3 12.5Z"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="155" y="126" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Cloudflare DNS</text>
-        <text data-detail="context" x="155" y="142" class="t-muted" font-size="9" text-anchor="middle">authoritative A + ACME TXT records</text>
-        <text data-detail="fine" x="155" y="158" class="t-cloud" font-size="7" text-anchor="middle">DNS only</text>
+          <text data-node-label="" data-detail-anchor="" x="140" y="136" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Cloudflare DNS</text>
+        <text data-detail="context" x="140" y="152" class="t-muted" font-size="9" text-anchor="middle">authoritative A + ACME TXT records</text>
+        <text data-detail="fine" x="140" y="168" class="t-cloud" font-size="7" text-anchor="middle">DNS only</text>
         </g>
 
         <g id="node-tailnet" data-node-id="tailnet" data-node-label="Tailscale Tailnet" tabindex="0" role="button" aria-label="Focus Tailscale Tailnet, identity policy + WireGuard, Tailnet-only application path" aria-pressed="false" data-node-kind="security" data-node-sublabel="identity policy + WireGuard" data-node-tag="private 100.64.0.0/10" data-node-context="Tailnet-only application path">
           <title>Tailscale Tailnet · identity policy + WireGuard · Tailnet-only application path · private 100.64.0.0/10</title>
-          <rect x="290" y="300" width="205" height="72" rx="6" class="c-mask"/>
-          <rect x="290" y="300" width="205" height="72" rx="6" class="c-security" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(296 306) scale(0.6875)">
+          <rect x="230" y="450" width="180" height="72" rx="6" class="c-mask"/>
+          <rect x="230" y="450" width="180" height="72" rx="6" class="c-security" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(236 456) scale(0.6875)">
             <path d="M8 2.2 13 4v3.5c0 3.1-1.8 5.4-5 6.5-3.2-1.1-5-3.4-5-6.5V4Z"/>
             <path d="m5.8 8 1.5 1.5 3-3"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="392.5" y="334" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Tailscale Tailnet</text>
-        <text data-detail="context" x="392.5" y="350" class="t-muted" font-size="9" text-anchor="middle">identity policy + WireGuard</text>
-        <text data-detail="fine" x="392.5" y="364" class="t-security" font-size="7" text-anchor="middle">private 100.64.0.0/10</text>
+          <text data-node-label="" data-detail-anchor="" x="320" y="484" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Tailscale Tailnet</text>
+        <text data-detail="context" x="320" y="500" class="t-muted" font-size="9" text-anchor="middle">identity policy + WireGuard</text>
+        <text data-detail="fine" x="320" y="514" class="t-security" font-size="7" text-anchor="middle">private 100.64.0.0/10</text>
         </g>
 
-        <g id="node-tailscale_service" data-node-id="tailscale_service" data-node-label="hubble-ui Service" tabindex="0" role="button" aria-label="Focus hubble-ui Service, Tailscale LoadBalancer, Kubernetes cluster › Tailnet-only application path" aria-pressed="false" data-node-kind="security" data-node-sublabel="Tailscale LoadBalancer" data-node-tag="TCP 80 / 443" data-node-context="Kubernetes cluster › Tailnet-only application path">
-          <title>hubble-ui Service · Tailscale LoadBalancer · Kubernetes cluster › Tailnet-only application path · TCP 80 / 443</title>
-          <rect x="565" y="300" width="205" height="72" rx="6" class="c-mask"/>
-          <rect x="565" y="300" width="205" height="72" rx="6" class="c-security" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(571 306) scale(0.6875)">
+        <g id="node-tailscale_proxy" data-node-id="tailscale_proxy" data-node-label="Tailscale Proxy Pod" tabindex="0" role="button" aria-label="Focus Tailscale Proxy Pod, operator-managed StatefulSet, Kubernetes cluster › Tailnet-only application path" aria-pressed="false" data-node-kind="security" data-node-sublabel="operator-managed StatefulSet" data-node-tag="100.71.15.115" data-node-context="Kubernetes cluster › Tailnet-only application path">
+          <title>Tailscale Proxy Pod · operator-managed StatefulSet · Kubernetes cluster › Tailnet-only application path · 100.71.15.115</title>
+          <rect x="440" y="450" width="185" height="72" rx="6" class="c-mask"/>
+          <rect x="440" y="450" width="185" height="72" rx="6" class="c-security" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(446 456) scale(0.6875)">
             <path d="M8 2.2 13 4v3.5c0 3.1-1.8 5.4-5 6.5-3.2-1.1-5-3.4-5-6.5V4Z"/>
             <path d="m5.8 8 1.5 1.5 3-3"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="667.5" y="334" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">hubble-ui Service</text>
-        <text data-detail="context" x="667.5" y="350" class="t-muted" font-size="9" text-anchor="middle">Tailscale LoadBalancer</text>
-        <text data-detail="fine" x="667.5" y="364" class="t-security" font-size="7" text-anchor="middle">TCP 80 / 443</text>
+          <text data-node-label="" data-detail-anchor="" x="532.5" y="484" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Tailscale Proxy Pod</text>
+        <text data-detail="context" x="532.5" y="500" class="t-muted" font-size="9" text-anchor="middle">operator-managed StatefulSet</text>
+        <text data-detail="fine" x="532.5" y="514" class="t-security" font-size="7" text-anchor="middle">100.71.15.115</text>
+        </g>
+
+        <g id="node-lb_service" data-node-id="lb_service" data-node-label="hubble-ui-tailscale" tabindex="0" role="button" aria-label="Focus hubble-ui-tailscale, LoadBalancer Service, Kubernetes cluster › Tailnet-only application path" aria-pressed="false" data-node-kind="backend" data-node-sublabel="LoadBalancer Service" data-node-tag="class: tailscale" data-node-context="Kubernetes cluster › Tailnet-only application path">
+          <title>hubble-ui-tailscale · LoadBalancer Service · Kubernetes cluster › Tailnet-only application path · class: tailscale</title>
+          <rect x="655" y="450" width="185" height="72" rx="6" class="c-mask"/>
+          <rect x="655" y="450" width="185" height="72" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(661 456) scale(0.6875)">
+            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="747.5" y="484" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">hubble-ui-tailscale</text>
+        <text data-detail="context" x="747.5" y="500" class="t-muted" font-size="9" text-anchor="middle">LoadBalancer Service</text>
+        <text data-detail="fine" x="747.5" y="514" class="t-backend" font-size="7" text-anchor="middle">class: tailscale</text>
         </g>
 
         <g id="node-ingress_nginx" data-node-id="ingress_nginx" data-node-label="ingress-nginx" tabindex="0" role="button" aria-label="Focus ingress-nginx, redirect + TLS termination, Kubernetes cluster › Tailnet-only application path" aria-pressed="false" data-node-kind="backend" data-node-sublabel="redirect + TLS termination" data-node-tag="Ingress class nginx" data-node-context="Kubernetes cluster › Tailnet-only application path">
           <title>ingress-nginx · redirect + TLS termination · Kubernetes cluster › Tailnet-only application path · Ingress class nginx</title>
-          <rect x="840" y="300" width="205" height="72" rx="6" class="c-mask"/>
-          <rect x="840" y="300" width="205" height="72" rx="6" class="c-backend" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(846 306) scale(0.6875)">
+          <rect x="870" y="450" width="185" height="72" rx="6" class="c-mask"/>
+          <rect x="870" y="450" width="185" height="72" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(876 456) scale(0.6875)">
             <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="942.5" y="334" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">ingress-nginx</text>
-        <text data-detail="context" x="942.5" y="350" class="t-muted" font-size="9" text-anchor="middle">redirect + TLS termination</text>
-        <text data-detail="fine" x="942.5" y="364" class="t-backend" font-size="7" text-anchor="middle">Ingress class nginx</text>
+          <text data-node-label="" data-detail-anchor="" x="962.5" y="484" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">ingress-nginx</text>
+        <text data-detail="context" x="962.5" y="500" class="t-muted" font-size="9" text-anchor="middle">redirect + TLS termination</text>
+        <text data-detail="fine" x="962.5" y="514" class="t-backend" font-size="7" text-anchor="middle">Ingress class nginx</text>
         </g>
 
-        <g id="node-hubble_ui" data-node-id="hubble_ui" data-node-label="Hubble UI" tabindex="0" role="button" aria-label="Focus Hubble UI, Cilium-managed ClusterIP Service, Kubernetes cluster › Tailnet-only application path" aria-pressed="false" data-node-kind="frontend" data-node-sublabel="Cilium-managed ClusterIP Service" data-node-tag="HTTP :80" data-node-context="Kubernetes cluster › Tailnet-only application path">
-          <title>Hubble UI · Cilium-managed ClusterIP Service · Kubernetes cluster › Tailnet-only application path · HTTP :80</title>
-          <rect x="1110" y="300" width="180" height="72" rx="6" class="c-mask"/>
-          <rect x="1110" y="300" width="180" height="72" rx="6" class="c-frontend" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="frontend" class="semantic-sigil s-frontend" transform="translate(1116 306) scale(0.6875)">
+        <g id="node-hubble_ui" data-node-id="hubble_ui" data-node-label="Hubble UI" tabindex="0" role="button" aria-label="Focus Hubble UI, Cilium ClusterIP Service, Kubernetes cluster › Tailnet-only application path" aria-pressed="false" data-node-kind="frontend" data-node-sublabel="Cilium ClusterIP Service" data-node-tag="HTTP :80" data-node-context="Kubernetes cluster › Tailnet-only application path">
+          <title>Hubble UI · Cilium ClusterIP Service · Kubernetes cluster › Tailnet-only application path · HTTP :80</title>
+          <rect x="1085" y="450" width="180" height="72" rx="6" class="c-mask"/>
+          <rect x="1085" y="450" width="180" height="72" rx="6" class="c-frontend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="frontend" class="semantic-sigil s-frontend" transform="translate(1091 456) scale(0.6875)">
             <rect x="2" y="3" width="12" height="10" rx="2"/>
             <path d="M2 6.5h12"/>
             <circle cx="4.1" cy="4.8" r=".7" class="sigil-fill"/>
             <circle cx="6.3" cy="4.8" r=".7" class="sigil-fill"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="1200" y="334" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Hubble UI</text>
-        <text data-detail="context" x="1200" y="350" class="t-muted" font-size="8.9" text-anchor="middle">Cilium-managed ClusterIP Service</text>
-        <text data-detail="fine" x="1200" y="364" class="t-frontend" font-size="7" text-anchor="middle">HTTP :80</text>
+          <text data-node-label="" data-detail-anchor="" x="1175" y="484" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Hubble UI</text>
+        <text data-detail="context" x="1175" y="500" class="t-muted" font-size="9" text-anchor="middle">Cilium ClusterIP Service</text>
+        <text data-detail="fine" x="1175" y="514" class="t-frontend" font-size="7" text-anchor="middle">HTTP :80</text>
         </g>
 
         <g id="node-cert_manager" data-node-id="cert_manager" data-node-label="cert-manager" tabindex="0" role="button" aria-label="Focus cert-manager, Issuer + Certificate controller, Kubernetes cluster" aria-pressed="false" data-node-kind="security" data-node-sublabel="Issuer + Certificate controller" data-node-tag="DNS-01 renewal" data-node-context="Kubernetes cluster">
           <title>cert-manager · Issuer + Certificate controller · Kubernetes cluster · DNS-01 renewal</title>
-          <rect x="430" y="520" width="220" height="76" rx="6" class="c-mask"/>
-          <rect x="430" y="520" width="220" height="76" rx="6" class="c-security" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(436 526) scale(0.6875)">
+          <rect x="850" y="680" width="200" height="76" rx="6" class="c-mask"/>
+          <rect x="850" y="680" width="200" height="76" rx="6" class="c-security" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(856 686) scale(0.6875)">
             <path d="M8 2.2 13 4v3.5c0 3.1-1.8 5.4-5 6.5-3.2-1.1-5-3.4-5-6.5V4Z"/>
             <path d="m5.8 8 1.5 1.5 3-3"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="540" y="556" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">cert-manager</text>
-        <text data-detail="context" x="540" y="572" class="t-muted" font-size="9" text-anchor="middle">Issuer + Certificate controller</text>
-        <text data-detail="fine" x="540" y="588" class="t-security" font-size="7" text-anchor="middle">DNS-01 renewal</text>
+          <text data-node-label="" data-detail-anchor="" x="950" y="716" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">cert-manager</text>
+        <text data-detail="context" x="950" y="732" class="t-muted" font-size="9" text-anchor="middle">Issuer + Certificate controller</text>
+        <text data-detail="fine" x="950" y="748" class="t-security" font-size="7" text-anchor="middle">DNS-01 renewal</text>
         </g>
 
         <g id="node-tls_secret" data-node-id="tls_secret" data-node-label="hubble-ui-tls Secret" tabindex="0" role="button" aria-label="Focus hubble-ui-tls Secret, ECDSA certificate + private key, Kubernetes cluster" aria-pressed="false" data-node-kind="database" data-node-sublabel="ECDSA certificate + private key" data-node-tag="kube-system" data-node-context="Kubernetes cluster">
           <title>hubble-ui-tls Secret · ECDSA certificate + private key · Kubernetes cluster · kube-system</title>
-          <rect x="780" y="520" width="230" height="76" rx="6" class="c-mask"/>
-          <rect x="780" y="520" width="230" height="76" rx="6" class="c-database" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(786 526) scale(0.6875)">
+          <rect x="1080" y="680" width="220" height="76" rx="6" class="c-mask"/>
+          <rect x="1080" y="680" width="220" height="76" rx="6" class="c-database" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(1086 686) scale(0.6875)">
             <ellipse cx="8" cy="4" rx="5" ry="2"/>
             <path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="895" y="556" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">hubble-ui-tls Secret</text>
-        <text data-detail="context" x="895" y="572" class="t-muted" font-size="9" text-anchor="middle">ECDSA certificate + private key</text>
-        <text data-detail="fine" x="895" y="588" class="t-database" font-size="7" text-anchor="middle">kube-system</text>
+          <text data-node-label="" data-detail-anchor="" x="1190" y="716" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">hubble-ui-tls Secret</text>
+        <text data-detail="context" x="1190" y="732" class="t-muted" font-size="9" text-anchor="middle">ECDSA certificate + private key</text>
+        <text data-detail="fine" x="1190" y="748" class="t-database" font-size="7" text-anchor="middle">kube-system</text>
+        </g>
+
+        <g id="node-ingress_resources" data-node-id="ingress_resources" data-node-label="Ingress API Objects" tabindex="0" role="button" aria-label="Focus Ingress API Objects, IngressClass + Ingress, Kubernetes cluster" aria-pressed="false" data-node-kind="backend" data-node-sublabel="IngressClass + Ingress" data-node-tag="class: nginx" data-node-context="Kubernetes cluster">
+          <title>Ingress API Objects · IngressClass + Ingress · Kubernetes cluster · class: nginx</title>
+          <rect x="870" y="200" width="185" height="72" rx="6" class="c-mask"/>
+          <rect x="870" y="200" width="185" height="72" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(876 206) scale(0.6875)">
+            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="962.5" y="234" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Ingress API Objects</text>
+        <text data-detail="context" x="962.5" y="250" class="t-muted" font-size="9" text-anchor="middle">IngressClass + Ingress</text>
+        <text data-detail="fine" x="962.5" y="264" class="t-backend" font-size="7" text-anchor="middle">class: nginx</text>
+        </g>
+
+        <g id="node-tailscale_operator" data-node-id="tailscale_operator" data-node-label="Tailscale Operator" tabindex="0" role="button" aria-label="Focus Tailscale Operator, watches classed Services, Kubernetes cluster" aria-pressed="false" data-node-kind="backend" data-node-sublabel="watches classed Services" data-node-tag="provisions proxy" data-node-context="Kubernetes cluster">
+          <title>Tailscale Operator · watches classed Services · Kubernetes cluster · provisions proxy</title>
+          <rect x="440" y="200" width="185" height="72" rx="6" class="c-mask"/>
+          <rect x="440" y="200" width="185" height="72" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(446 206) scale(0.6875)">
+            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="532.5" y="234" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Tailscale Operator</text>
+        <text data-detail="context" x="532.5" y="250" class="t-muted" font-size="9" text-anchor="middle">watches classed Services</text>
+        <text data-detail="fine" x="532.5" y="264" class="t-backend" font-size="7" text-anchor="middle">provisions proxy</text>
         </g>
 
         <!-- Connection labels -->
         <g data-detail="context" data-edge-from="browser" data-edge-to="cloudflare_dns" data-edge-label="resolve DNS-only A record" data-edge-key="0" data-edge-id="resolve_private_ip">
-          <rect x="78.75" y="213" width="130" height="14" rx="3" class="c-mask"/>
-          <text x="143.75" y="223" class="t-messagebus" font-size="8" text-anchor="middle">resolve DNS-only A record</text>
+          <rect x="61.25" y="293" width="130" height="14" rx="3" class="c-mask"/>
+          <text x="126.25" y="303" class="t-messagebus" font-size="8" text-anchor="middle">resolve DNS-only A record</text>
         </g>
         <g data-detail="context" data-edge-from="browser" data-edge-to="tailnet" data-edge-label="authenticated device" data-edge-key="1" data-edge-id="join_tailnet">
-          <rect x="202" y="376" width="106" height="14" rx="3" class="c-mask"/>
-          <text x="255" y="386" class="t-security" font-size="8" text-anchor="middle">authenticated device</text>
+          <rect x="157" y="530" width="106" height="14" rx="3" class="c-mask"/>
+          <text x="210" y="540" class="t-security" font-size="8" text-anchor="middle">authenticated device</text>
         </g>
-        <g data-detail="context" data-edge-from="tailnet" data-edge-to="tailscale_service" data-edge-label="WireGuard-encrypted HTTPS :443" data-edge-key="2" data-edge-id="private_https">
-          <rect x="453" y="376" width="154" height="14" rx="3" class="c-mask"/>
-          <text x="530" y="386" class="t-security" font-size="8" text-anchor="middle">WireGuard-encrypted HTTPS :443</text>
+        <g data-detail="context" data-edge-from="tailnet" data-edge-to="tailscale_proxy" data-edge-label="WireGuard-encrypted HTTPS :443" data-edge-key="2" data-edge-id="private_https">
+          <rect x="338" y="530" width="154" height="14" rx="3" class="c-mask"/>
+          <text x="415" y="540" class="t-security" font-size="8" text-anchor="middle">WireGuard-encrypted HTTPS :443</text>
         </g>
-        <g data-detail="context" data-edge-from="tailscale_service" data-edge-to="ingress_nginx" data-edge-label="TCP 443 to controller Pod" data-edge-key="3" data-edge-id="service_forward">
-          <rect x="740" y="286" width="130" height="14" rx="3" class="c-mask"/>
-          <text x="805" y="296" class="t-backend" font-size="8" text-anchor="middle">TCP 443 to controller Pod</text>
+        <g data-detail="context" data-edge-from="tailscale_proxy" data-edge-to="lb_service" data-edge-label="DNAT to ClusterIP" data-edge-key="3" data-edge-id="service_forward">
+          <rect x="589.2" y="530" width="91.6" height="14" rx="3" class="c-mask"/>
+          <text x="635" y="540" class="t-backend" font-size="8" text-anchor="middle">DNAT to ClusterIP</text>
         </g>
-        <g data-detail="context" data-edge-from="ingress_nginx" data-edge-to="hubble_ui" data-edge-label="decrypted HTTP to ClusterIP" data-edge-key="4" data-edge-id="hubble_route">
-          <rect x="1007.7" y="376" width="139.6" height="14" rx="3" class="c-mask"/>
-          <text x="1077.5" y="386" class="t-backend" font-size="8" text-anchor="middle">decrypted HTTP to ClusterIP</text>
+        <g data-detail="context" data-edge-from="lb_service" data-edge-to="ingress_nginx" data-edge-label="select controller Pod" data-edge-key="4" data-edge-id="service_to_ingress">
+          <rect x="799.6" y="530" width="110.8" height="14" rx="3" class="c-mask"/>
+          <text x="855" y="540" class="t-backend" font-size="8" text-anchor="middle">select controller Pod</text>
         </g>
-        <g data-detail="context" data-edge-from="cert_manager" data-edge-to="tls_secret" data-edge-label="write renewed keypair" data-edge-key="5" data-edge-id="store_certificate">
-          <rect x="659.6" y="538" width="110.8" height="14" rx="3" class="c-mask"/>
-          <text x="715" y="548" class="t-security" font-size="8" text-anchor="middle">write renewed keypair</text>
+        <g data-detail="context" data-edge-from="ingress_nginx" data-edge-to="hubble_ui" data-edge-label="decrypted HTTP to ClusterIP" data-edge-key="5" data-edge-id="hubble_route">
+          <rect x="1005.2" y="530" width="139.6" height="14" rx="3" class="c-mask"/>
+          <text x="1075" y="540" class="t-backend" font-size="8" text-anchor="middle">decrypted HTTP to ClusterIP</text>
         </g>
-        <g data-detail="context" data-edge-from="tls_secret" data-edge-to="ingress_nginx" data-edge-label="watch and reload certificate" data-edge-key="6" data-edge-id="reload_certificate">
-          <rect x="846.55" y="426" width="144.4" height="14" rx="3" class="c-mask"/>
-          <text x="918.75" y="436" class="t-security" font-size="8" text-anchor="middle">watch and reload certificate</text>
+        <g data-detail="context" data-edge-from="cert_manager" data-edge-to="tls_secret" data-edge-label="write renewed keypair" data-edge-key="6" data-edge-id="store_certificate">
+          <rect x="1019.6" y="760" width="110.8" height="14" rx="3" class="c-mask"/>
+          <text x="1075" y="770" class="t-security" font-size="8" text-anchor="middle">write renewed keypair</text>
+        </g>
+        <g data-detail="context" data-edge-from="tls_secret" data-edge-to="ingress_nginx" data-edge-label="watch and reload certificate" data-edge-key="7" data-edge-id="reload_certificate">
+          <rect x="1004.05" y="581" width="144.4" height="14" rx="3" class="c-mask"/>
+          <text x="1076.25" y="591" class="t-security" font-size="8" text-anchor="middle">watch and reload certificate</text>
+        </g>
+        <g data-detail="context" data-edge-from="ingress_resources" data-edge-to="ingress_nginx" data-edge-label="render NGINX config" data-edge-key="8" data-edge-id="watch_ingress">
+          <rect x="924.4" y="340" width="101.2" height="14" rx="3" class="c-mask"/>
+          <text x="975" y="350" class="t-muted" font-size="8" text-anchor="middle">render NGINX config</text>
+        </g>
+        <g data-detail="context" data-edge-from="lb_service" data-edge-to="tailscale_operator" data-edge-label="watch class: tailscale" data-edge-key="9" data-edge-id="watch_lb_service">
+          <rect x="612.2" y="325" width="115.6" height="14" rx="3" class="c-mask"/>
+          <text x="670" y="335" class="t-messagebus" font-size="8" text-anchor="middle">watch class: tailscale</text>
+        </g>
+        <g data-detail="context" data-edge-from="tailscale_operator" data-edge-to="tailscale_proxy" data-edge-label="create StatefulSet + identity" data-edge-key="10" data-edge-id="provision_proxy">
+          <rect x="355.4" y="340" width="149.2" height="14" rx="3" class="c-mask"/>
+          <text x="430" y="350" class="t-muted" font-size="8" text-anchor="middle">create StatefulSet + identity</text>
         </g>
 
         <!-- Boundary labels (foreground masks keep routes out of titles) -->
         <g data-graph-role="structural-frame-label" data-composition-frame-id="0" data-composition-frame-kind="security-group" data-composition-frame-label="Tailnet-only application path">
-          <rect data-graph-role="structural-frame-label-mask" x="268" y="280" width="166.6" height="16" rx="3" class="c-mask"/>
-          <text data-boundary-label="" x="272" y="293" class="t-security" font-size="9" font-weight="600">Tailnet-only application path</text>
+          <rect data-graph-role="structural-frame-label-mask" x="208" y="430" width="166.6" height="16" rx="3" class="c-mask"/>
+          <text data-boundary-label="" x="212" y="443" class="t-security" font-size="9" font-weight="600">Tailnet-only application path</text>
         </g>
 
         <g data-graph-role="structural-frame-label" data-composition-frame-id="1" data-composition-frame-kind="region" data-composition-frame-label="Kubernetes cluster">
-          <rect data-graph-role="structural-frame-label-mask" x="410" y="262" width="107.2" height="16" rx="3" class="c-mask"/>
-          <text data-boundary-label="" x="414" y="275" class="t-cloud" font-size="9" font-weight="600">Kubernetes cluster</text>
+          <rect data-graph-role="structural-frame-label-mask" x="420" y="180" width="107.2" height="16" rx="3" class="c-mask"/>
+          <text data-boundary-label="" x="424" y="193" class="t-cloud" font-size="9" font-weight="600">Kubernetes cluster</text>
         </g>
 
         <!-- Legend -->
         <g data-legend="" data-legend-bridge="">
-          <text x="40" y="684" class="t-primary" font-size="12" font-weight="650">Legend</text>
-          <g data-legend-semantic-kind="frontend" data-legend-kind="frontend" data-legend-label="Frontend" data-legend-x="40" data-legend-baseline="704" data-legend-width="83">
-            <rect x="40" y="695" width="16" height="10" rx="2.5" class="c-frontend" stroke-width="1"/>
-            <text x="62" y="704" class="t-muted" font-size="10" font-weight="500">Frontend</text>
+          <text x="40" y="864" class="t-primary" font-size="12" font-weight="650">Legend</text>
+          <g data-legend-semantic-kind="frontend" data-legend-kind="frontend" data-legend-label="Frontend" data-legend-x="40" data-legend-baseline="884" data-legend-width="83">
+            <rect x="40" y="875" width="16" height="10" rx="2.5" class="c-frontend" stroke-width="1"/>
+            <text x="62" y="884" class="t-muted" font-size="10" font-weight="500">Frontend</text>
           </g>
-          <g data-legend-semantic-kind="backend" data-legend-kind="backend" data-legend-label="Backend" data-legend-x="145" data-legend-baseline="704" data-legend-width="78">
-            <rect x="145" y="695" width="16" height="10" rx="2.5" class="c-backend" stroke-width="1"/>
-            <text x="167" y="704" class="t-muted" font-size="10" font-weight="500">Backend</text>
+          <g data-legend-semantic-kind="backend" data-legend-kind="backend" data-legend-label="Backend" data-legend-x="145" data-legend-baseline="884" data-legend-width="78">
+            <rect x="145" y="875" width="16" height="10" rx="2.5" class="c-backend" stroke-width="1"/>
+            <text x="167" y="884" class="t-muted" font-size="10" font-weight="500">Backend</text>
           </g>
-          <g data-legend-semantic-kind="database" data-legend-kind="database" data-legend-label="Database" data-legend-x="245" data-legend-baseline="704" data-legend-width="83">
-            <rect x="245" y="695" width="16" height="10" rx="2.5" class="c-database" stroke-width="1"/>
-            <text x="267" y="704" class="t-muted" font-size="10" font-weight="500">Database</text>
+          <g data-legend-semantic-kind="database" data-legend-kind="database" data-legend-label="Database" data-legend-x="245" data-legend-baseline="884" data-legend-width="83">
+            <rect x="245" y="875" width="16" height="10" rx="2.5" class="c-database" stroke-width="1"/>
+            <text x="267" y="884" class="t-muted" font-size="10" font-weight="500">Database</text>
           </g>
-          <g data-legend-semantic-kind="cloud" data-legend-kind="cloud" data-legend-label="Cloud" data-legend-x="350" data-legend-baseline="704" data-legend-width="68">
-            <rect x="350" y="695" width="16" height="10" rx="2.5" class="c-cloud" stroke-width="1"/>
-            <text x="372" y="704" class="t-muted" font-size="10" font-weight="500">Cloud</text>
+          <g data-legend-semantic-kind="cloud" data-legend-kind="cloud" data-legend-label="Cloud" data-legend-x="350" data-legend-baseline="884" data-legend-width="68">
+            <rect x="350" y="875" width="16" height="10" rx="2.5" class="c-cloud" stroke-width="1"/>
+            <text x="372" y="884" class="t-muted" font-size="10" font-weight="500">Cloud</text>
           </g>
-          <g data-legend-semantic-kind="security" data-legend-kind="security" data-legend-label="Security" data-legend-x="440" data-legend-baseline="704" data-legend-width="83">
-            <rect x="440" y="695" width="16" height="10" rx="2.5" class="c-security" stroke-width="1"/>
-            <text x="462" y="704" class="t-muted" font-size="10" font-weight="500">Security</text>
+          <g data-legend-semantic-kind="security" data-legend-kind="security" data-legend-label="Security" data-legend-x="440" data-legend-baseline="884" data-legend-width="83">
+            <rect x="440" y="875" width="16" height="10" rx="2.5" class="c-security" stroke-width="1"/>
+            <text x="462" y="884" class="t-muted" font-size="10" font-weight="500">Security</text>
           </g>
-          <g data-legend-semantic-kind="external" data-legend-kind="external" data-legend-label="External" data-legend-x="545" data-legend-baseline="704" data-legend-width="83">
-            <rect x="545" y="695" width="16" height="10" rx="2.5" class="c-external" stroke-width="1"/>
-            <text x="567" y="704" class="t-muted" font-size="10" font-weight="500">External</text>
+          <g data-legend-semantic-kind="external" data-legend-kind="external" data-legend-label="External" data-legend-x="545" data-legend-baseline="884" data-legend-width="83">
+            <rect x="545" y="875" width="16" height="10" rx="2.5" class="c-external" stroke-width="1"/>
+            <text x="567" y="884" class="t-muted" font-size="10" font-weight="500">External</text>
           </g>
         </g>
       </svg>
@@ -5405,11 +5461,11 @@
       <div class="card">
         <div class="card-header">
           <div class="card-dot violet"></div>
-          <h3>Request invariant</h3>
+          <h3>Request path</h3>
         </div>
         <ul>
           <li>&bull; Cloudflare answers DNS but never proxies application traffic</li>
-          <li>&bull; Only a tailnet-authorized client can route to the 100.x Service address</li>
+          <li>&bull; The Tailscale proxy forwards TCP to the Service selecting ingress-nginx</li>
         </ul>
       </div>
 
@@ -5427,11 +5483,22 @@
       <div class="card">
         <div class="card-header">
           <div class="card-dot amber"></div>
-          <h3>Ownership</h3>
+          <h3>Provisioning ownership</h3>
         </div>
         <ul>
-          <li>&bull; Cilium owns Hubble UI; ingress-nginx owns TLS termination</li>
-          <li>&bull; Tailscale owns private reachability; cert-manager owns ACME state</li>
+          <li>&bull; Helm installs ingress-nginx; Ingress objects configure its routes</li>
+          <li>&bull; The LoadBalancer Service causes Tailscale to create the external proxy</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot rose"></div>
+          <h3>Client address limit</h3>
+        </div>
+        <ul>
+          <li>&bull; ingress-nginx sees the Tailscale proxy Pod as its TCP peer</li>
+          <li>&bull; Tailnet grants, not source-IP headers, remain the access boundary</li>
         </ul>
       </div>
     </div>

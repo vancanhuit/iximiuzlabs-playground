@@ -2,20 +2,20 @@
   "schema_version": 1,
   "diagram_type": "architecture",
   "meta": {
-    "title": "Private Hubble UI over Tailscale with Browser-Trusted TLS",
+    "title": "ingress-nginx Provisioning and Private Hubble Request Path",
     "output": "docs/k0s/architecture/hubble-private-https.html",
     "quality_profile": "showcase",
     "repository": {
       "url": "https://github.com/vancanhuit/iximiuzlabs-playground",
-      "revision": "70ea935e6dbb251a9272d0dc4392e6e4e262a140"
+      "revision": "fbe2671ceebad17b658a3ea2647054f53363bd31"
     },
-    "viewBox": [1320, 720],
+    "viewBox": [1380, 900],
     "views": [
       {
         "id": "request-path",
         "label": "HTTPS request path",
-        "focus": ["browser", "cloudflare_dns", "tailnet", "tailscale_service", "ingress_nginx", "hubble_ui"],
-        "note": "DNS returns a private Tailscale IP; HTTPS remains inside the tailnet and terminates at ingress-nginx."
+        "focus": ["browser", "cloudflare_dns", "tailnet", "tailscale_proxy", "lb_service", "ingress_nginx", "hubble_ui"],
+        "note": "HTTPS crosses the tailnet proxy and Kubernetes Service before ingress-nginx terminates TLS."
       },
       {
         "id": "certificate-ownership",
@@ -24,10 +24,10 @@
         "note": "cert-manager completes DNS-01 out of band, stores the certificate, and renews it before expiry."
       },
       {
-        "id": "security-boundaries",
-        "label": "Security boundaries",
-        "focus": ["browser", "tailnet", "tailscale_service", "ingress_nginx", "hubble_ui"],
-        "note": "Tailnet policy gates network reachability; TLS authenticates the custom hostname to the browser."
+        "id": "provisioning",
+        "label": "Controller provisioning",
+        "focus": ["ingress_resources", "ingress_nginx", "lb_service", "tailscale_operator", "tailscale_proxy"],
+        "note": "Helm creates ingress-nginx; the hand-authored LoadBalancer Service causes Tailscale to create its proxy."
       }
     ]
   },
@@ -37,7 +37,7 @@
       "type": "external",
       "label": "Tailnet Browser",
       "sublabel": "policy-authorized client",
-      "pos": [45, 300],
+      "pos": [25, 450],
       "size": [175, 72]
     },
     {
@@ -46,7 +46,7 @@
       "label": "Cloudflare DNS",
       "sublabel": "authoritative A + ACME TXT records",
       "tag": "DNS only",
-      "pos": [45, 90],
+      "pos": [30, 100],
       "size": [220, 76]
     },
     {
@@ -55,17 +55,27 @@
       "label": "Tailscale Tailnet",
       "sublabel": "identity policy + WireGuard",
       "tag": "private 100.64.0.0/10",
-      "pos": [290, 300],
-      "size": [205, 72]
+      "pos": [230, 450],
+      "size": [180, 72]
     },
     {
-      "id": "tailscale_service",
+      "id": "tailscale_proxy",
       "type": "security",
-      "label": "hubble-ui Service",
-      "sublabel": "Tailscale LoadBalancer",
-      "tag": "TCP 80 / 443",
-      "pos": [565, 300],
-      "size": [205, 72]
+      "label": "Tailscale Proxy Pod",
+      "sublabel": "operator-managed StatefulSet",
+      "tag": "100.71.15.115",
+      "pos": [440, 450],
+      "size": [185, 72]
+    },
+    {
+      "id": "lb_service",
+      "type": "backend",
+      "label": "hubble-ui-tailscale",
+      "sublabel": "LoadBalancer Service",
+      "tag": "class: tailscale",
+      "pos": [655, 450],
+      "size": [185, 72],
+      "sources": [{"path": "docs/k0s/hubble-ui-tailscale.yaml", "line": 1, "end_line": 23, "label": "Tailscale Service"}]
     },
     {
       "id": "ingress_nginx",
@@ -73,16 +83,16 @@
       "label": "ingress-nginx",
       "sublabel": "redirect + TLS termination",
       "tag": "Ingress class nginx",
-      "pos": [840, 300],
-      "size": [205, 72]
+      "pos": [870, 450],
+      "size": [185, 72]
     },
     {
       "id": "hubble_ui",
       "type": "frontend",
       "label": "Hubble UI",
-      "sublabel": "Cilium-managed ClusterIP Service",
+      "sublabel": "Cilium ClusterIP Service",
       "tag": "HTTP :80",
-      "pos": [1110, 300],
+      "pos": [1085, 450],
       "size": [180, 72],
       "sources": [{"path": "docs/k0s/cilium-values.yaml", "line": 37, "end_line": 41, "label": "Hubble enabled"}]
     },
@@ -92,8 +102,8 @@
       "label": "cert-manager",
       "sublabel": "Issuer + Certificate controller",
       "tag": "DNS-01 renewal",
-      "pos": [430, 520],
-      "size": [220, 76]
+      "pos": [850, 680],
+      "size": [200, 76]
     },
     {
       "id": "tls_secret",
@@ -101,21 +111,40 @@
       "label": "hubble-ui-tls Secret",
       "sublabel": "ECDSA certificate + private key",
       "tag": "kube-system",
-      "pos": [780, 520],
-      "size": [230, 76]
+      "pos": [1080, 680],
+      "size": [220, 76]
+    },
+    {
+      "id": "ingress_resources",
+      "type": "backend",
+      "label": "Ingress API Objects",
+      "sublabel": "IngressClass + Ingress",
+      "tag": "class: nginx",
+      "pos": [870, 200],
+      "size": [185, 72],
+      "sources": [{"path": "docs/k0s/hubble-ui-tls.yaml", "line": 39, "end_line": 62, "label": "Hubble Ingress"}]
+    },
+    {
+      "id": "tailscale_operator",
+      "type": "backend",
+      "label": "Tailscale Operator",
+      "sublabel": "watches classed Services",
+      "tag": "provisions proxy",
+      "pos": [440, 200],
+      "size": [185, 72]
     }
   ],
   "boundaries": [
     {
       "kind": "security-group",
       "label": "Tailnet-only application path",
-      "wraps": ["tailnet", "tailscale_service", "ingress_nginx", "hubble_ui"],
+      "wraps": ["tailnet", "tailscale_proxy", "lb_service", "ingress_nginx", "hubble_ui"],
       "pad": 26
     },
     {
       "kind": "region",
       "label": "Kubernetes cluster",
-      "wraps": ["tailscale_service", "ingress_nginx", "hubble_ui", "cert_manager", "tls_secret"],
+      "wraps": ["tailscale_proxy", "lb_service", "ingress_nginx", "hubble_ui", "cert_manager", "tls_secret", "ingress_resources", "tailscale_operator"],
       "pad": 24
     }
   ],
@@ -135,23 +164,31 @@
       "to": "tailnet",
       "label": "authenticated device",
       "variant": "security",
-      "labelAt": [255, 386]
+      "labelAt": [210, 540]
     },
     {
       "id": "private_https",
       "from": "tailnet",
-      "to": "tailscale_service",
+      "to": "tailscale_proxy",
       "label": "WireGuard-encrypted HTTPS :443",
       "variant": "security",
-      "labelDy": 60
+      "labelAt": [415, 540]
     },
     {
       "id": "service_forward",
-      "from": "tailscale_service",
-      "to": "ingress_nginx",
-      "label": "TCP 443 to controller Pod",
+      "from": "tailscale_proxy",
+      "to": "lb_service",
+      "label": "DNAT to ClusterIP",
       "variant": "emphasis",
-      "labelDy": -30
+      "labelAt": [635, 540]
+    },
+    {
+      "id": "service_to_ingress",
+      "from": "lb_service",
+      "to": "ingress_nginx",
+      "label": "select controller Pod",
+      "variant": "emphasis",
+      "labelAt": [855, 540]
     },
     {
       "id": "hubble_route",
@@ -159,14 +196,15 @@
       "to": "hubble_ui",
       "label": "decrypted HTTP to ClusterIP",
       "variant": "emphasis",
-      "labelDy": 60
+      "labelAt": [1075, 540]
     },
     {
       "id": "store_certificate",
       "from": "cert_manager",
       "to": "tls_secret",
       "label": "write renewed keypair",
-      "variant": "security"
+      "variant": "security",
+      "labelAt": [1075, 770]
     },
     {
       "id": "reload_certificate",
@@ -176,15 +214,41 @@
       "variant": "security",
       "fromSide": "top",
       "toSide": "bottom"
+    },
+    {
+      "id": "watch_ingress",
+      "from": "ingress_resources",
+      "to": "ingress_nginx",
+      "label": "render NGINX config",
+      "variant": "default",
+      "labelAt": [975, 350]
+    },
+    {
+      "id": "watch_lb_service",
+      "from": "lb_service",
+      "to": "tailscale_operator",
+      "label": "watch class: tailscale",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "labelAt": [670, 335]
+    },
+    {
+      "id": "provision_proxy",
+      "from": "tailscale_operator",
+      "to": "tailscale_proxy",
+      "label": "create StatefulSet + identity",
+      "variant": "default",
+      "labelAt": [430, 350]
     }
   ],
   "cards": [
     {
       "dot": "violet",
-      "title": "Request invariant",
+      "title": "Request path",
       "items": [
         "Cloudflare answers DNS but never proxies application traffic",
-        "Only a tailnet-authorized client can route to the 100.x Service address"
+        "The Tailscale proxy forwards TCP to the Service selecting ingress-nginx"
       ]
     },
     {
@@ -197,10 +261,18 @@
     },
     {
       "dot": "amber",
-      "title": "Ownership",
+      "title": "Provisioning ownership",
       "items": [
-        "Cilium owns Hubble UI; ingress-nginx owns TLS termination",
-        "Tailscale owns private reachability; cert-manager owns ACME state"
+        "Helm installs ingress-nginx; Ingress objects configure its routes",
+        "The LoadBalancer Service causes Tailscale to create the external proxy"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Client address limit",
+      "items": [
+        "ingress-nginx sees the Tailscale proxy Pod as its TCP peer",
+        "Tailnet grants, not source-IP headers, remain the access boundary"
       ]
     }
   ]
