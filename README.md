@@ -1,7 +1,7 @@
 # Runbook: Deploy Debian and Kubernetes playgrounds
 
 **Owner:** Lab operator | **Frequency:** As needed
-**Last updated:** 2026-08-30 | **Last run:** Not recorded
+**Last updated:** 2026-08-30 | **Last run:** 2026-08-30
 
 ## Purpose
 
@@ -427,6 +427,7 @@ Record each image publication, playground deployment, update, or removal:
 | --- | --- | --- |
 | 2026-08-30 | Not recorded | Converted the deployment guide into an operational runbook |
 | 2026-08-30 | Repository owner and OpenCode | Recreated Kubernetes runs `6a93971d8bf0b87423a618b4` and `6a93971c156818a291cad1ef` from the updated playground definitions |
+| 2026-08-30 | Repository owner and OpenCode | Rebuilt and published both root filesystem images, updated all four playground definitions, verified Debian runs `6a93a6e48bf0b87423a9f221` and `6a93a6e48bf0b87423a9f22f`, and revalidated the persistent Kubernetes cluster |
 
 ## Playground and cluster references
 
