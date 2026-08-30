@@ -426,6 +426,7 @@ Record each image publication, playground deployment, update, or removal:
 | Date | Run by | Notes |
 | --- | --- | --- |
 | 2026-08-30 | Not recorded | Converted the deployment guide into an operational runbook |
+| 2026-08-30 | Repository owner and OpenCode | Recreated Kubernetes runs `6a93971d8bf0b87423a618b4` and `6a93971c156818a291cad1ef` from the updated playground definitions |
 
 ## Playground and cluster references
 

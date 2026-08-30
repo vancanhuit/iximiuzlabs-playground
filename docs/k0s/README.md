@@ -1,7 +1,7 @@
 # Build and operate a k0s cluster over Tailscale
 
 **Owner:** Lab operator | **Frequency:** As needed
-**Last updated:** 2026-08-29 | **Last run:** Not recorded
+**Last updated:** 2026-08-30 | **Last run:** 2026-08-30
 
 This runbook builds and operates an eight-node Kubernetes cluster across two iximiuz Labs playgrounds. Use it for initial deployment, validation, upgrades, recovery, and teardown.
 
@@ -152,7 +152,9 @@ Tailscale SSH policy and network grants are separate controls. The `check` actio
 
 ### Step 3: Enroll every playground machine
 
-Create a preapproved, one-use auth key for `tag:lab`. Store it at `tailscale.auth_key` in [`../../secrets/lab.sops.yaml`](../../secrets/lab.sops.yaml).
+Create a preapproved, reusable auth key for `tag:lab`. Store it at `tailscale.auth_key` in [`../../secrets/lab.sops.yaml`](../../secrets/lab.sops.yaml). Revoke the key immediately after enrolling all eight machines.
+
+If this tailnet previously contained machines with the same hostnames, remove those stale device records before enrollment. Duplicate names receive suffixed MagicDNS names such as `node-01-1`, and the address updater intentionally rejects duplicate hostnames. Delete only records confirmed offline and belonging to destroyed playground sessions; never remove a live or unrelated device to make validation pass. Allow MagicDNS to converge before reusing canonical names.
 
 From the control host, enroll one machine at a time. Replace `playground_id` with the playground run ID and `node_name` with the machine name:
 
@@ -182,7 +184,7 @@ sudo tailscale up \
 sudo rm -f /run/tailscale-auth-key
 ```
 
-Repeat enrollment for all eight nodes. Revoke a reusable key immediately after the final enrollment.
+Repeat enrollment for all eight nodes. A one-use key can enroll only one machine and is not suitable for this procedure.
 
 Never place auth keys in shell history, manifests, plaintext Git files, or command arguments. Do not enable `--accept-routes` without an explicit routed-subnet requirement and a CIDR review.
 
@@ -223,6 +225,8 @@ ip route get 10.96.0.1
 Before Cilium installation, neither address may use another virtual private network (VPN) or subnet router.
 
 **Expected result:** Every peer responds, hostnames are unique, and `tailscale0` has a `100.x` address. Direct paths offer better latency, but DERP paths remain functional.
+
+`tailscale ping` exits nonzero when it receives DERP replies but cannot establish a direct path. In that case, confirm that the output contains successful `pong` replies, then use SSH and `tailscale netcheck` to distinguish functional DERP connectivity from a failed peer.
 
 **If it fails:** Stop the deployment. Resolve missing peers, duplicate hostnames, intermittent links, or route overlap first.
 
@@ -735,6 +739,8 @@ Use observed symptoms to select the narrowest corrective action:
 | `ProxyGroupReady` remains false | Tailscale Service approval is missing | Add the exact auto-approver or approve only the two backends |
 | Tailscale paths use DERP | Direct UDP connectivity is unavailable | Check `tailscale netcheck`, firewall rules, and NAT behavior |
 | Cluster routes use another VPN | Accepted subnet routes overlap cluster CIDR ranges | Remove the route or choose unused Pod and Service ranges |
+| Canonical hostnames resolve to stale addresses or fresh devices receive `-1` suffixes | Destroyed playground devices remain registered in the tailnet | Remove only the confirmed offline records, restore the fresh devices' canonical names, and wait for MagicDNS convergence |
+| `tailscale ping` prints `pong` but exits nonzero | DERP works but no direct peer path was established | Verify SSH succeeds, inspect `tailscale netcheck`, and troubleshoot UDP or NAT without blocking bootstrap on a functional DERP path |
 | Sonobuoy reports failures | Cluster behavior or the test environment failed | Preserve the archive and inspect each failed test |
 
 ## Rollback and safe teardown
@@ -770,6 +776,7 @@ Update this table after every deployment, upgrade, recovery, or teardown:
 | Date | Run by | Notes |
 | --- | --- | --- |
 | 2026-08-29 | Not recorded | Converted the deployment guide into an operational runbook |
+| 2026-08-30 | Repository owner and OpenCode | Rebuilt two playgrounds from scratch; verified k0s, Cilium connectivity, Sonobuoy quick mode, and both Kubernetes API paths |
 
 ## Supporting references
 
