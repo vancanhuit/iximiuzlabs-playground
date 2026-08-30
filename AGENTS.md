@@ -9,8 +9,10 @@
 ## Local Workflow
 
 - Install the pinned toolchain and Python dependency with `mise install` then `uv sync --locked`.
+- Install repository Git hooks with `mise run hooks:install`; Cocogitto sources them from `cog.toml`.
 - Run all updater tests with `uv run --locked python -m unittest scripts/test_update_k0s_tailscale_ips.py -v`.
 - Run one test with `uv run --locked python -m unittest scripts.test_update_k0s_tailscale_ips.UpdateFileTests.test_dry_run_does_not_write -v`.
+- Run full-history secret scans with `mise run security:secrets`; use `mise run security:secrets:gitleaks` or `mise run security:secrets:trufflehog` to isolate a finding.
 - Build `trixie-base` before `trixie-dev`; the dev Dockerfile inherits the published base image. Use `mise run docker:build:trixie-base` and `mise run docker:build:trixie-dev`. The dev task obtains a GitHub token through `gh auth token` and passes it as a BuildKit secret.
 - Finish text/config edits with `git diff --check`. YAML and TOML use two-space indentation; other files default to four spaces per `.editorconfig`.
 

@@ -12,7 +12,26 @@ k0sctl = "0.32.2"
 helm = "4.2.4"
 sops = "3.13.3"
 age = "1.3.2"
+gitleaks = "8.30.1"
+trufflehog = "3.97.1"
+cocogitto = "7.0.0"
 "aqua:cilium/hubble" = "1.19.4"
+
+[tasks."hooks:install"]
+description = "Install repository Git hooks managed by Cocogitto"
+run = "cog install-hook --all"
+
+[tasks."security:secrets:gitleaks"]
+description = "Scan Git history for secrets with Gitleaks"
+run = "gitleaks git --redact --no-banner --verbose ."
+
+[tasks."security:secrets:trufflehog"]
+description = "Scan Git history for secrets with TruffleHog without external verification"
+run = "trufflehog git file://. --no-verification --results=unverified --fail --no-update"
+
+[tasks."security:secrets"]
+description = "Scan Git history with Gitleaks and TruffleHog"
+depends = ["security:secrets:gitleaks", "security:secrets:trufflehog"]
 
 [tasks."docker:build:trixie-base"]
 description = "Build the base image for trixie"

@@ -1,0 +1,13 @@
+ignore_merge_commits = true
+
+[git_hooks.commit-msg]
+script = """#!/bin/sh
+set -eu
+mise exec -- cog verify --file "$1"
+"""
+
+[git_hooks.pre-push]
+script = """#!/bin/sh
+set -eu
+mise run security:secrets
+"""

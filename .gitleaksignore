@@ -1,0 +1,2 @@
+# Historical RKE2 Gateway API manifest checksum, not a credential.
+a383edd784b4ec2dd664cc9db6708e4dd375a949:ansible/roles/rke2/defaults/main.yaml:generic-api-key:7

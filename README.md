@@ -149,7 +149,15 @@ labctl auth login
 labctl auth whoami
 ```
 
-`mise.toml` pins Python, `uv`, `kubectl`, the Cilium command-line interface (CLI), the GitHub CLI, `k0sctl`, Helm, SOPS, and age. Install Docker, Tailscale, and `labctl` separately.
+`mise.toml` pins Python, `uv`, `kubectl`, the Cilium command-line interface (CLI), the GitHub CLI, `k0sctl`, Helm, SOPS, age, Gitleaks, TruffleHog, and Cocogitto. Install Docker, Tailscale, and `labctl` separately.
+
+Install the repository-managed Git hooks after installing the tools:
+
+```bash
+mise run hooks:install
+```
+
+[`cog.toml`](cog.toml) defines a `commit-msg` hook that enforces Conventional Commits and a `pre-push` hook that runs both full-history secret scanners. Re-run the installation task after changing the hook definitions. The generated files under `.git/hooks/` are local Git metadata and are not committed.
 
 Verify access before changing infrastructure:
 
@@ -163,6 +171,25 @@ tailscale status
 **Expected result:** Every version and authentication command exits successfully. `tailscale status` shows the control host in the target tailnet.
 
 **If it fails:** Resolve the missing tool, expired login, or tailnet connection before publishing an image or creating a playground.
+
+### Scan the repository for secrets
+
+Run both secret scanners against the complete local Git history before publishing changes:
+
+```bash
+mise run security:secrets
+```
+
+Run one scanner when diagnosing a finding:
+
+```bash
+mise run security:secrets:gitleaks
+mise run security:secrets:trufflehog
+```
+
+Gitleaks redacts detected values from its terminal output. The TruffleHog task disables credential verification and update checks, so routine scans do not submit candidates to external provider APIs. TruffleHog may still print detected material locally; run it only in a trusted terminal and do not retain or publish scanner output.
+
+Both tasks scan Git history rather than only the current working tree. A clean scan exits successfully. A finding fails the task and must be investigated without copying the suspected value into an issue, log, commit message, or response. Revoke a confirmed credential before removing it from current files and rewriting history where required. Do not allowlist `secrets/lab.sops.yaml` as a path: its current values are encrypted, but a path-wide exclusion could hide plaintext committed to an earlier revision.
 
 ### Step 2: Authenticate to the container registry
 
