@@ -1,37 +1,33 @@
-# iximiuz Labs Playgrounds
+# Runbook: Deploy Debian and Kubernetes playgrounds
 
-Runbooks and manifests for custom Debian Trixie playgrounds and Kubernetes
-clusters on [iximiuz Labs](https://labs.iximiuz.com).
+**Owner:** Lab operator | **Frequency:** As needed
+**Last updated:** 2026-08-30 | **Last run:** Not recorded
 
-> **Reference environment:** This repository records one tested lab; it is not
-> a drop-in configuration for another account or network. Before running the
-> commands, review and tailor:
+## Purpose
+
+Use this runbook to publish the Debian Trixie images and deploy their custom [iximiuz Labs playgrounds](https://labs.iximiuz.com). It also prepares the eight Kubernetes hosts for the separate k0s cluster runbook.
+
+Use [`docs/k0s/README.md`](docs/k0s/README.md) after both Kubernetes playgrounds are running and every host is connected to Tailscale. That runbook owns k0s, Cilium, conformance testing, and private Kubernetes API access.
+
+> **Reference environment**: This repository records one tested lab. It is not a drop-in configuration for another account or network. Before running commands, review these values:
 >
-> - the GitHub account, package URLs, and
->   `ghcr.io/vancanhuit/debian-rootfs` image path in [`mise.toml`](mise.toml)
->   and the four playground manifests
-> - playground and machine names, topology, resources, storage, and the
->   `172.16.0.0/24` playground subnet in the manifests
-> - Tailscale enrollment and ACLs, hostnames, SSH user and port, node interface,
->   and node addresses
-> - Kubernetes and Cilium versions, Pod and Service CIDRs, and feature settings
->   in [`docs/k0s/k0s.yaml`](docs/k0s/k0s.yaml) and
->   [`docs/k0s/cilium-values.yaml`](docs/k0s/cilium-values.yaml)
+> - The GitHub account, package URLs, and `ghcr.io/vancanhuit/debian-rootfs` image path in [`mise.toml`](mise.toml) and the four playground manifests
+> - Playground and machine names, topology, resources, storage, and local subnets in the manifests
+> - Tailscale enrollment and access control lists (ACLs), hostnames, Secure Shell (SSH) settings, interfaces, and node addresses
+> - Kubernetes and Cilium versions, Pod and Service Classless Inter-Domain Routing (CIDR) ranges, and settings in [`docs/k0s/k0s.yaml`](docs/k0s/k0s.yaml) and [`docs/k0s/cilium-values.yaml`](docs/k0s/cilium-values.yaml)
 >
-> Examples below retain the repository owner's values so the tested setup remains
-> reproducible. Keep replacements consistent across tasks, manifests, and cluster
-> configuration, and publish images under a registry path your environment can
-> access.
+> The examples retain the repository owner’s values to reproduce the tested setup. Keep replacements consistent across tasks, manifests, and cluster configuration. Publish images under an accessible registry path.
 
-This repository provides:
+Use these repository components to build the environment:
 
 - custom `trixie-base` and `trixie-dev` root filesystem images
 - single-machine Debian playgrounds for testing those images
-- two multi-machine playgrounds that form an eight-node Kubernetes lab over
-  Tailscale
-- a `k0s` cluster definition with Cilium, Hubble, and private Tailscale API access
+- two multi-machine playgrounds that form an eight-node Kubernetes lab over Tailscale
+- a `k0s` cluster definition with Cilium, Hubble, and private Tailscale application programming interface (API) access
 
 ## Repository map
+
+Use this map to locate each image, manifest, and cluster configuration:
 
 | Path | Purpose |
 | --- | --- |
@@ -45,17 +41,32 @@ This repository provides:
 | [`docs/k0s/cilium-values.yaml`](docs/k0s/cilium-values.yaml) | Cilium Helm values for the `k0s` cluster |
 | [`docs/k0s/README.md`](docs/k0s/README.md) | Full `k0s` and Cilium runbook |
 
-## 1. Prepare the control host
+## Prerequisites
+
+Complete these checks before changing images or playgrounds:
+
+- [ ] Install Docker, `mise`, `labctl`, and the Tailscale client on the control host
+- [ ] Join the control host to the Kubernetes machines’ tailnet
+- [ ] Authenticate `gh` with permission to publish packages to `ghcr.io/vancanhuit`
+- [ ] Authenticate `labctl` to the target iximiuz Labs account
+- [ ] Confirm the repository-specific registry paths, machine names, resources, subnets, and cluster ranges
+- [ ] Obtain a Tailscale authentication key that can assign `tag:lab` when deploying Kubernetes playgrounds
+
+## Procedure
+
+Follow the steps in order for a new deployment. For an image or manifest update, start at the relevant build or update step.
+
+### Step 1: Prepare the control host
+
+Install the local tools and verify access before changing infrastructure.
 
 Required software:
 
 - [Docker](https://docs.docker.com/get-docker/)
 - [`mise`](https://mise.jdx.dev/)
 - [`labctl`](https://github.com/iximiuz/labctl)
-- a GitHub account with permission to publish packages to
-  `ghcr.io/vancanhuit`
-- the [Tailscale client](https://tailscale.com/download) installed on the control
-  host and joined to the same tailnet as the Kubernetes machines
+- A GitHub account with permission to publish packages to `ghcr.io/vancanhuit`
+- The [Tailscale client](https://tailscale.com/download) on the control host and connected to the Kubernetes machines’ tailnet
 
 Clone the repository and install the pinned tools:
 
@@ -73,8 +84,7 @@ labctl auth login
 labctl auth whoami
 ```
 
-`mise.toml` pins Python, `uv`, `kubectl`, Cilium CLI, GitHub CLI, `k0sctl`,
-Helm, SOPS, and age. Docker, Tailscale, and `labctl` are installed separately.
+`mise.toml` pins Python, `uv`, `kubectl`, the Cilium command-line interface (CLI), the GitHub CLI, `k0sctl`, Helm, SOPS, and age. Install Docker, Tailscale, and `labctl` separately.
 
 Verify access before changing infrastructure:
 
@@ -85,7 +95,13 @@ labctl version
 tailscale status
 ```
 
-## 2. Authenticate to the container registry
+**Expected result:** Every version and authentication command exits successfully. `tailscale status` shows the control host in the target tailnet.
+
+**If it fails:** Resolve the missing tool, expired login, or tailnet connection before publishing an image or creating a playground.
+
+### Step 2: Authenticate to the container registry
+
+Authenticate Docker with a GitHub token that can publish packages.
 
 ```bash
 gh auth login --scopes write:packages
@@ -96,8 +112,7 @@ gh auth token | docker login ghcr.io \
   --password-stdin
 ```
 
-iximiuz Labs pulls root filesystem images anonymously. After the first push,
-make the `debian-rootfs` package public:
+iximiuz Labs pulls root filesystem images anonymously. After the first push, make the `debian-rootfs` package public:
 
 1. Open [Package settings](https://github.com/users/vancanhuit/packages/container/debian-rootfs/settings).
 2. Select **Change visibility** in the Danger Zone.
@@ -113,7 +128,13 @@ docker manifest inspect \
 
 Log in again before the next push.
 
-## 3. Build and publish root filesystem images
+**Expected result:** Docker authenticates to `ghcr.io`, and anonymous manifest inspection succeeds after the package becomes public.
+
+**If it fails:** Confirm the GitHub account has `write:packages`, repeat `gh auth login`, and verify package visibility before continuing.
+
+### Step 3: Build and publish root filesystem images
+
+Build and publish the base image before the development image.
 
 ### Base image
 
@@ -124,14 +145,11 @@ mise run docker:build:trixie-base
 docker push ghcr.io/vancanhuit/debian-rootfs:trixie-base
 ```
 
-The base image is a minimal sysadmin environment derived from the upstream
-[`100.rootfs-debian-stable`](https://github.com/iximiuz/labs/tree/main/playgrounds/100.rootfs-debian-stable)
-pattern.
+The base image extends the upstream [`100.rootfs-debian-stable`](https://github.com/iximiuz/labs/tree/main/playgrounds/100.rootfs-debian-stable) pattern with a minimal system administration environment.
 
 ### Development image
 
-The development image builds on `trixie-base` and uses the authenticated GitHub
-token exposed by the `mise` task:
+The development image builds on `trixie-base`. The `mise` task exposes the authenticated GitHub token to BuildKit:
 
 ```bash
 mise run docker:build:trixie-dev
@@ -147,7 +165,13 @@ docker manifest inspect \
   ghcr.io/vancanhuit/debian-rootfs:trixie-dev >/dev/null
 ```
 
-## 4. Create the Debian playgrounds
+**Expected result:** Both builds and pushes succeed. `docker manifest inspect` resolves both published tags without registry credentials.
+
+**If it fails:** Build `trixie-base` first. Confirm Docker BuildKit can read the GitHub token secret, then inspect the failing build stage or registry response.
+
+### Step 4: Create or update the Debian playgrounds
+
+Create one single-machine playground for each published image.
 
 Create each custom playground once:
 
@@ -161,23 +185,26 @@ labctl playground create debian-trixie-dev \
   --file dev.manifest.yaml
 ```
 
-`labctl` returns the generated playground name. Keep that value for update,
-start, and remove commands. A started session has a separate run ID used by
-status, SSH, and stop commands.
+`labctl` returns the generated playground name. Keep it for update and remove commands. A started session has a separate run identifier (ID) for status, SSH, and stop commands.
 
 Update an existing playground after changing its manifest or image tag:
 
 ```bash
-labctl playground update <playground-name> \
+labctl playground update playground_name \
   --file base.manifest.yaml
 ```
 
-Replace the manifest path with `dev.manifest.yaml` for the development
-playground.
+Replace the manifest path with `dev.manifest.yaml` for the development playground.
 
-## 5. Create the Kubernetes playgrounds
+**Expected result:** `labctl` returns a generated playground name for each manifest. An updated playground retains that generated name.
 
-The Kubernetes lab spans two iximiuz Labs playgrounds joined through Tailscale:
+**If it fails:** Inspect the current base manifest with `labctl playground manifest debian-stable`. Confirm the published image is public and the manifest references the intended tag.
+
+### Step 5: Create the Kubernetes playgrounds
+
+Create both multi-machine playgrounds before enrolling their eight hosts in Tailscale.
+
+Tailscale connects the hosts in two iximiuz Labs playgrounds:
 
 | Playground | Machines |
 | --- | --- |
@@ -200,30 +227,13 @@ Start one session for each generated playground.
 
 ### Enroll machines in Tailscale
 
-For repeatable lab provisioning, create a reusable Tailscale auth key that
-assigns `tag:lab`:
+For repeatable lab provisioning, create a reusable Tailscale authentication key that assigns `tag:lab`:
 
 1. Define `tag:lab` and its owners in the tailnet policy.
-2. Add network and Tailscale SSH policy rules that allow the control host to
-   reach `tag:lab` machines and connect as `root`.
-3. Generate a reusable auth key in the Tailscale admin console, assign it
-   `tag:lab`, and make it pre-approved when device approval is enabled.
+2. Add network and Tailscale SSH policy rules that let the control host reach `tag:lab` machines as `root`.
+3. Generate a reusable authentication key in the Tailscale admin console. Assign `tag:lab`. Preapprove the key if your tailnet requires device approval.
 
-Run this command on each of the eight machines, replacing the quoted placeholder
-at execution time:
-
-```bash
-sudo tailscale up \
-  --auth-key='tskey-auth-REPLACE_ME' \
-  --ssh \
-  --accept-routes \
-  --advertise-tags=tag:lab
-```
-
-Reusable auth keys can enroll multiple machines and must be handled as secrets.
-Never commit the key or place it in a manifest. The inline form above can expose
-the key through shell history or process inspection; prefer a secret manager and
-Tailscale's `file:` form when available:
+Store the key in `/run/secrets/tailscale-auth-key` with mode `600`. Then run this command on each machine:
 
 ```bash
 sudo tailscale up \
@@ -233,13 +243,11 @@ sudo tailscale up \
   --advertise-tags=tag:lab
 ```
 
-`--accept-routes` accepts subnet routes advertised by other tailnet nodes. Omit
-it when this lab should not consume those routes. Revoke the reusable auth key
-after provisioning if no more lab machines need to join; revocation does not
-deauthorize machines already enrolled with it.
+Reusable authentication keys can enroll multiple machines, so handle them as secrets. Never commit the key or add it to a manifest. Remove the temporary key file after enrollment.
 
-Every host must now be reachable by its Tailscale name and IP from the control
-host:
+`--accept-routes` accepts subnet routes that other tailnet nodes advertise. Omit it when this lab shouldn’t consume those routes. Revoke the key after provisioning the final machine. Revocation doesn’t deauthorize enrolled machines.
+
+Verify that every host responds through its Tailscale name and Internet Protocol (IP) address:
 
 ```bash
 tailscale status
@@ -249,14 +257,17 @@ ssh root@control-plane-03 hostname
 ssh root@node-01 hostname
 ```
 
-The manifests install and start `tailscaled`; the enrollment command joins each
-machine to the tailnet and enables Tailscale SSH.
+The manifests install and start `tailscaled`. The enrollment command connects each machine to the tailnet and enables Tailscale SSH.
 
-## 6. Bootstrap Kubernetes with k0s
+**Expected result:** Both playground sessions run, and all eight unique hostnames respond through Tailscale and SSH.
 
-The k0s workflow is the repository's single supported Kubernetes path. It is
-tested end to end across both playgrounds and uses `k0sctl` to reproduce the
-multi-controller cluster.
+**If it fails:** Stop before running k0s. Check the authentication key, tag ownership, device approval, duplicate hostnames, and tailnet ACLs.
+
+### Step 6: Hand off to the k0s runbook
+
+Follow the dedicated runbook to bootstrap and verify the supported Kubernetes configuration.
+
+The k0s workflow is the repository’s supported Kubernetes path. The tested workflow uses `k0sctl` across both playgrounds to reproduce the multi-controller cluster.
 
 Use the dedicated [`k0s` runbook](docs/k0s/README.md) for:
 
@@ -267,44 +278,53 @@ Use the dedicated [`k0s` runbook](docs/k0s/README.md) for:
 5. cluster and connectivity verification
 6. private Kubernetes API access through the Tailscale operator
 
-Quick entry point:
+Preview the k0s changes, then apply them:
 
 ```bash
 k0sctl apply --config docs/k0s/k0s.yaml --dry-run
 k0sctl apply --config docs/k0s/k0s.yaml
 ```
 
-Workers remain `NotReady` until Cilium is installed. Continue through the full
-runbook before evaluating cluster health.
+Workers remain `NotReady` until you install Cilium. Complete the runbook before evaluating cluster health.
 
-## 7. Operate playground sessions
+**Expected result:** The k0s dry run shows only the intended cluster changes. The complete k0s runbook ends with healthy cluster and API checks.
+
+**If it fails:** Follow the failure action in the corresponding k0s runbook step. Preserve the direct `tailscale-k0s` recovery context.
+
+### Step 7: Operate playground sessions
+
+Use the generated playground name to start a session, then use its run ID for session operations.
 
 Start a playground session:
 
 ```bash
-labctl playground start <playground-name>
+labctl playground start playground_name
 ```
 
-The command prints a run ID. Use the run ID, not the playground name, for
-session operations:
+The command prints a run ID. Use that ID, not the playground name, for session operations:
 
 ```bash
-labctl playground status <run-id>
-labctl ssh <run-id>
-labctl ssh <run-id> -- uname -a
-labctl playground stop <run-id>
+labctl playground status run_id
+labctl ssh run_id
+labctl ssh run_id -- uname -a
+labctl playground stop run_id
 ```
 
-Stopping preserves the session. Removing a custom playground is permanent:
+Stopping preserves the session. The following command permanently removes a custom playground:
 
 ```bash
-labctl playground remove --force <playground-name>
+labctl playground remove --force playground_name
 ```
 
-## 8. Inspect and update manifests
+**Expected result:** Status and SSH commands address a run ID. Stop preserves session state; remove deletes the generated custom playground.
 
-There is no formally published schema for every custom playground field. Use a
-known playground's live manifest as the reference:
+**If it fails:** List custom playgrounds to distinguish their generated names from session run IDs. Retry with the identifier required by the command.
+
+### Step 8: Inspect and update manifests
+
+Inspect a live base manifest before using an undocumented custom playground field.
+
+iximiuz Labs doesn’t publish a schema for every custom playground field. Use a known playground’s live manifest as the reference:
 
 ```bash
 labctl playground manifest flexbox
@@ -315,11 +335,28 @@ labctl playground catalog --filter my-custom
 After editing a manifest, update its generated playground:
 
 ```bash
-labctl playground update <playground-name> \
-  --file <manifest.yaml>
+labctl playground update playground_name \
+  --file manifest_path
 ```
 
-## Troubleshooting
+**Expected result:** `labctl` accepts the manifest and updates the intended generated playground.
+
+**If it fails:** Compare the edited field with the live base manifest. Confirm the command targets the generated playground name, not a run ID.
+
+## Verification
+
+Complete the checks that match the deployed playgrounds:
+
+- [ ] `docker manifest inspect` resolves every published image tag without registry credentials
+- [ ] `labctl playground catalog --filter my-custom` lists each generated custom playground
+- [ ] Every started session reports a healthy status when addressed by its run ID
+- [ ] SSH commands reach the expected machine and report its configured hostname
+- [ ] Every Kubernetes host appears online in `tailscale status` with a unique hostname and IP address
+- [ ] The k0s runbook verification passes when this deployment includes the Kubernetes cluster
+
+## Troubleshoot playground operations
+
+Use the observed failure to select the narrowest diagnostic command.
 
 ### Image pull fails
 
@@ -333,8 +370,7 @@ docker manifest inspect \
 
 ### Playground update uses the wrong target
 
-List custom playgrounds and use the generated playground name returned by
-`labctl playground create`:
+List custom playgrounds and use the generated name from `labctl playground create`:
 
 ```bash
 labctl playground catalog --filter my-custom
@@ -342,8 +378,7 @@ labctl playground catalog --filter my-custom
 
 ### Kubernetes nodes cannot communicate
 
-Check that all machines are online in the same tailnet and that ACLs allow the
-required control-plane and Cilium traffic:
+Confirm that every machine is online in the same tailnet. Check that ACLs allow the required control-plane and Cilium traffic:
 
 ```bash
 tailscale status
@@ -351,11 +386,50 @@ ssh root@control-plane-01 tailscale status
 ssh root@node-01 tailscale status
 ```
 
-See the [`k0s` runbook](docs/k0s/README.md) for tailnet policy, required ports,
-MTU, address stability, API availability, connectivity diagnostics, and
-recovery procedures.
+See the [`k0s` runbook](docs/k0s/README.md) for tailnet policy, required ports, maximum transmission unit (MTU), address stability, API availability, diagnostics, and recovery procedures.
 
-## References
+## Rollback
+
+Stop a faulty session by its run ID to preserve its disks for diagnosis:
+
+```bash
+labctl playground stop run_id
+```
+
+For a faulty manifest update, correct the tracked manifest and apply it to the same generated playground name. An image tag in a running playground doesn’t change until you update the playground and start a new session.
+
+To restore a previous image, publish the known-good content under a new immutable tag. Update the manifest and start a new session. Don’t overwrite a tag while another session may depend on it.
+
+Remove a custom playground only after preserving required session data and recording its generated name:
+
+```bash
+labctl playground remove --force playground_name
+```
+
+For Kubernetes rollback and teardown, follow [`docs/k0s/README.md`](docs/k0s/README.md). Don’t destroy cluster playgrounds before exporting workload data and backing up etcd.
+
+## Escalation
+
+Use the failing system to choose the escalation path:
+
+| Situation | Contact | Method |
+| --- | --- | --- |
+| Registry authentication, package publication, or image access failure | Repository owner | Repository issue tracker |
+| Playground provisioning, manifest acceptance, or platform network failure | iximiuz Labs support | [iximiuz Labs documentation](https://labs.iximiuz.com/docs) |
+| Tailnet enrollment, ACL, or device approval failure | Tailnet owner | Organization-approved operations channel |
+| k0s, Cilium, or etcd failure after playground deployment | Kubernetes platform owner | Organization-approved incident channel |
+
+## History
+
+Record each image publication, playground deployment, update, or removal:
+
+| Date | Run by | Notes |
+| --- | --- | --- |
+| 2026-08-30 | Not recorded | Converted the deployment guide into an operational runbook |
+
+## Playground and cluster references
+
+Use these sources to verify the external tools and procedures in this guide:
 
 - [iximiuz Labs custom playgrounds](https://labs.iximiuz.com/docs/custom-playgrounds)
 - [iximiuz Labs CLI](https://github.com/iximiuz/labctl)
