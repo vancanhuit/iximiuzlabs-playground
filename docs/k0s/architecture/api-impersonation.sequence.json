@@ -1,0 +1,182 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Tailscale Identity to Kubernetes RBAC",
+    "output": "docs/k0s/architecture/api-impersonation.html",
+    "quality_profile": "showcase",
+    "column_fit": "spread",
+    "viewBox": [1080, 550],
+    "views": [
+      {
+        "id": "tailnet-authentication",
+        "label": "Tailnet authentication",
+        "focus": ["kubectl", "tailnet", "proxy"],
+        "note": "Tailscale verifies the caller and tailnet policy permits HTTPS access to the API proxy."
+      },
+      {
+        "id": "impersonation",
+        "label": "Impersonation",
+        "focus": ["proxy", "apiserver", "rbac"],
+        "note": "The proxy authenticates with its workload credential and asks Kubernetes to act as the Tailscale identity."
+      },
+      {
+        "id": "resource-authorization",
+        "label": "Resource authorization",
+        "focus": ["apiserver", "rbac", "resource"],
+        "note": "Kubernetes evaluates the requested operation as the impersonated user and groups, not as the proxy workload."
+      }
+    ]
+  },
+  "participants": [
+    {
+      "id": "kubectl",
+      "type": "external",
+      "label": "kubectl",
+      "sublabel": "administrator device"
+    },
+    {
+      "id": "tailnet",
+      "type": "security",
+      "label": "Tailscale",
+      "sublabel": "identity + grants"
+    },
+    {
+      "id": "proxy",
+      "type": "security",
+      "label": "API ProxyGroup",
+      "sublabel": "auth mode"
+    },
+    {
+      "id": "apiserver",
+      "type": "backend",
+      "label": "Kubernetes API",
+      "sublabel": "authentication chain"
+    },
+    {
+      "id": "rbac",
+      "type": "security",
+      "label": "Kubernetes RBAC",
+      "sublabel": "authorization"
+    },
+    {
+      "id": "resource",
+      "type": "cloud",
+      "label": "API Resource",
+      "sublabel": "nodes, Pods, Secrets"
+    }
+  ],
+  "segments": [
+    {
+      "from": 145,
+      "to": 225,
+      "label": "1. Authenticate caller"
+    },
+    {
+      "from": 235,
+      "to": 335,
+      "label": "2. Establish effective identity"
+    },
+    {
+      "from": 345,
+      "to": 470,
+      "label": "3. Authorize operation"
+    }
+  ],
+  "messages": [
+    {
+      "id": "kubectl-request",
+      "from": "kubectl",
+      "to": "tailnet",
+      "y": 170,
+      "label": "HTTPS request to lab-k0s:443",
+      "variant": "emphasis"
+    },
+    {
+      "id": "identity-check",
+      "from": "tailnet",
+      "to": "proxy",
+      "y": 205,
+      "label": "verified user or tagged-device identity",
+      "variant": "security",
+      "note": "Tailnet policy must also permit TCP 443 to the proxy."
+    },
+    {
+      "id": "proxy-forward",
+      "from": "proxy",
+      "to": "apiserver",
+      "y": 250,
+      "label": "proxy credential + Impersonate-User / Group",
+      "variant": "security",
+      "note": "A user device maps to its login; a tagged device maps to its node FQDN."
+    },
+    {
+      "id": "impersonation-check",
+      "from": "apiserver",
+      "to": "rbac",
+      "y": 285,
+      "label": "may proxy impersonate users and groups?",
+      "variant": "security"
+    },
+    {
+      "id": "impersonation-allowed",
+      "from": "rbac",
+      "to": "apiserver",
+      "y": 320,
+      "label": "allowed by operator impersonation RBAC",
+      "variant": "return"
+    },
+    {
+      "id": "resource-check",
+      "from": "apiserver",
+      "to": "rbac",
+      "y": 355,
+      "label": "may effective user/groups perform verb on resource?",
+      "variant": "security"
+    },
+    {
+      "id": "resource-decision",
+      "from": "rbac",
+      "to": "apiserver",
+      "y": 390,
+      "label": "allow or deny from RoleBindings",
+      "variant": "return"
+    },
+    {
+      "id": "resource-operation",
+      "from": "apiserver",
+      "to": "resource",
+      "y": 425,
+      "label": "execute only when authorized",
+      "variant": "emphasis"
+    },
+    {
+      "id": "kubectl-response",
+      "from": "apiserver",
+      "to": "kubectl",
+      "y": 460,
+      "label": "result or 403 Forbidden through proxy",
+      "variant": "return"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "proxy",
+      "from": 195,
+      "to": 470,
+      "type": "security"
+    },
+    {
+      "participant": "apiserver",
+      "from": 240,
+      "to": 470,
+      "type": "backend"
+    },
+    {
+      "participant": "rbac",
+      "from": 275,
+      "to": 400,
+      "type": "security"
+    }
+  ]
+}

@@ -15,7 +15,7 @@ This page serves an operator who controls the playgrounds, tailnet, and Kubernet
 - **Content plan:** Prepare, secure, bootstrap, verify, operate, and remove the cluster
 - **Open questions:** Record environment-specific contacts and the last successful run before sharing this runbook
 
-This page is an operational how-to. Open the [interactive architecture](architecture/lab-architecture.html) to explore the system. Open the [interactive bootstrap journey](architecture/bootstrap-journey.html) to explore the deployment sequence.
+This page is an operational how-to. Open the [interactive architecture](architecture/lab-architecture.html) to explore the system, the [interactive network data paths](architecture/network-data-paths.html) to trace packet flows, or the [interactive bootstrap journey](architecture/bootstrap-journey.html) to explore the deployment sequence.
 
 ## Purpose
 
@@ -49,6 +49,32 @@ Controllers do not run workloads. `kubectl get nodes` lists five workers. Use `k
 [![k0s lab architecture](architecture/lab-architecture.svg)](architecture/lab-architecture.svg)
 
 [![k0s bootstrap journey](architecture/bootstrap-journey.svg)](architecture/bootstrap-journey.svg)
+
+## Network data paths
+
+The diagram uses one representative source worker and one destination worker. The same stages apply to every pair among the five workers. Controllers run no workload Pods.
+
+[![Kubernetes network data paths](architecture/network-data-paths.svg)](architecture/network-data-paths.svg)
+
+Open the [interactive network data-path diagram](architecture/network-data-paths.html) and select a guided view to isolate Pod, control-plane, Service, or external traffic.
+
+| Flow | Forward data path | Address and encapsulation behavior |
+| --- | --- | --- |
+| Node to node | Host process → Linux routing → `tailscale0` → peer `tailscale0` → destination host process | Uses `100.64.0.0/10` node addresses. Tailscale encrypts with WireGuard and prefers a direct peer path; DERP is an encrypted fallback. |
+| Controller to controller | Controller service → `tailscale0` → peer controller | Kubernetes control traffic uses TCP `6443`; etcd client traffic uses TCP `2379`, and etcd peer quorum uses TCP `2380`. |
+| Worker to controller | kubelet, Cilium, or another worker component → worker-local Envoy `127.0.0.1:7443` → selected controller `100.x:6443` over `tailscale0` | k0s node-local load balancing retries healthy controllers. It provides in-cluster API availability, not an external virtual IP. |
+| Pod to same node | Pod `eth0` → host-side veth → source Cilium eBPF policy and routing → destination endpoint eBPF policy → destination veth | The packet keeps Pod IP addresses and never enters `cilium_vxlan` or `tailscale0`. |
+| Pod to another node | Pod `eth0` → veth eBPF → `cilium_vxlan` encapsulation → UDP `8472` with remote `100.x` node destination → `tailscale0` → remote VXLAN decapsulation → ingress policy → destination veth | Inner source and destination remain `10.244.x.y`. VXLAN adds 50 bytes; Tailscale encrypts the outer node packet. Cilium MTU `1230` fits inside `tailscale0` MTU `1280`. |
+| Pod to node process | Pod `eth0` → veth eBPF → host routing → local node socket, or VXLAN/Tailscale first when the node is remote | Cilium applies endpoint policy before host delivery. Host-network traffic is outside the Pod veth path. |
+| Pod to ClusterIP Service | Pod → veth eBPF Service lookup → selected backend Pod → same-node or cross-node Pod path | `10.96.0.0/12` is virtual and is never routed through Tailscale. With `socketLB.hostNamespaceOnly: true`, Pod namespaces use the tc eBPF load balancer on the veth. |
+| Tailnet client to Kubernetes API | Client → Tailscale Service HTTPS `443` → one API ProxyGroup Pod → API server `6443` | In auth mode, the proxy derives impersonation headers from Tailscale identity; Kubernetes RBAC makes the authorization decision. The direct client-certificate context remains the recovery path. |
+| Tailnet client to NodePort | Client → node `100.x:NodePort` on `tailscale0` → Cilium eBPF Service lookup → local or remote backend | `nodePort.directRoutingDevice: tailscale0` selects the ingress device. The default Cilium load-balancer mode is SNAT; remote backends then use the cross-node path. |
+| Pod to Internet | Pod → veth eBPF policy → Linux route → BPF masquerade on `eth0` → Internet | Cilium changes the source Pod IP to the worker `eth0` address. The reply is reverse-translated through BPF connection tracking and delivered to the Pod. |
+| Pod DNS lookup | Pod → CoreDNS ClusterIP → Cilium Service lookup → selected CoreDNS Pod | Backend delivery follows the same-node or cross-node Pod path. No Layer 7 DNS proxy is in the path unless a Cilium DNS policy requires it. |
+
+Reply packets traverse the corresponding stages in reverse. Cilium connection tracking restores Service and masquerade translations; a cross-node reply is independently VXLAN-encapsulated and WireGuard-encrypted between the two worker Tailscale addresses.
+
+Do not advertise `10.244.0.0/16` or `10.96.0.0/12` as Tailscale subnet routes. Cilium owns those ranges, while Tailscale carries only the node underlay and explicitly exposed Tailscale Services.
 
 ## Tested versions
 
@@ -533,6 +559,47 @@ kubectl wait proxygroup/lab-k0s \
 ```
 
 The URL follows `https://lab-k0s.tailnet_dns_name.ts.net`.
+
+#### Understand identity impersonation
+
+The API proxy in `auth` mode converts a Tailscale identity into a Kubernetes identity. It does not issue each tailnet user a Kubernetes client certificate, and reaching the proxy does not grant Kubernetes permissions.
+
+[![Tailscale identity to Kubernetes RBAC](architecture/api-impersonation.svg)](architecture/api-impersonation.svg)
+
+Open the [interactive impersonation sequence](architecture/api-impersonation.html) to isolate tailnet authentication, impersonation, and resource authorization.
+
+Each request crosses three independent authorization boundaries:
+
+1. Tailscale authenticates the calling user or tagged device. Tailnet grants decide whether that identity can reach the proxy on HTTPS port `443`.
+2. The ProxyGroup authenticates to the Kubernetes API with its own workload credential and forwards `Impersonate-User` and, when applicable, `Impersonate-Group` headers. Kubernetes verifies that the ProxyGroup may impersonate those identity categories.
+3. Kubernetes evaluates the requested verb and resource as the impersonated user and groups. A matching `RoleBinding` or `ClusterRoleBinding` permits the operation; otherwise the API returns `403 Forbidden`.
+
+The request therefore carries two identities:
+
+| Identity | Meaning | Authorization purpose |
+| --- | --- | --- |
+| ProxyGroup transport identity | The proxy workload that authenticated to the API server | Must be allowed to impersonate users and groups |
+| Effective identity | The Tailscale user, device, and mapped groups in the impersonation headers | Must be allowed to perform the requested Kubernetes operation |
+
+The Helm value `apiServerProxyConfig.allowImpersonation=true` provisions the operator RBAC for the first Kubernetes check. It does not grant the effective user access to resources. The later `tailscale-lab-k0s-admin` binding grants the owner’s Tailscale login its Kubernetes role.
+
+The proxy derives headers from the caller:
+
+| Tailscale caller | `Impersonate-User` | `Impersonate-Group` |
+| --- | --- | --- |
+| User-owned device | Tailscale login, such as `alice@example.com` | Groups supplied by matching Tailscale Kubernetes capability grants, when configured |
+| Tagged device | Device fully qualified domain name (FQDN) | Groups supplied by matching capability grants; without those grants, the device tags are used as groups |
+
+This lab currently binds the owner login directly as a Kubernetes user. The checked-in tailnet policy grants network access to `tag:k8s` but does not map a Tailscale group to a Kubernetes group. For shared access, prefer a purpose-specific group such as `tailnet-readers`, map it with a Tailscale Kubernetes capability grant, and bind that group to `view` or a namespace-scoped role. Do not map routine users to `system:masters`.
+
+Verify the effective identity and authorization result through the proxy context:
+
+```bash
+kubectl --context lab-k0s.tailnet_dns_name.ts.net auth whoami
+kubectl --context lab-k0s.tailnet_dns_name.ts.net auth can-i get pods --all-namespaces
+```
+
+Keep the direct `tailscale-k0s` context separate. It uses a privileged Kubernetes client certificate rather than Tailscale impersonation and remains the recovery path.
 
 If readiness stalls, inspect the advertised Service:
 
