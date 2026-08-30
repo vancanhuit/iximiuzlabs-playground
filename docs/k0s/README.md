@@ -59,7 +59,7 @@ Treat these versions as one tested set. Validate upgrades in a fresh playground 
 | k0sctl | `v0.32.2` |
 | k0s and Kubernetes | `v1.36.3+k0s.0` |
 | Cilium | `v1.20.0` |
-| Tailscale Kubernetes Operator | `1.98.9` |
+| Tailscale Kubernetes Operator | `1.102.3` |
 | Sonobuoy | `v0.57.5` |
 
 The repository pins client tools in [`../../mise.toml`](../../mise.toml).
@@ -504,7 +504,7 @@ helm repo add tailscale https://pkgs.tailscale.com/helmcharts
 helm repo update
 helm upgrade --install tailscale-operator \
   tailscale/tailscale-operator \
-  --version 1.98.9 \
+  --version 1.102.3 \
   --namespace tailscale \
   --set-string apiServerProxyConfig.allowImpersonation=true \
   --wait
