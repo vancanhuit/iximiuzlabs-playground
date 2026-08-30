@@ -697,6 +697,85 @@ kubectl --context tailscale-k0s -n tailscale get pods \
   -l tailscale.com/parent-resource=lab-k0s -o wide
 ```
 
+### Live status reference
+
+The following output was captured from the running lab on 2026-08-30. Use it as a structural reference, not as fixed expected output: resource names, ages, process IDs, Pod IPs, and Tailscale addresses change when the cluster is rebuilt.
+
+List the worker nodes and confirm that every InternalIP belongs to the Tailscale underlay:
+
+```console
+$ kubectl get nodes -o wide
+NAME      STATUS   ROLES    AGE     VERSION       INTERNAL-IP      EXTERNAL-IP   OS-IMAGE                       KERNEL-VERSION    CONTAINER-RUNTIME
+node-01   Ready    <none>   3h24m   v1.36.3+k0s   100.116.95.79    <none>        Debian GNU/Linux 13 (trixie)   6.1.167 (amd64)   containerd://2.3.3
+node-02   Ready    <none>   3h24m   v1.36.3+k0s   100.127.198.66   <none>        Debian GNU/Linux 13 (trixie)   6.1.167 (amd64)   containerd://2.3.3
+node-03   Ready    <none>   3h24m   v1.36.3+k0s   100.94.184.38    <none>        Debian GNU/Linux 13 (trixie)   6.1.167 (amd64)   containerd://2.3.3
+node-04   Ready    <none>   3h24m   v1.36.3+k0s   100.66.160.66    <none>        Debian GNU/Linux 13 (trixie)   6.1.167 (amd64)   containerd://2.3.3
+node-05   Ready    <none>   3h24m   v1.36.3+k0s   100.120.47.6     <none>        Debian GNU/Linux 13 (trixie)   6.1.167 (amd64)   containerd://2.3.3
+```
+
+Inspect namespaced workloads and the controllers that maintain them. This abbreviated snapshot retains one representative row for repeated per-node resources:
+
+```console
+$ kubectl get all --all-namespaces
+NAMESPACE     NAME                                   READY   STATUS    RESTARTS   AGE
+kube-system   pod/cilium-677d2                       1/1     Running   0          3h24m
+kube-system   pod/cilium-operator-6fdfd468dd-xhgsj   1/1     Running   0          3h24m
+kube-system   pod/coredns-86f8659d76-j4hln           1/1     Running   0          3h24m
+kube-system   pod/hubble-relay-5fd64868c6-6pdk8      1/1     Running   0          3h24m
+kube-system   pod/hubble-ui-5b94b84b8c-tm25j         2/2     Running   0          3h24m
+kube-system   pod/konnectivity-agent-2rxsj           1/1     Running   0          3h24m
+kube-system   pod/metrics-server-d987bf784-p7fhn     1/1     Running   0          3h25m
+kube-system   pod/nllb-node-01                       1/1     Running   0          3h24m
+tailscale     pod/lab-k0s-0                          1/1     Running   0          3h17m
+tailscale     pod/operator-548c6f88bc-m8dvg          1/1     Running   0          3h17m
+
+NAMESPACE     NAME                                DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE
+kube-system   daemonset.apps/cilium               5         5         5       5            5
+kube-system   daemonset.apps/konnectivity-agent   5         5         5       5            5
+
+NAMESPACE     NAME                              READY   UP-TO-DATE   AVAILABLE
+kube-system   deployment.apps/cilium-operator   2/2     2            2
+kube-system   deployment.apps/coredns           2/2     2            2
+kube-system   deployment.apps/hubble-relay      1/1     1            1
+kube-system   deployment.apps/hubble-ui         1/1     1            1
+kube-system   deployment.apps/metrics-server    1/1     1            1
+tailscale     deployment.apps/operator          1/1     1            1
+
+NAMESPACE   NAME                       READY   AGE
+tailscale   statefulset.apps/lab-k0s   2/2     3h17m
+```
+
+Check Cilium independently of generic Kubernetes readiness:
+
+```console
+$ cilium status
+Cilium:             OK
+Operator:           OK
+Envoy DaemonSet:    disabled (using embedded mode)
+Hubble Relay:       OK
+ClusterMesh:        disabled
+
+DaemonSet              cilium           Desired: 5, Ready: 5/5, Available: 5/5
+Deployment             cilium-operator  Desired: 2, Ready: 2/2, Available: 2/2
+Deployment             hubble-relay     Desired: 1, Ready: 1/1, Available: 1/1
+Deployment             hubble-ui        Desired: 1, Ready: 1/1, Available: 1/1
+Cluster Pods:          8/8 managed by Cilium
+Helm chart version:    1.20.0
+```
+
+Controllers are intentionally absent from `kubectl get nodes`. Query each controller directly to confirm its k0s process and role:
+
+```console
+$ ssh root@control-plane-01 k0s status
+Version: v1.36.3+k0s.0
+Process ID: 2157
+Role: controller
+Workloads: false
+SingleNode: false
+```
+
+Healthy output has five `Ready` workers, no non-running workload in the full `kubectl get all --all-namespaces` output, all desired Cilium replicas available, and every controller reporting `Role: controller` with `Workloads: false`.
+
 ## Recurring operations
 
 Use these procedures after deployment without repeating the full bootstrap.
