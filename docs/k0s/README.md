@@ -781,6 +781,8 @@ openssl s_client \
 
 Deploy Envoy Gateway as the Gateway API implementation, expose its managed Envoy Service through the Tailscale operator, and let ExternalDNS maintain the DNS-only Cloudflare record for `echo.playground.canhdinh.com`. The application address remains private: Cloudflare is authoritative for DNS and ACME DNS-01 only, while tailnet policy controls access to the Envoy gateway.
 
+[![Echo Server private Gateway API architecture](architecture/echo-gateway-api.svg)](architecture/echo-gateway-api.html)
+
 Install the pinned Envoy Gateway release. Its chart installs the Gateway API and Envoy Gateway CRDs before starting the controller:
 
 ```bash

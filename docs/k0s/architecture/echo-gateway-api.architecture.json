@@ -1,0 +1,325 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Echo Server through Private Gateway API",
+    "output": "docs/k0s/architecture/echo-gateway-api.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/vancanhuit/iximiuzlabs-playground",
+      "revision": "55a2f3d49cfa2b8e81abf68af24967ba03a17444"
+    },
+    "viewBox": [1395, 780],
+    "views": [
+      {
+        "id": "request-path",
+        "label": "Private HTTPS request",
+        "focus": ["client", "cloudflare_dns", "tailnet", "tailscale_lb", "envoy", "echo_service", "echo_pods"],
+        "note": "Cloudflare returns a private 100.x address; HTTPS crosses the tailnet and terminates at Envoy before reaching Echo Server."
+      },
+      {
+        "id": "dns-automation",
+        "label": "DNS automation",
+        "focus": ["gateway_api", "external_dns", "cloudflare_dns", "tailscale_lb"],
+        "note": "ExternalDNS watches the accepted HTTPRoute and Gateway address, then synchronizes DNS-only records with TXT ownership."
+      },
+      {
+        "id": "certificate-lifecycle",
+        "label": "Certificate lifecycle",
+        "focus": ["cert_manager", "letsencrypt", "cloudflare_dns", "tls_secret", "envoy"],
+        "note": "cert-manager proves domain control with Cloudflare DNS-01 and renews the ECDSA keypair consumed by Envoy."
+      },
+      {
+        "id": "ownership",
+        "label": "Controller ownership",
+        "focus": ["gateway_api", "external_dns", "cert_manager", "tailscale_lb", "envoy", "echo_service", "echo_pods"],
+        "note": "Gateway API declares intent; Envoy, Tailscale, ExternalDNS, and cert-manager reconcile distinct parts of the deployment."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "client",
+      "type": "external",
+      "label": "Tailnet Client",
+      "pos": [40, 350],
+      "size": [180, 76]
+    },
+    {
+      "id": "cloudflare_dns",
+      "type": "cloud",
+      "label": "Cloudflare DNS",
+      "sublabel": "A + ownership + ACME TXT records",
+      "tag": "DNS only",
+      "pos": [40, 90],
+      "size": [230, 78]
+    },
+    {
+      "id": "external_dns",
+      "type": "backend",
+      "label": "ExternalDNS",
+      "sublabel": "gateway-httproute source",
+      "tag": "policy: sync",
+      "pos": [40, 250],
+      "size": [210, 78],
+      "sources": [{"path": "docs/k0s/external-dns-values.yaml", "line": 1, "end_line": 20, "label": "Cloudflare synchronization"}]
+    },
+    {
+      "id": "gateway_api",
+      "type": "backend",
+      "label": "Gateway API Resources",
+      "sublabel": "GatewayClass + Gateway + HTTPRoute",
+      "tag": "echo namespace",
+      "pos": [380, 250],
+      "size": [250, 78],
+      "sources": [
+        {"path": "docs/k0s/envoy-gateway-tailscale.yaml", "line": 16, "end_line": 26, "label": "GatewayClass"},
+        {"path": "docs/k0s/echo-server.yaml", "line": 62, "end_line": 113, "label": "Gateway and route"}
+      ]
+    },
+    {
+      "id": "cert_manager",
+      "type": "security",
+      "label": "cert-manager",
+      "sublabel": "ClusterIssuer + Gateway shim",
+      "tag": "Cloudflare DNS-01",
+      "pos": [720, 90],
+      "size": [220, 78],
+      "sources": [{"path": "docs/k0s/cert-manager-cloudflare.yaml", "line": 1, "end_line": 19, "label": "ClusterIssuer"}]
+    },
+    {
+      "id": "letsencrypt",
+      "type": "external",
+      "label": "Let's Encrypt",
+      "sublabel": "public ACME authority",
+      "tag": "DNS-01 validation",
+      "pos": [380, 90],
+      "size": [195, 78]
+    },
+    {
+      "id": "tailnet",
+      "type": "security",
+      "label": "Tailscale Tailnet",
+      "sublabel": "identity policy + WireGuard",
+      "tag": "private network",
+      "pos": [280, 470],
+      "size": [200, 76]
+    },
+    {
+      "id": "tailscale_lb",
+      "type": "security",
+      "label": "gateway-envoy",
+      "sublabel": "Tailscale LoadBalancer proxy",
+      "tag": "100.70.228.74 :443",
+      "pos": [530, 470],
+      "size": [210, 76],
+      "sources": [{"path": "docs/k0s/envoy-gateway-tailscale.yaml", "line": 1, "end_line": 14, "label": "Envoy Service provider"}]
+    },
+    {
+      "id": "envoy",
+      "type": "backend",
+      "label": "Envoy Data Plane",
+      "sublabel": "HTTPS listener + TLS termination",
+      "tag": "Gateway echo",
+      "pos": [790, 470],
+      "size": [220, 76]
+    },
+    {
+      "id": "echo_service",
+      "type": "backend",
+      "label": "echo-server Service",
+      "sublabel": "ClusterIP backend",
+      "tag": "HTTP :80",
+      "pos": [1035, 470],
+      "size": [200, 76],
+      "sources": [{"path": "docs/k0s/echo-server.yaml", "line": 49, "end_line": 61, "label": "Service"}]
+    },
+    {
+      "id": "echo_pods",
+      "type": "frontend",
+      "label": "Echo Server Pods",
+      "sublabel": "2 ready replicas",
+      "tag": "image 0.9.2",
+      "pos": [1260, 470],
+      "size": [110, 76],
+      "sources": [{"path": "docs/k0s/echo-server.yaml", "line": 6, "end_line": 47, "label": "Deployment"}]
+    },
+    {
+      "id": "tls_secret",
+      "type": "database",
+      "label": "TLS Secret",
+      "sublabel": "ECDSA certificate + private key",
+      "tag": "echo namespace",
+      "pos": [720, 250],
+      "size": [220, 78]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "security-group",
+      "label": "Tailnet-only application path",
+      "wraps": ["tailnet", "tailscale_lb", "envoy", "echo_service", "echo_pods"],
+      "pad": 24
+    },
+    {
+      "kind": "region",
+      "label": "k0s Kubernetes cluster",
+      "wraps": ["external_dns", "gateway_api", "cert_manager", "tailscale_lb", "envoy", "echo_service", "echo_pods", "tls_secret"],
+      "pad": 22
+    }
+  ],
+  "connections": [
+    {
+      "id": "resolve_gateway",
+      "from": "client",
+      "to": "cloudflare_dns",
+      "label": "resolve DNS-only A record",
+      "variant": "dashed",
+      "fromSide": "left",
+      "toSide": "left",
+      "via": [[20, 388], [20, 129]],
+      "labelAt": [95, 340]
+    },
+    {
+      "id": "authenticate_tailnet",
+      "from": "client",
+      "to": "tailnet",
+      "label": "authenticated device",
+      "variant": "security",
+      "labelAt": [250, 576]
+    },
+    {
+      "id": "private_https",
+      "from": "tailnet",
+      "to": "tailscale_lb",
+      "label": "WireGuard HTTPS :443",
+      "variant": "security",
+      "labelAt": [500, 576]
+    },
+    {
+      "id": "proxy_to_envoy",
+      "from": "tailscale_lb",
+      "to": "envoy",
+      "label": "TCP 443",
+      "variant": "emphasis",
+      "labelAt": [760, 456]
+    },
+    {
+      "id": "route_backend",
+      "from": "envoy",
+      "to": "echo_service",
+      "label": "HTTPRoute backend :80",
+      "variant": "emphasis",
+      "labelAt": [1022, 576]
+    },
+    {
+      "id": "balance_pods",
+      "from": "echo_service",
+      "to": "echo_pods",
+      "label": "load balance HTTP",
+      "variant": "emphasis",
+      "labelAt": [1248, 456]
+    },
+    {
+      "id": "reconcile_envoy",
+      "from": "gateway_api",
+      "to": "envoy",
+      "label": "configure listener + route",
+      "variant": "default",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [650, 380]
+    },
+    {
+      "id": "watch_gateway",
+      "from": "gateway_api",
+      "to": "external_dns",
+      "label": "watch accepted route + address",
+      "variant": "dashed",
+      "labelAt": [310, 236]
+    },
+    {
+      "id": "publish_dns",
+      "from": "external_dns",
+      "to": "cloudflare_dns",
+      "label": "sync A + ownership TXT",
+      "variant": "default",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "labelAt": [220, 210]
+    },
+    {
+      "id": "request_certificate",
+      "from": "cert_manager",
+      "to": "letsencrypt",
+      "label": "ACME order",
+      "variant": "security",
+      "labelAt": [665, 76]
+    },
+    {
+      "id": "present_challenge",
+      "from": "cert_manager",
+      "to": "cloudflare_dns",
+      "label": "present _acme-challenge TXT",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "top",
+      "via": [[830, 50], [155, 50]],
+      "labelAt": [650, 40]
+    },
+    {
+      "id": "validate_challenge",
+      "from": "letsencrypt",
+      "to": "cloudflare_dns",
+      "label": "query public TXT proof",
+      "variant": "dashed",
+      "labelAt": [325, 76]
+    },
+    {
+      "id": "store_keypair",
+      "from": "cert_manager",
+      "to": "tls_secret",
+      "label": "write renewed keypair",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [900, 210]
+    },
+    {
+      "id": "load_certificate",
+      "from": "tls_secret",
+      "to": "envoy",
+      "label": "load certificate",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [835, 420]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "violet",
+      "title": "Private request invariant",
+      "items": [
+        "Cloudflare publishes DNS but never proxies application traffic",
+        "Tailnet policy gates access to the Gateway's private 100.x address"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Automated lifecycle",
+      "items": [
+        "ExternalDNS synchronizes owned records from accepted Gateway API routes",
+        "cert-manager renews the certificate through Cloudflare DNS-01"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Clear ownership",
+      "items": [
+        "Envoy Gateway owns L7 routing and TLS termination",
+        "Tailscale owns private reachability; Echo owns only its Service and Pods"
+      ]
+    }
+  ]
+}
