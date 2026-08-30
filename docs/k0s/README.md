@@ -713,36 +713,68 @@ node-04   Ready    <none>   3h24m   v1.36.3+k0s   100.66.160.66    <none>       
 node-05   Ready    <none>   3h24m   v1.36.3+k0s   100.120.47.6     <none>        Debian GNU/Linux 13 (trixie)   6.1.167 (amd64)   containerd://2.3.3
 ```
 
-Inspect namespaced workloads and the controllers that maintain them. This abbreviated snapshot retains one representative row for repeated per-node resources:
+Inspect all namespaced workloads and the controllers that maintain them:
 
 ```console
 $ kubectl get all --all-namespaces
 NAMESPACE     NAME                                   READY   STATUS    RESTARTS   AGE
-kube-system   pod/cilium-677d2                       1/1     Running   0          3h24m
-kube-system   pod/cilium-operator-6fdfd468dd-xhgsj   1/1     Running   0          3h24m
-kube-system   pod/coredns-86f8659d76-j4hln           1/1     Running   0          3h24m
-kube-system   pod/hubble-relay-5fd64868c6-6pdk8      1/1     Running   0          3h24m
-kube-system   pod/hubble-ui-5b94b84b8c-tm25j         2/2     Running   0          3h24m
-kube-system   pod/konnectivity-agent-2rxsj           1/1     Running   0          3h24m
-kube-system   pod/metrics-server-d987bf784-p7fhn     1/1     Running   0          3h25m
-kube-system   pod/nllb-node-01                       1/1     Running   0          3h24m
-tailscale     pod/lab-k0s-0                          1/1     Running   0          3h17m
-tailscale     pod/operator-548c6f88bc-m8dvg          1/1     Running   0          3h17m
+kube-system   pod/cilium-677d2                       1/1     Running   0          3h27m
+kube-system   pod/cilium-6k9t7                       1/1     Running   0          3h27m
+kube-system   pod/cilium-ccbd2                       1/1     Running   0          3h27m
+kube-system   pod/cilium-kfqh2                       1/1     Running   0          3h27m
+kube-system   pod/cilium-nqppf                       1/1     Running   0          3h27m
+kube-system   pod/cilium-operator-6fdfd468dd-xhgsj   1/1     Running   0          3h27m
+kube-system   pod/cilium-operator-6fdfd468dd-z5tsz   1/1     Running   0          3h27m
+kube-system   pod/coredns-86f8659d76-j4hln           1/1     Running   0          3h28m
+kube-system   pod/coredns-86f8659d76-nfvrv           1/1     Running   0          3h28m
+kube-system   pod/hubble-relay-5fd64868c6-6pdk8      1/1     Running   0          3h27m
+kube-system   pod/hubble-ui-5b94b84b8c-tm25j         2/2     Running   0          3h27m
+kube-system   pod/konnectivity-agent-2rxsj           1/1     Running   0          3h28m
+kube-system   pod/konnectivity-agent-h5nzp           1/1     Running   0          3h28m
+kube-system   pod/konnectivity-agent-hpxvk           1/1     Running   0          3h28m
+kube-system   pod/konnectivity-agent-jn6d7           1/1     Running   0          3h28m
+kube-system   pod/konnectivity-agent-zhzmv           1/1     Running   0          3h28m
+kube-system   pod/metrics-server-d987bf784-p7fhn     1/1     Running   0          3h28m
+kube-system   pod/nllb-node-01                       1/1     Running   0          3h28m
+kube-system   pod/nllb-node-02                       1/1     Running   0          3h28m
+kube-system   pod/nllb-node-03                       1/1     Running   0          3h28m
+kube-system   pod/nllb-node-04                       1/1     Running   0          3h28m
+kube-system   pod/nllb-node-05                       1/1     Running   0          3h28m
+tailscale     pod/lab-k0s-0                          1/1     Running   0          3h20m
+tailscale     pod/lab-k0s-1                          1/1     Running   0          3h20m
+tailscale     pod/operator-548c6f88bc-m8dvg          1/1     Running   0          3h21m
 
-NAMESPACE     NAME                                DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE
-kube-system   daemonset.apps/cilium               5         5         5       5            5
-kube-system   daemonset.apps/konnectivity-agent   5         5         5       5            5
+NAMESPACE     NAME                     TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)                  AGE
+default       service/kubernetes       ClusterIP   10.96.0.1        <none>        443/TCP                  3h29m
+kube-system   service/hubble-peer      ClusterIP   10.101.251.91    <none>        443/TCP                  3h27m
+kube-system   service/hubble-relay     ClusterIP   10.103.81.195    <none>        80/TCP                   3h27m
+kube-system   service/hubble-ui        ClusterIP   10.106.61.237    <none>        80/TCP                   3h27m
+kube-system   service/kube-dns         ClusterIP   10.96.0.10       <none>        53/UDP,53/TCP,9153/TCP   3h29m
+kube-system   service/metrics-server   ClusterIP   10.107.188.107   <none>        443/TCP                  3h28m
 
-NAMESPACE     NAME                              READY   UP-TO-DATE   AVAILABLE
-kube-system   deployment.apps/cilium-operator   2/2     2            2
-kube-system   deployment.apps/coredns           2/2     2            2
-kube-system   deployment.apps/hubble-relay      1/1     1            1
-kube-system   deployment.apps/hubble-ui         1/1     1            1
-kube-system   deployment.apps/metrics-server    1/1     1            1
-tailscale     deployment.apps/operator          1/1     1            1
+NAMESPACE     NAME                                DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR            AGE
+kube-system   daemonset.apps/cilium               5         5         5       5            5           kubernetes.io/os=linux   3h27m
+kube-system   daemonset.apps/konnectivity-agent   5         5         5       5            5           <none>                   3h29m
+
+NAMESPACE     NAME                              READY   UP-TO-DATE   AVAILABLE   AGE
+kube-system   deployment.apps/cilium-operator   2/2     2            2           3h27m
+kube-system   deployment.apps/coredns           2/2     2            2           3h29m
+kube-system   deployment.apps/hubble-relay      1/1     1            1           3h27m
+kube-system   deployment.apps/hubble-ui         1/1     1            1           3h27m
+kube-system   deployment.apps/metrics-server    1/1     1            1           3h28m
+tailscale     deployment.apps/operator          1/1     1            1           3h21m
+
+NAMESPACE     NAME                                         DESIRED   CURRENT   READY   AGE
+kube-system   replicaset.apps/cilium-operator-6fdfd468dd   2         2         2       3h27m
+kube-system   replicaset.apps/coredns-84958f7b59           0         0         0       3h29m
+kube-system   replicaset.apps/coredns-86f8659d76           2         2         2       3h28m
+kube-system   replicaset.apps/hubble-relay-5fd64868c6      1         1         1       3h27m
+kube-system   replicaset.apps/hubble-ui-5b94b84b8c         1         1         1       3h27m
+kube-system   replicaset.apps/metrics-server-d987bf784     1         1         1       3h28m
+tailscale     replicaset.apps/operator-548c6f88bc          1         1         1       3h21m
 
 NAMESPACE   NAME                       READY   AGE
-tailscale   statefulset.apps/lab-k0s   2/2     3h17m
+tailscale   statefulset.apps/lab-k0s   2/2     3h20m
 ```
 
 Check Cilium independently of generic Kubernetes readiness:
