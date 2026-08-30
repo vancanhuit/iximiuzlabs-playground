@@ -18,7 +18,7 @@ playground:
       drives:
         - source: oci://ghcr.io/vancanhuit/debian-rootfs:trixie-base
           mount: /
-          size: 60GiB
+          size: 30GiB
       network:
         interfaces:
           - network: local
@@ -33,7 +33,7 @@ playground:
       drives:
         - source: oci://ghcr.io/vancanhuit/debian-rootfs:trixie-base
           mount: /
-          size: 60GiB
+          size: 30GiB
       network:
         interfaces:
           - network: local
@@ -48,7 +48,7 @@ playground:
       drives:
         - source: oci://ghcr.io/vancanhuit/debian-rootfs:trixie-base
           mount: /
-          size: 60GiB
+          size: 90GiB
       network:
         interfaces:
           - network: local
@@ -63,7 +63,7 @@ playground:
       drives:
         - source: oci://ghcr.io/vancanhuit/debian-rootfs:trixie-base
           mount: /
-          size: 60GiB
+          size: 90GiB
       network:
         interfaces:
           - network: local
