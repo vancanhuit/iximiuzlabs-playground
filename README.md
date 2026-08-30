@@ -40,6 +40,8 @@ Use this map to locate each image, manifest, and cluster configuration:
 | [`docs/k0s/k0s.yaml`](docs/k0s/k0s.yaml) | Eight-node `k0sctl` cluster definition |
 | [`docs/k0s/cilium-values.yaml`](docs/k0s/cilium-values.yaml) | Cilium Helm values for the `k0s` cluster |
 | [`docs/k0s/README.md`](docs/k0s/README.md) | Full `k0s` and Cilium runbook |
+| [`.sops.yaml`](.sops.yaml) | SOPS rule that selects the age recipient for encrypted secret files |
+| [`secrets/lab.sops.yaml`](secrets/lab.sops.yaml) | Versioned ciphertext for credentials used by the lab runbooks |
 
 ## Prerequisites
 
@@ -51,6 +53,69 @@ Complete these checks before changing images or playgrounds:
 - [ ] Authenticate `labctl` to the target iximiuz Labs account
 - [ ] Confirm the repository-specific registry paths, machine names, resources, subnets, and cluster ranges
 - [ ] Obtain a Tailscale authentication key that can assign `tag:lab` when deploying Kubernetes playgrounds
+
+## Secret management with SOPS and age
+
+This repository uses [SOPS](https://getsops.io/) with [age](https://age-encryption.org/) so encrypted credentials can be versioned beside the configuration that consumes them. SOPS understands the YAML structure and encrypts its values; age controls who can unlock the file. This preserves useful keys and diffs such as `tailscale.oauth.client_id` without committing their plaintext values.
+
+The two tools have separate responsibilities:
+
+| Component | Responsibility |
+| --- | --- |
+| SOPS | Generates a random data key, encrypts each YAML value with AES-256-GCM, and authenticates the encrypted document with a message authentication code (MAC) |
+| age | Encrypts, or wraps, the SOPS data key to the public recipient in [`.sops.yaml`](.sops.yaml) |
+| age private identity | Stays outside Git and unwraps the data key when an authorized operator edits or decrypts the file |
+
+This is envelope encryption. The public recipient beginning with `age1` is safe to commit and lets anyone encrypt a new data key for that recipient. It cannot decrypt the existing file. The corresponding private identity beginning with `AGE-SECRET-KEY-` grants decryption access and must be distributed through an approved secret-sharing channel, stored outside the repository, and protected like the credentials it unlocks.
+
+[![SOPS and age envelope-encryption workflow](docs/k0s/architecture/sops-age.svg)](docs/k0s/architecture/sops-age.svg)
+
+Open the [interactive SOPS and age workflow](docs/k0s/architecture/sops-age.html) to inspect the encryption, storage, and point-of-use boundaries.
+
+### Configure access
+
+Install the pinned versions with `mise install`. Obtain the existing repository age private identity from the repository owner; generating a new identity does not grant access to ciphertext encrypted for the current recipient.
+
+SOPS checks its standard age identity locations and `SOPS_AGE_KEY_FILE`. If the identity is stored at a non-default path, point SOPS to it without putting the key itself in the shell command:
+
+```bash
+export SOPS_AGE_KEY_FILE="$HOME/.config/sops/age/keys.txt"
+chmod 600 "$SOPS_AGE_KEY_FILE"
+
+age-keygen -y "$SOPS_AGE_KEY_FILE"
+sops decrypt secrets/lab.sops.yaml >/dev/null
+```
+
+The first command prints the public recipient derived from the private identity. It must match the recipient in [`.sops.yaml`](.sops.yaml). The decrypt check should exit successfully without printing plaintext to the terminal.
+
+### Edit and consume secrets
+
+Edit the encrypted file through SOPS so plaintext is held in the editor buffer and the saved file remains encrypted:
+
+```bash
+sops secrets/lab.sops.yaml
+```
+
+Decrypt only the field needed by the next process and prefer a pipe:
+
+```bash
+sops decrypt --extract '["tailscale"]["auth_key"]' \
+  secrets/lab.sops.yaml | consuming_command
+```
+
+When a consumer requires a file, create a private temporary directory, set `umask 077`, and remove it with a shell trap. The k0s runbook demonstrates this pattern for the Tailscale operator OAuth credentials. Do not place plaintext secrets in command arguments, shell history, traced shell output, logs, manifests, Git files, or documentation.
+
+Before committing, inspect the diff and confirm every secret value still begins with `ENC[` and the document retains its `sops` metadata. Commit only `secrets/lab.sops.yaml`, never a decrypted copy.
+
+### Rotate repository access
+
+Changing a credential value and changing who can decrypt the file are different operations. Edit the encrypted YAML to rotate a service credential. To rotate repository decryption access, securely create or obtain the replacement age identity, change the recipient in `.sops.yaml`, and rewrap the existing data key:
+
+```bash
+sops updatekeys secrets/lab.sops.yaml
+```
+
+Review the encrypted diff before committing, verify that an intended replacement identity can decrypt it, and verify that a removed identity no longer can. Do not remove the old identity until the updated ciphertext is committed and recovery access is confirmed.
 
 ## Procedure
 

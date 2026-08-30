@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "How SOPS and age Protect Repository Secrets",
+    "output": "docs/k0s/architecture/sops-age.html",
+    "quality_profile": "showcase",
+    "viewBox": [1340, 650],
+    "legend": {
+      "mode": "hidden"
+    }
+  },
+  "components": [
+    { "id": "edit", "type": "frontend", "label": "Edit with SOPS", "sublabel": "plaintext in editor memory", "tag": "authorized host", "pos": [35, 235], "size": [145, 76] },
+    { "id": "data_key", "type": "security", "label": "Random data key", "sublabel": "generated per file", "tag": "never committed raw", "pos": [225, 235], "size": [145, 76] },
+    { "id": "encrypted_values", "type": "security", "label": "Encrypted values", "sublabel": "AES-256-GCM", "tag": "MAC authenticates file", "pos": [425, 115], "size": [145, 76] },
+    { "id": "wrapped_key", "type": "security", "label": "Wrapped data key", "sublabel": "age public recipient", "tag": "safe ciphertext", "pos": [425, 355], "size": [145, 76] },
+    { "id": "encrypted_file", "type": "database", "label": "Encrypted YAML", "sublabel": "ENC values + age stanza", "tag": "secrets/lab.sops.yaml", "pos": [625, 235], "size": [155, 76] },
+    { "id": "git", "type": "cloud", "label": "Git repository", "sublabel": "versions ciphertext only", "pos": [835, 235], "size": [145, 76] },
+    { "id": "decrypt", "type": "security", "label": "SOPS decrypt", "sublabel": "verify MAC + unwrap key", "tag": "extract one value", "pos": [1030, 235], "size": [145, 76] },
+    { "id": "private_identity", "type": "security", "label": "age private identity", "sublabel": "stored outside Git", "tag": "grants decryption", "pos": [1030, 420], "size": [145, 76] },
+    { "id": "consumer", "type": "backend", "label": "Runtime consumer", "sublabel": "stdin or mode-600 file", "tag": "remove after use", "pos": [1190, 80], "size": [125, 76] }
+  ],
+  "boundaries": [
+    { "kind": "security-group", "label": "SOPS envelope encryption", "wraps": ["data_key", "encrypted_values", "wrapped_key", "encrypted_file"], "pad": 25 },
+    { "kind": "region", "label": "Versioned ciphertext", "wraps": ["git"], "pad": 25 },
+    { "kind": "security-group", "label": "Authorized decryption", "wraps": ["decrypt", "private_identity", "consumer"], "pad": 25 }
+  ],
+  "connections": [
+    { "id": "save", "from": "edit", "to": "data_key", "label": "save", "variant": "security" },
+    { "id": "encrypt", "from": "data_key", "to": "encrypted_values", "label": "encrypt YAML values", "variant": "security", "fromSide": "top", "toSide": "left" },
+    { "id": "wrap", "from": "data_key", "to": "wrapped_key", "label": "wrap for age recipient", "variant": "security", "fromSide": "bottom", "toSide": "left" },
+    { "id": "values_to_file", "from": "encrypted_values", "to": "encrypted_file", "label": "ENC values + MAC", "variant": "security", "fromSide": "right", "toSide": "top" },
+    { "id": "key_to_file", "from": "wrapped_key", "to": "encrypted_file", "label": "age stanza", "variant": "security", "fromSide": "right", "toSide": "bottom" },
+    { "id": "commit", "from": "encrypted_file", "to": "git", "label": "commit encrypted file", "variant": "emphasis", "labelAt": [808, 325] },
+    { "id": "read", "from": "git", "to": "decrypt", "label": "sops decrypt --extract", "variant": "emphasis", "labelAt": [1005, 325] },
+    { "id": "unlock", "from": "private_identity", "to": "decrypt", "label": "unwrap data key", "variant": "security", "fromSide": "top", "toSide": "bottom" },
+    { "id": "use", "from": "decrypt", "to": "consumer", "label": "plaintext at point of use", "variant": "security", "fromSide": "top", "toSide": "left" }
+  ]
+}
