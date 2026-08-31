@@ -56,7 +56,7 @@ The diagram uses one representative source worker and one destination worker. Th
 
 [![Kubernetes network data paths](architecture/network-data-paths.svg)](architecture/network-data-paths.svg)
 
-Open the [interactive network data-path diagram](architecture/network-data-paths.html) and select a guided view to isolate Pod, control-plane, Service, or external traffic.
+Open the [interactive network data-path diagram](architecture/network-data-paths.html) and select a guided view to isolate cross-node, same-node, Service-backend, or Internet-egress traffic.
 
 | Flow | Forward data path | Address and encapsulation behavior |
 | --- | --- | --- |

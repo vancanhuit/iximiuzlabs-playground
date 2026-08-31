@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="generator" content="archify 2.16.0-dev.0">
-  <title>Kubernetes Network Data Paths over Tailscale and Cilium Diagram</title>
+  <meta name="generator" content="archify 2.16.0">
+  <title>Pod Packet Paths across Cilium and Tailscale Diagram</title>
   <script>
     // Resolve the theme before first paint so light-preference users don't
     // see a dark flash. The toolbar script below re-applies with UI state.
@@ -4955,12 +4955,12 @@
            data-preset-badge-blueprint="BLUEPRINT / REV 01"
            data-preset-badge-editorial="EDITORIAL / FIELD NOTE">
         <div class="pulse-dot"></div>
-        <h1>Kubernetes Network Data Paths over Tailscale and Cilium</h1>
+        <h1>Pod Packet Paths across Cilium and Tailscale</h1>
       </div>
     </div>
 
-    <script id="archify-guided-views-data" type="application/json">[{"id":"pod-to-pod","label":"Pod to Pod","focus":["source_pod","source_cilium","local_pod","tailnet","destination_cilium","remote_pod"],"note":"Same-node traffic stays local; cross-node traffic adds VXLAN and traverses the encrypted Tailscale underlay."},{"id":"node-control","label":"Node and control","focus":["worker_nllb","tailnet","controllers","etcd"],"note":"Worker components use local Envoy, while controllers, kubelet, etcd, and SSH communicate over Tailscale addresses."},{"id":"service-node","label":"Service and node","focus":["source_pod","source_cilium","worker_nllb","controllers","destination_cilium","remote_pod"],"note":"Cilium eBPF replaces kube-proxy for ClusterIP, NodePort, LoadBalancer, externalIP, and hostPort forwarding."},{"id":"external-access","label":"External paths","focus":["administrator","api_proxy","controllers","source_pod","source_cilium","internet"],"note":"Routine kubectl uses Tailscale identity; Pod Internet egress is masqueraded to the worker eth0 address."}]</script>
-    <script id="archify-source-evidence-data" type="application/json">{"schemaVersion":1,"verified":true,"repository":{"url":"https://github.com/vancanhuit/iximiuzlabs-playground","revision":"a0bec2fd49317a14fd074e3bc19e83cbd308de31","shortRevision":"a0bec2f"},"referenceCount":11,"nodes":{"administrator":[{"path":"docs/k0s/README.md","line":264,"endLine":292,"label":"Recovery API path","href":"https://github.com/vancanhuit/iximiuzlabs-playground/blob/a0bec2fd49317a14fd074e3bc19e83cbd308de31/docs/k0s/README.md#L264-L292"}],"api_proxy":[{"path":"docs/k0s/README.md","line":514,"endLine":535,"label":"ProxyGroup","href":"https://github.com/vancanhuit/iximiuzlabs-playground/blob/a0bec2fd49317a14fd074e3bc19e83cbd308de31/docs/k0s/README.md#L514-L535"}],"controllers":[{"path":"docs/k0s/k0s.yaml","line":6,"endLine":30,"label":"Controller addresses","href":"https://github.com/vancanhuit/iximiuzlabs-playground/blob/a0bec2fd49317a14fd074e3bc19e83cbd308de31/docs/k0s/k0s.yaml#L6-L30"}],"etcd":[{"path":"docs/k0s/README.md","line":243,"endLine":253,"label":"Quorum verification","href":"https://github.com/vancanhuit/iximiuzlabs-playground/blob/a0bec2fd49317a14fd074e3bc19e83cbd308de31/docs/k0s/README.md#L243-L253"}],"source_pod":[{"path":"docs/k0s/cilium-values.yaml","line":24,"endLine":32,"label":"Pod MTU and CIDR","href":"https://github.com/vancanhuit/iximiuzlabs-playground/blob/a0bec2fd49317a14fd074e3bc19e83cbd308de31/docs/k0s/cilium-values.yaml#L24-L32"}],"source_cilium":[{"path":"docs/k0s/cilium-values.yaml","line":1,"endLine":23,"label":"Datapath settings","href":"https://github.com/vancanhuit/iximiuzlabs-playground/blob/a0bec2fd49317a14fd074e3bc19e83cbd308de31/docs/k0s/cilium-values.yaml#L1-L23"}],"worker_nllb":[{"path":"docs/k0s/k0s.yaml","line":92,"endLine":96,"label":"NLLB enabled","href":"https://github.com/vancanhuit/iximiuzlabs-playground/blob/a0bec2fd49317a14fd074e3bc19e83cbd308de31/docs/k0s/k0s.yaml#L92-L96"},{"path":"docs/k0s/cilium-values.yaml","line":13,"endLine":15,"label":"Local API endpoint","href":"https://github.com/vancanhuit/iximiuzlabs-playground/blob/a0bec2fd49317a14fd074e3bc19e83cbd308de31/docs/k0s/cilium-values.yaml#L13-L15"}],"tailnet":[{"path":"docs/k0s/README.md","line":24,"endLine":32,"label":"Network layers","href":"https://github.com/vancanhuit/iximiuzlabs-playground/blob/a0bec2fd49317a14fd074e3bc19e83cbd308de31/docs/k0s/README.md#L24-L32"}],"destination_cilium":[{"path":"docs/k0s/cilium-values.yaml","line":21,"endLine":25,"label":"VXLAN overlay","href":"https://github.com/vancanhuit/iximiuzlabs-playground/blob/a0bec2fd49317a14fd074e3bc19e83cbd308de31/docs/k0s/cilium-values.yaml#L21-L25"}],"internet":[{"path":"docs/k0s/cilium-values.yaml","line":7,"endLine":19,"label":"BPF devices","href":"https://github.com/vancanhuit/iximiuzlabs-playground/blob/a0bec2fd49317a14fd074e3bc19e83cbd308de31/docs/k0s/cilium-values.yaml#L7-L19"}]}}</script>
+    <script id="archify-guided-views-data" type="application/json">[{"id":"cross-node","label":"Cross-node Pod path","focus":["source_pod","source_cilium","vxlan_encap","tailnet","vxlan_decap","destination_cilium","remote_pod"],"note":"Follow the unchanged inner Pod packet inside a VXLAN node packet, then through Tailscale encryption to Worker B."},{"id":"same-node","label":"Same-node Pod path","focus":["source_pod","source_cilium","local_pod"],"note":"A local destination branches after source policy and routing; it never enters VXLAN or tailscale0."},{"id":"service-backend","label":"Service to backend","focus":["service_vip","source_cilium","local_pod","vxlan_encap","tailnet","vxlan_decap","destination_cilium","remote_pod"],"note":"The Service IP is virtual: eBPF selects a backend, then forwarding uses the same-node or cross-node Pod path."},{"id":"internet-egress","label":"Internet egress","focus":["source_pod","source_cilium","internet"],"note":"BPF masquerading changes the source Pod IP to Worker A's eth0 address before Internet routing."}]</script>
+    <script id="archify-source-evidence-data" type="application/json">{"schemaVersion":1,"verified":true,"repository":{"url":"https://github.com/vancanhuit/iximiuzlabs-playground","revision":"7d2d5a10d7b4c09b60846806f31a2ac2b55308ba","shortRevision":"7d2d5a1"},"referenceCount":8,"nodes":{"service_vip":[{"path":"docs/k0s/README.md","line":69,"label":"Service lookup","href":"https://github.com/vancanhuit/iximiuzlabs-playground/blob/7d2d5a10d7b4c09b60846806f31a2ac2b55308ba/docs/k0s/README.md#L69"}],"source_pod":[{"path":"docs/k0s/cilium-values.yaml","line":24,"endLine":32,"label":"Pod MTU and CIDR","href":"https://github.com/vancanhuit/iximiuzlabs-playground/blob/7d2d5a10d7b4c09b60846806f31a2ac2b55308ba/docs/k0s/cilium-values.yaml#L24-L32"}],"source_cilium":[{"path":"docs/k0s/cilium-values.yaml","line":1,"endLine":23,"label":"eBPF datapath","href":"https://github.com/vancanhuit/iximiuzlabs-playground/blob/7d2d5a10d7b4c09b60846806f31a2ac2b55308ba/docs/k0s/cilium-values.yaml#L1-L23"}],"vxlan_encap":[{"path":"docs/k0s/README.md","line":67,"label":"Cross-node path","href":"https://github.com/vancanhuit/iximiuzlabs-playground/blob/7d2d5a10d7b4c09b60846806f31a2ac2b55308ba/docs/k0s/README.md#L67"}],"tailnet":[{"path":"docs/k0s/README.md","line":24,"endLine":32,"label":"Node underlay","href":"https://github.com/vancanhuit/iximiuzlabs-playground/blob/7d2d5a10d7b4c09b60846806f31a2ac2b55308ba/docs/k0s/README.md#L24-L32"}],"vxlan_decap":[{"path":"docs/k0s/README.md","line":67,"label":"Cross-node path","href":"https://github.com/vancanhuit/iximiuzlabs-playground/blob/7d2d5a10d7b4c09b60846806f31a2ac2b55308ba/docs/k0s/README.md#L67"}],"destination_cilium":[{"path":"docs/k0s/cilium-values.yaml","line":21,"endLine":25,"label":"VXLAN overlay","href":"https://github.com/vancanhuit/iximiuzlabs-playground/blob/7d2d5a10d7b4c09b60846806f31a2ac2b55308ba/docs/k0s/cilium-values.yaml#L21-L25"}],"internet":[{"path":"docs/k0s/cilium-values.yaml","line":7,"endLine":19,"label":"BPF masquerade","href":"https://github.com/vancanhuit/iximiuzlabs-playground/blob/7d2d5a10d7b4c09b60846806f31a2ac2b55308ba/docs/k0s/cilium-values.yaml#L7-L19"}]}}</script>
     <script id="archify-i18n-data" type="application/json">{"locale":"en","messages":{"viewer.kind.frontend":"Frontend","viewer.kind.backend":"Backend","viewer.kind.database":"Database","viewer.kind.cloud":"Cloud","viewer.kind.security":"Security","viewer.kind.messagebus":"Message bus","viewer.kind.external":"External","viewer.kind.neutral":"Neutral","viewer.kind.node":"Node","viewer.kind.start":"Start","viewer.kind.active":"Active","viewer.kind.waiting":"Waiting","viewer.kind.decision":"Decision","viewer.kind.success":"Success","viewer.kind.failure":"Failure","viewer.toolbar.actions":"Diagram actions","viewer.theme.toggle.title":"Toggle theme (T)","viewer.theme.toggle":"Toggle color theme","viewer.theme.dark":"Dark","viewer.theme.light":"Light","viewer.preset.choose.title":"Choose visual style (S cycles)","viewer.preset.choose":"Choose visual style","viewer.preset.style":"Style","viewer.preset.menu":"Visual style","viewer.preset.identity":"Visual identity","viewer.preset.cycles":"S cycles","viewer.preset.classic":"Classic","viewer.preset.classic.short":"Classic","viewer.preset.classic.hint":"Stable technical default","viewer.preset.flow":"Signal Flow","viewer.preset.flow.short":"Flow","viewer.preset.flow.hint":"Motion-forward presentation","viewer.preset.blueprint":"Blueprint","viewer.preset.blueprint.hint":"Engineering review","viewer.preset.editorial":"Editorial","viewer.preset.editorial.hint":"Publication and launch notes","viewer.preset.badge.signalFlow":"SIGNAL FLOW","viewer.preset.badge.blueprint":"BLUEPRINT / REV 01","viewer.preset.badge.editorial":"EDITORIAL / FIELD NOTE","viewer.preset.badge.editorialPlate":"ARCHIFY / PLATE 04","viewer.preset.current":"Visual style: {style}. Choose visual style","viewer.motion.live":"Live","viewer.motion.still":"Still","viewer.motion.pause":"Pause motion","viewer.motion.resume":"Resume motion","viewer.motion.reduced":"Motion paused by reduced-motion preference","viewer.motion.hidden":"Motion paused while this page is hidden","viewer.motion.yielding":"Pause motion; currently yielding to {owner}","viewer.motion.yielding.title":"Live preview enabled · yielding to {owner}","viewer.owner.story":"the guided story","viewer.owner.chapter":"the active chapter","viewer.owner.chapterPreview":"the chapter delta preview","viewer.owner.handoff":"the chapter handoff","viewer.owner.route":"Route Probe","viewer.owner.lens":"Semantic Lens","viewer.owner.relationship":"Relationship Preview","viewer.owner.intent":"Intent Trace","viewer.owner.focus":"semantic focus","viewer.owner.legend":"legend preview","viewer.owner.reader":"reader interaction","viewer.present.enter":"Enter presentation stage","viewer.present.enter.title":"Presentation stage (F)","viewer.present.exit":"Exit presentation stage","viewer.present.exit.title":"Exit presentation stage (F or Escape)","viewer.present.present":"Present","viewer.present.exit.label":"Exit","viewer.export.button":"Export","viewer.export.button.title":"Export diagram (E)","viewer.export.diagram":"Export diagram","viewer.export.menu":"Export","viewer.export.subtitle":"Portable, clean outputs","viewer.export.share":"Share","viewer.export.shareCard":"Share Card","viewer.export.routeShareCard":"Route Share Card","viewer.export.reachShareCard":"Reach Share Card","viewer.export.copyShareCard":"Copy Share Card","viewer.export.copyDiagram":"Copy diagram","viewer.export.clipboardPng":"PNG to clipboard","viewer.export.raster":"Raster images","viewer.export.image":"Image","viewer.export.lossless":"Lossless image","viewer.export.compact":"Compact image","viewer.export.modern":"Modern image","viewer.export.vectorMotion":"Vector and motion","viewer.export.vectorMotion.heading":"Vector \u0026 motion","viewer.export.editable":"Editable vector","viewer.export.motion6s":"6s motion","viewer.export.unsupported":"Not supported by this browser","viewer.export.clipboardUnsupported":"Clipboard image write not supported by this browser","viewer.export.clipboardUnsupported.period":"Clipboard image write not supported by this browser.","viewer.export.clipboardUnsupported.short":"Clipboard image write not supported in this browser.","viewer.export.motionUnavailable":"Motion capture unavailable in this browser","viewer.export.webmUnavailable":"WebM unavailable in this browser","viewer.export.failed":"Export failed: {message}","viewer.export.unknownVariant":"Unknown Share Card variant: {variant}","viewer.export.routeRequired":"Trace a route before exporting a Route Share Card","viewer.export.reachRequired":"Trace authored reach before exporting a Reach Share Card","viewer.export.unknown":"unknown","viewer.export.routeFailed":"Route Share Card export failed: {message}","viewer.export.reachFailed":"Reach Share Card export failed: {message}","viewer.export.copyFailed":"Copy failed: {message}","viewer.export.copiedPng":"Copied PNG to clipboard","viewer.export.copiedShare":"Copied Share Card","viewer.export.downloadedShare":"Downloaded Share Card","viewer.export.downloadedRoute":"Downloaded Route Share Card","viewer.export.downloadedReach":"Downloaded Reach Share Card","viewer.export.downloadedWebm":"Downloaded WebM","viewer.export.recording":"Recording 6 seconds of motion…","viewer.export.card.routeSummary.one":"Route: {source} → {target} · {count} directed hop","viewer.export.card.routeSummary.other":"Route: {source} → {target} · {count} directed hops","viewer.export.card.reachSummary":"Authored {direction} from {origin} · {nodes} · {links} · max {hops}","viewer.export.card.node.one":"{count} node","viewer.export.card.node.other":"{count} nodes","viewer.export.card.link.one":"{count} link","viewer.export.card.link.other":"{count} links","viewer.export.card.hop.one":"{count} hop","viewer.export.card.hop.other":"{count} hops","viewer.export.card.routeBadge":"ARCHIFY · ROUTE · {hops}","viewer.export.card.reachBadge":"ARCHIFY · {direction} REACH","viewer.export.card.defaultBadge":"ARCHIFY · {preset} · {theme}","viewer.export.direction.upstream":"Upstream","viewer.export.direction.downstream":"Downstream","viewer.export.error.canvasUnavailable":"Canvas unavailable for {label}","viewer.export.error.contextUnavailable":"2D canvas context unavailable for {label}","viewer.export.error.toBlobUnavailable":"canvas.toBlob unavailable for {label}","viewer.export.error.toBlobNull":"canvas.toBlob returned no data for {label}","viewer.export.error.variantsCombined":"Share Card variants cannot be combined","viewer.export.error.viewerState":"Share Card export could not remove temporary viewer state","viewer.export.error.routeState":"Route Card export could not preserve the resolved route safely","viewer.export.error.reachState":"Reach Card export could not preserve authored reach safely","viewer.export.error.webmRequirements":"WebM motion export requires a trace animation and browser MediaRecorder support","viewer.export.error.mediaRecorder":"MediaRecorder failed","viewer.export.error.emptyWebm":"MediaRecorder produced an empty WebM","viewer.export.error.webmBackground":"SVG background could not be loaded for WebM export","viewer.guided.region":"Guided diagram views","viewer.guided.previous":"Previous guided view","viewer.guided.previous.title":"Previous guided view ([)","viewer.guided.next":"Next guided view","viewer.guided.next.title":"Next guided view (])","viewer.guided.views":"Guided views","viewer.guided.explore":"Explore this system","viewer.guided.intro":"Step through curated paths without changing the source diagram.","viewer.guided.trail":"Story trail","viewer.guided.beat":"Beat","viewer.guided.nextBeat":"Next","viewer.guided.play":"Play guided story","viewer.guided.play.title":"Play guided story (P)","viewer.guided.pause":"Pause guided story","viewer.guided.pause.title":"Pause guided story (P)","viewer.guided.replay":"Replay guided story","viewer.guided.replay.title":"Replay guided story (P)","viewer.guided.playStory":"Play story","viewer.guided.pauseStory":"Pause","viewer.guided.replayStory":"Replay story","viewer.guided.motionUnavailable":"Story playback unavailable while motion is Still","viewer.guided.enableMotion":"Switch motion to Live to play the guided story","viewer.guided.selectBeatLink":"Select a Story Beat to copy its exact link","viewer.guided.copyMoment":"Copy moment","viewer.guided.momentCopied":"Moment link copied","viewer.guided.momentCopyFailed":"Could not copy story moment link","viewer.guided.copied":"Copied","viewer.guided.copyFailed":"Copy failed","viewer.guided.showAll":"Show all","viewer.guided.showAll.aria":"Show entire diagram","viewer.guided.chapters":"Story chapters","viewer.guided.storyTrail":"Story trail for {label}: {count} beats","viewer.guided.chapter.open":"Open chapter {index} of {total}: {label}, {count} stops","viewer.guided.chapter.current":"Current chapter {index} of {total}: {label}, {count} stops","viewer.guided.chapter.selectedNodes":"{count} selected nodes","viewer.guided.chapter.stops":"{count} stops","viewer.guided.chapter.stop.one":"{count} stop","viewer.guided.chapter.stop.other":"{count} stops","viewer.guided.chapter.current.title":"{label} — current chapter, {count} stops","viewer.guided.chapter.delta.expanded":"{stay} stay, {enter} enter, {leave} leave","viewer.guided.chapter.delta.aria":"Open chapter {index} of {total}: {label}. Chapter focus delta: {delta}","viewer.guided.chapter.delta.title":"{label} — {delta} chapter focus","viewer.guided.handoff":"{from} → {to} · via {label}","viewer.guided.share.chapter":"Chapter {index} / {total}","viewer.guided.share.initial":"Chapter 01 / 01","viewer.guided.share.default":"Guided chapter","viewer.guided.state.ready":"Ready","viewer.guided.state.playing":"Playing","viewer.guided.state.settled":"Settled","viewer.guided.state.paused":"Paused","viewer.guided.state.pinned":"Pinned","viewer.guided.state.still":"Still","viewer.guided.share.step":"Step {index} / {total} · {label}","viewer.guided.share.staticMoment":"{step} · Static moment","viewer.guided.share.complete":"{count} steps complete · {note}","viewer.guided.share.settled":"Path settled for reading.","viewer.guided.share.staticPath":"{count} steps · Static path","viewer.guided.share.ready":"{count} steps · Ready","viewer.guided.share.aria":"{state} chapter {index} of {total}: {label}. {beat}. {route}","viewer.guided.beat.start":"Beat {index} / {total} · {label} · starting point","viewer.guided.beat.forward":"Beat {index} / {total} · {from} → {to}","viewer.guided.beat.reverse":"Beat {index} / {total} · {from} → {to} · reverse authored link","viewer.guided.beat.multiple":"Beat {index} / {total} · {from} ⇄ {to} · {count} authored links","viewer.guided.beat.group":"Beat {index} / {total} · {from} · {to} · grouped · no direct link","viewer.guided.beat.aria.prefix":"Story beat {index} of {total}: {label}. ","viewer.guided.beat.aria.start":"Starting point.","viewer.guided.beat.aria.forward":"From {from} through one authored forward relationship.","viewer.guided.beat.aria.reverse":"From {from}; the authored relationship points from {to} to {from}.","viewer.guided.beat.aria.multiple":"From {from} through {count} authored relationships; shown without arbitrary motion.","viewer.guided.beat.aria.group":"Grouped from {from} with no direct authored relationship.","viewer.guided.caption.start":"Starting point","viewer.guided.caption.grouped":"Grouped transition · no direct authored link","viewer.guided.caption.more":" +{count} more","viewer.guided.caption.reverse":"Reverse authored relationship","viewer.guided.caption.relationships":"{count} authored relationships","viewer.guided.caption.relationship":"Authored relationship","viewer.guided.caption.direction":"authored direction: {from} → {to}","viewer.guided.caption.starting":"Authored starting point","viewer.guided.beatLink":"Copy link to current story moment: Beat {index} of {total}: {label}","viewer.guided.noStory":"This diagram has no authored guided story.","viewer.guide.eyebrow":"Diagram guide","viewer.guide.close":"Close diagram guide","viewer.guide.inspecting":"Inspecting compiled semantics","viewer.guide.actions":"Diagram exploration actions","viewer.guide.find":"Find any node","viewer.guide.find.hint":"Search labels, responsibilities, kinds, and stable IDs.","viewer.guide.route":"Trace a route","viewer.guide.route.aria":"Trace a directed route","viewer.guide.route.hint":"Ask how two semantic nodes connect in authored direction.","viewer.guide.map":"See the whole system","viewer.guide.map.hint":"Open Semantic Radar with a live viewport and stable nodes.","viewer.guide.lens":"Compare semantic kinds","viewer.guide.lens.hint":"Count roles, reveal their traffic, and compare direct authored links.","viewer.guide.story":"Play the guided story","viewer.guide.story.hint":"Walk the authored chapters and real relationships.","viewer.guide.present":"Enter Presentation Stage","viewer.guide.present.hint":"Give the live diagram the viewport without changing export.","viewer.guide.shortcuts":"Additional keyboard shortcuts","viewer.guide.shortcut.export":"Export","viewer.guide.shortcut.theme":"Theme","viewer.guide.shortcut.style":"Style","viewer.guide.shortcut.reset":"Reset","viewer.guide.shortcut.zoomIn":"Zoom in","viewer.guide.shortcut.zoomOut":"Zoom out","viewer.guide.shortcut.close":"Close","viewer.guide.facts":"{nodes} · {relationships} · {views}","viewer.guide.fact.node.one":"{count} semantic node","viewer.guide.fact.node.other":"{count} semantic nodes","viewer.guide.fact.relationship.one":"{count} relationship","viewer.guide.fact.relationship.other":"{count} relationships","viewer.guide.fact.view.one":"{count} guided view","viewer.guide.fact.view.other":"{count} guided views","viewer.guide.story.available.one":"Walk {count} authored chapter and its real relationships.","viewer.guide.story.available.other":"Walk {count} authored chapters and their real relationships.","viewer.guide.story.unavailable":"No authored guided story in this diagram.","viewer.guide.open":"Open diagram guide","viewer.guide.noStory":"This diagram has no authored guided story.","viewer.finder.title":"Find a node","viewer.finder.close":"Close node finder","viewer.finder.placeholder":"Search labels or IDs","viewer.finder.search":"Search diagram nodes","viewer.finder.results":"Diagram nodes","viewer.finder.empty":"No matching nodes","viewer.finder.result.focus":"Focus {label}","viewer.finder.result.routeStart":"Choose {label} as route start","viewer.finder.result.routeTarget":"Choose {label} as route destination, {links}","viewer.finder.status.empty":"No matching nodes","viewer.finder.status.count.one":"{count} matching node","viewer.finder.status.count.other":"{count} matching nodes","viewer.finder.noun.nodes":"nodes","viewer.finder.link.one":"{count} link","viewer.finder.link.other":"{count} links","viewer.finder.result.focus.one":"Focus {label}, {count} related connection","viewer.finder.result.focus.other":"Focus {label}, {count} related connections","viewer.finder.status.filtered":"{visible} of {available} {noun}","viewer.finder.status.all":"{available} {noun}","viewer.passport.eyebrow":"Semantic passport","viewer.passport.metadata":"Node metadata","viewer.passport.evidence":"Verified source evidence","viewer.passport.verified":"Verified source","viewer.passport.reach":"Authored reach","viewer.passport.reach.trace":"Trace authored reachability","viewer.passport.upstream":"Upstream","viewer.passport.downstream":"Downstream","viewer.passport.upstream.trace":"Trace upstream authored reachability","viewer.passport.downstream.trace":"Trace downstream authored reachability","viewer.passport.close":"Close semantic passport","viewer.passport.copy":"Copy link","viewer.passport.copy.focus":"Copy link to focused node","viewer.passport.relations":"Relations","viewer.passport.relations.show":"Show connected relationships","viewer.passport.relations.hide":"Hide connected relationships","viewer.passport.relations.list":"Connected relationships","viewer.passport.copyRelation":"Copy relation","viewer.passport.copyNode":"Copy node","viewer.passport.copyPinned":"Copy link to pinned relationship","viewer.passport.copySource":"Copy link to source node","viewer.passport.copy.focused.success":"Focused node link copied","viewer.passport.copy.pinned.success":"Pinned relationship link copied","viewer.passport.copy.focused.failed":"Could not copy focused node link","viewer.passport.copy.pinned.failed":"Could not copy pinned relationship link","viewer.passport.relationship.none":"No connected relationships","viewer.passport.relationship.count.one":"{count} relation","viewer.passport.relationship.count.other":"{count} relations","viewer.passport.relationship.show.one":"Show {count} connected relationship","viewer.passport.relationship.show.other":"Show {count} connected relationships","viewer.passport.relationship.summary":"{out} outgoing · {in} incoming{loops}","viewer.passport.relationship.loops":" · {count} loop","viewer.passport.relationship.explorer":"Direct relationship explorer","viewer.passport.relationship.help":"Use arrow keys to explore relationships. Press Enter or Space to pin details; Escape clears.","viewer.passport.relationship.loopsBack":"loops back","viewer.passport.relationship.connectsTo":"connects to","viewer.passport.relationship.connectsFrom":"connects from","viewer.passport.relationship.pinned":"Pinned relationship · {from} → {to} · {label}","viewer.passport.relationship.inspect":"Inspect relationship {index} of {total}: {from} to {to}, {label}. Press Enter for details.","viewer.passport.relationship.group.out":"Outgoing","viewer.passport.relationship.group.in":"Incoming","viewer.passport.relationship.group.loop":"Self loops","viewer.passport.relationship.row":"{group}: {relationship}, {neighbor}","viewer.passport.relationship.direction.out":"OUT →","viewer.passport.relationship.direction.in":"← IN","viewer.passport.relationship.direction.loop":"LOOP","viewer.passport.sourceCount.one":"{count} verified source reference","viewer.passport.sourceCount.other":"{count} verified source references","viewer.passport.sourceMarker":"SRC","viewer.passport.beacon.one":"{count} verified source; focus this node to inspect","viewer.passport.beacon.other":"{count} verified sources; focus this node to inspect","viewer.passport.repository.open":"Open verified repository revision {revision}","viewer.passport.source.open":"Open verified source {path} at revision {revision}","viewer.passport.source.openLink":"Open ↗","viewer.passport.reach.upstream.one":"Trace {count} upstream authored node","viewer.passport.reach.upstream.other":"Trace {count} upstream authored nodes","viewer.passport.reach.downstream.one":"Trace {count} downstream authored node","viewer.passport.reach.downstream.other":"Trace {count} downstream authored nodes","viewer.passport.reach.noUpstream":"No upstream authored nodes","viewer.passport.reach.noDownstream":"No downstream authored nodes","viewer.passport.reach.status":"{direction} · {nodes} nodes · {links} links · max {hops} hops","viewer.route.eyebrow":"Route probe","viewer.route.start":"Choose a start node","viewer.route.start.find":"Find start","viewer.route.start.find.aria":"Find a route start","viewer.route.copy":"Copy link","viewer.route.copy.aria":"Copy link to traced route","viewer.route.clear":"Clear","viewer.route.clear.aria":"Clear route probe","viewer.route.traced":"Traced route","viewer.route.pickTwo":"Pick two semantic nodes on the diagram","viewer.route.pickOne":"Pick a semantic node on the diagram","viewer.route.controls":"Route journey controls","viewer.route.previous":"Previous route position","viewer.route.play":"Play route journey","viewer.route.pause":"Pause route journey","viewer.route.replay":"Replay route journey","viewer.route.next":"Next route position","viewer.route.journey":"Journey","viewer.route.pause.label":"Pause","viewer.route.replay.label":"Replay","viewer.route.overview":"Overview","viewer.route.overview.aria":"Show complete route overview","viewer.route.instructions":"Choose the source, then the destination. Direction matters.","viewer.route.destination":"Choose a destination from {label}","viewer.route.destination.find":"Find target","viewer.route.destination.find.aria":"Find a reachable route destination","viewer.route.differentDestination":"Choose a different destination","viewer.route.distinct":"A route needs two distinct semantic nodes.","viewer.route.unreachable":"No directed route to {label}","viewer.route.unreachable.detail":"{target} is not reachable from {source}. Pick a highlighted destination.","viewer.route.start.instructions":"Select the source. The next step will reveal only directed destinations.","viewer.route.copy.success":"Traced route link copied","viewer.route.copy.failed":"Could not copy traced route link","viewer.route.position":"Route position {index} of {total}: {label}","viewer.route.step":"Step {index} of {total} · {phase} · {label}","viewer.route.motionRequired":"Automatic journey requires Live motion","viewer.route.trigger.clear":"Clear traced route","viewer.route.overview.status":"{nodes} · {hops} · shortest authored route","viewer.route.overview.node.one":"{count} node","viewer.route.overview.node.other":"{count} nodes","viewer.route.overview.hop.one":"{count} directed hop","viewer.route.overview.hop.other":"{count} directed hops","viewer.route.phase.playing":"Playing","viewer.route.phase.complete":"Complete","viewer.route.phase.inspecting":"Inspecting","viewer.route.destination.count.one":"{count} directed destination available. Pick a highlighted node.","viewer.route.destination.count.other":"{count} directed destinations available. Pick a highlighted node.","viewer.route.noOutgoing":"No outgoing route starts here. Clear and choose another source.","viewer.route.result.title":"{source} to {target}","viewer.route.finder.source.title":"Choose route start","viewer.route.finder.source.placeholder":"Search route sources","viewer.route.finder.source.empty":"No matching route sources","viewer.route.finder.source.results":"Nodes that can start a route","viewer.route.finder.source.noun":"route sources","viewer.route.finder.source.badge":"start","viewer.route.finder.target.title":"Destination from {label}","viewer.route.finder.target.placeholder":"Search reachable destinations","viewer.route.finder.target.empty":"No matching reachable destinations","viewer.route.finder.target.results":"Reachable route destinations","viewer.route.finder.target.noun":"reachable destinations","viewer.route.hop.one":"{count} hop","viewer.route.hop.other":"{count} hops","viewer.lens.eyebrow":"Semantic lens","viewer.lens.title":"Compare system roles","viewer.lens.close":"Close semantic lens","viewer.lens.instruction":"Choose up to two semantic kinds. One reveals its real traffic; two compare only direct authored relationships.","viewer.lens.kinds":"Semantic kinds","viewer.lens.choose":"Choose a kind to inspect its nodes and touching relationships.","viewer.lens.copy":"Copy link to semantic lens","viewer.lens.clear":"Clear semantic lens","viewer.lens.open":"Open semantic lens","viewer.lens.openActive":"Open active semantic lens","viewer.lens.legend":"Semantic legend","viewer.lens.legend.inspect.one":"Inspect {label}, {count} node","viewer.lens.legend.inspect.other":"Inspect {label}, {count} nodes","viewer.lens.kind.count.one":"{label}, {count} node","viewer.lens.kind.count.other":"{label}, {count} nodes","viewer.lens.compare.one":"{first} → {second}: {forward} · {second} → {first}: {reverse} · {count} direct relationship","viewer.lens.compare.other":"{first} → {second}: {forward} · {second} → {first}: {reverse} · {count} direct relationships","viewer.lens.single":"{nodes} · {relationships} · connected peers remain visible","viewer.lens.node.one":"{count} {label} node","viewer.lens.node.other":"{count} {label} nodes","viewer.lens.relationship.one":"{count} touching relationship","viewer.lens.relationship.other":"{count} touching relationships","viewer.radar.title":"Semantic radar","viewer.radar.building":"Building overview","viewer.radar.openFull":"Open full semantic radar","viewer.radar.open":"Open radar","viewer.radar.close":"Close semantic radar","viewer.radar.surface":"Diagram overview. Click a node to focus it, or use arrow keys to pan.","viewer.radar.click":"Click node","viewer.radar.drag":"Drag to pan","viewer.radar.space":"Semantic radar needs more MAP space.","viewer.radar.nodes":"Semantic diagram radar nodes","viewer.radar.focus":"Focus {label} from Semantic Radar","viewer.radar.status":"{count} nodes · {viewport}","viewer.radar.fullMap":"{count} nodes · full map","viewer.radar.compacted":"Radar compacted to avoid covering the Semantic Passport or MAP controls.","viewer.radar.cancelWaiting":"Cancel semantic radar waiting for more MAP space","viewer.radar.needsSpace":"Semantic radar needs more visible MAP space","viewer.radar.viewport.full":"full map","viewer.radar.viewport.width":"{percent}% width","viewer.radar.viewport.scale":"{percent}% viewport","viewer.nav.controls":"Diagram view controls","viewer.nav.route":"Trace a directed route","viewer.nav.route.title":"Trace route (R)","viewer.nav.route.short":"PATH","viewer.nav.radar":"Open semantic radar","viewer.nav.radar.title":"Semantic radar (M)","viewer.nav.radar.short":"MAP","viewer.nav.lens":"Open semantic lens","viewer.nav.lens.title":"Semantic lens (L)","viewer.nav.lens.short":"LENS","viewer.nav.find":"Find a node","viewer.nav.find.title":"Find a node (/)","viewer.nav.guide":"Open diagram guide","viewer.nav.guide.title":"Diagram guide (?)","viewer.nav.zoomOut":"Zoom out","viewer.nav.zoomOut.title":"Zoom out (-)","viewer.nav.reset":"Reset diagram view","viewer.nav.reset.title":"Reset view (0)","viewer.nav.read":"READ","viewer.nav.zoomIn":"Zoom in","viewer.nav.zoomIn.title":"Zoom in (+)","viewer.nav.camera":"{hint}. Reset diagram view","viewer.nav.camera.title":"{semantic}{hint} · reset view (0)","viewer.nav.camera.semantic":"Semantic camera active · ","viewer.nav.level.map":"MAP","viewer.nav.level.read":"READ","viewer.nav.level.full":"FULL","viewer.nav.level.auto":"AUTO","viewer.nav.detail.map":"Zoom in to reveal relationship labels and node context","viewer.nav.detail.read":"Zoom in again to reveal tags and annotations","viewer.nav.detail.full":"Full diagram detail","viewer.intent.summary":"{label}. {out} outgoing, {in} incoming{loops}. {total} connections. Press Enter for details.","viewer.intent.loops":", {count} self loop","viewer.common.copied":"Copied","viewer.common.copyFailed":"Copy failed","viewer.common.copyLink":"Copy link","viewer.common.clear":"Clear","viewer.common.close":"Close"}}</script>
     <div class="guided-views no-print" id="guided-views" hidden aria-label="Guided diagram views">
       <button id="guided-view-prev" type="button" aria-label="Previous guided view" title="Previous guided view ([)">&#8592;</button>
@@ -5004,8 +5004,8 @@
     <!-- Main Diagram -->
     <div class="diagram-container" data-detail-level="read"
          data-preset-badge-editorial-plate="ARCHIFY / PLATE 04">
-      <svg viewBox="0 0 1395 715" role="img" lang="en" aria-labelledby="archify-diagram-title archify-diagram-description" data-preset="classic" data-quality-profile="showcase">
-        <title id="archify-diagram-title">Kubernetes Network Data Paths over Tailscale and Cilium</title>
+      <svg viewBox="0 0 1395 720" role="img" lang="en" aria-labelledby="archify-diagram-title archify-diagram-description" data-preset="classic" data-quality-profile="showcase">
+        <title id="archify-diagram-title">Pod Packet Paths across Cilium and Tailscale</title>
         <desc id="archify-diagram-description">An architecture diagram generated by Archify.</desc>
         <!-- Definitions -->
         <defs>
@@ -5030,241 +5030,232 @@
         <rect width="100%" height="100%" fill="url(#grid)" />
 
         <!-- Boundaries (behind everything) -->
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="security-group" data-composition-frame-id="0" data-composition-frame-label="Tailnet identity and encryption boundary" x="264" y="24" width="937" height="372" rx="8" class="c-security-group" stroke-width="1"/>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="region" data-composition-frame-id="0" data-composition-frame-label="Worker A: source node" x="1" y="275" width="583" height="326" rx="12" class="c-region" stroke-width="1"/>
 
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="region" data-composition-frame-id="1" data-composition-frame-label="Kubernetes workers" x="21" y="275" width="1368" height="301" rx="12" class="c-region" stroke-width="1"/>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="security-group" data-composition-frame-id="1" data-composition-frame-label="Encrypted node-to-node transport" x="566" y="275" width="223" height="127" rx="8" class="c-security-group" stroke-width="1"/>
+
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="region" data-composition-frame-id="2" data-composition-frame-label="Worker B: destination node" x="776" y="275" width="593" height="127" rx="12" class="c-region" stroke-width="1"/>
 
         <!-- Connection paths (before components for correct z-order) -->
-        <path data-edge-from="administrator" data-edge-to="api_proxy" data-edge-label="Tailscale identity + HTTPS :443" data-edge-key="0" data-edge-id="routine_kubectl" data-composition-points="235,88;290,88" d="M 235 88 L 290 88" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
-        <path data-edge-from="api_proxy" data-edge-to="controllers" data-edge-label="impersonation headers, HTTPS :6443" data-edge-key="1" data-edge-id="proxy_api" data-composition-points="530,88;650,88" d="M 530 88 L 650 88" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
-        <path data-edge-from="controllers" data-edge-to="etcd" data-edge-label="client :2379 + peer quorum :2380 over Tailscale" data-edge-key="2" data-edge-id="controller_etcd" data-composition-points="880,88;965,88" d="M 880 88 L 965 88" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
-        <path data-edge-from="source_pod" data-edge-to="source_cilium" data-edge-label="Pod eth0 → veth → eBPF policy" data-edge-key="3" data-edge-id="pod_veth" data-composition-points="235,338;280,338" d="M 235 338 L 280 338" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="source_cilium" data-edge-to="local_pod" data-edge-label="local endpoint route + destination policy" data-edge-key="4" data-edge-id="same_node" data-composition-points="392.5,376;392.5,400;408.5,400;408.5,456;382.5,456;382.5,480" d="M 392.5 376 L 392.5 392 Q 392.5 400 400.5 400 L 400.5 400 Q 408.5 400 408.5 408 L 408.5 448 Q 408.5 456 400.5 456 L 390.5 456 Q 382.5 456 382.5 464 L 382.5 480" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="source_cilium" data-edge-to="tailnet" data-edge-label="VXLAN UDP :8472, outer dst = remote 100.x" data-edge-key="5" data-edge-id="vxlan_encap" data-composition-points="505,338;600,338" d="M 505 338 L 600 338" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="tailnet" data-edge-to="destination_cilium" data-edge-label="WireGuard-encrypted peer path → VXLAN decap" data-edge-key="6" data-edge-id="wireguard_transport" data-composition-points="850,338;920,338" d="M 850 338 L 920 338" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
-        <path data-edge-from="destination_cilium" data-edge-to="remote_pod" data-edge-label="ingress policy → endpoint veth" data-edge-key="7" data-edge-id="remote_delivery" data-composition-points="1170,338;1200,338" d="M 1170 338 L 1200 338" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="source_cilium" data-edge-to="worker_nllb" data-edge-label="host-network clients use local API proxy" data-edge-key="8" data-edge-id="worker_api_local" data-composition-points="392.5,376;392.5,428;627.5,428;627.5,480" d="M 392.5 376 L 392.5 420 Q 392.5 428 400.5 428 L 619.5 428 Q 627.5 428 627.5 436 L 627.5 480" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="worker_nllb" data-edge-to="tailnet" data-edge-label="select healthy controller :6443" data-edge-key="9" data-edge-id="worker_api_underlay" data-composition-points="627.5,480;627.5,428;725,428;725,376" d="M 627.5 480 L 627.5 436 Q 627.5 428 635.5 428 L 717 428 Q 725 428 725 420 L 725 376" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
-        <path data-edge-from="tailnet" data-edge-to="controllers" data-edge-label="API, kubelet, konnectivity, SSH, node traffic" data-edge-key="10" data-edge-id="underlay_control" data-composition-points="725,300;725,213;765,213;765,126" d="M 725 300 L 725 221 Q 725 213 733 213 L 757 213 Q 765 213 765 205 L 765 126" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
-        <path data-edge-from="source_cilium" data-edge-to="internet" data-edge-label="BPF SNAT to worker eth0 address" data-edge-key="11" data-edge-id="pod_egress" data-composition-points="280,338;260,338;260,570;147.5,570;147.5,610" d="M 280 338 L 268 338 Q 260 338 260 346 L 260 562 Q 260 570 252 570 L 155.5 570 Q 147.5 570 147.5 578 L 147.5 610" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
+        <path data-edge-from="service_vip" data-edge-to="source_cilium" data-edge-label="eBPF selects Pod backend" data-edge-key="0" data-edge-id="service_lookup" data-composition-points="110,141;110,220.5;290,220.5;290,300" d="M 110 141 L 110 212.5 Q 110 220.5 118 220.5 L 282 220.5 Q 290 220.5 290 228.5 L 290 300" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
+        <path data-edge-from="source_pod" data-edge-to="source_cilium" data-edge-label="inner IP: 10.244.1.10 → 10.244.2.20" data-edge-key="1" data-edge-id="pod_veth" data-composition-points="175,341;205,341" d="M 175 341 L 205 341" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="source_cilium" data-edge-to="vxlan_encap" data-edge-label="remote Pod CIDR → tunnel" data-edge-key="2" data-edge-id="route_remote" data-composition-points="375,341;400,341" d="M 375 341 L 400 341" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="vxlan_encap" data-edge-to="tailnet" data-edge-label="outer IP: Worker A 100.x → Worker B 100.y, UDP :8472" data-edge-key="3" data-edge-id="vxlan_packet" data-composition-points="560,341;590,341" d="M 560 341 L 590 341" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="tailnet" data-edge-to="vxlan_decap" data-edge-label="Tailscale encrypts the complete VXLAN packet" data-edge-key="4" data-edge-id="wireguard_transport" data-composition-points="765,341;800,341" d="M 765 341 L 800 341" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
+        <path data-edge-from="vxlan_decap" data-edge-to="destination_cilium" data-edge-label="restore unchanged inner Pod packet" data-edge-key="5" data-edge-id="restore_inner" data-composition-points="960,341;990,341" d="M 960 341 L 990 341" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="destination_cilium" data-edge-to="remote_pod" data-edge-label="policy pass → destination veth" data-edge-key="6" data-edge-id="remote_delivery" data-composition-points="1160,341;1190,341" d="M 1160 341 L 1190 341" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="source_cilium" data-edge-to="local_pod" data-edge-label="local endpoint route; bypass VXLAN and Tailscale" data-edge-key="7" data-edge-id="same_node" data-composition-points="290,382;290,505" d="M 290 382 L 290 505" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="source_cilium" data-edge-to="internet" data-edge-label="SNAT Pod IP → Worker A eth0 IP" data-edge-key="8" data-edge-id="pod_egress" data-composition-points="290,382;290,443.5;750,443.5;750,505" d="M 290 382 L 290 435.5 Q 290 443.5 298 443.5 L 742 443.5 Q 750 443.5 750 451.5 L 750 505" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
 
         <!-- Components -->
-        <g id="node-administrator" data-node-id="administrator" data-node-label="Administrator" tabindex="0" role="button" aria-label="Focus Administrator, kubectl or SSH on the tailnet, Architecture component" aria-pressed="false" data-node-kind="external" data-node-sublabel="kubectl or SSH on the tailnet" data-node-context="Architecture component">
-          <title>Administrator · kubectl or SSH on the tailnet · Architecture component</title>
-          <rect x="45" y="50" width="190" height="76" rx="6" class="c-mask"/>
-          <rect x="45" y="50" width="190" height="76" rx="6" class="c-external" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(51 56) scale(0.6875)">
-            <rect x="2.5" y="5" width="8.5" height="8" rx="1.5"/>
-            <path d="M8 2.5h5.5V8M13.5 2.5 7.5 8.5"/>
-          </g>
-          <text data-node-label="" data-detail-anchor="" x="140" y="86" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Administrator</text>
-        <text data-detail="context" x="140" y="102" class="t-muted" font-size="9" text-anchor="middle">kubectl or SSH on the tailnet</text>
-        </g>
-
-        <g id="node-api_proxy" data-node-id="api_proxy" data-node-label="lab-k0s API Proxy" tabindex="0" role="button" aria-label="Focus lab-k0s API Proxy, Tailscale Service + 2 ProxyGroup Pods, Tailnet identity and encryption boundary" aria-pressed="false" data-node-kind="security" data-node-sublabel="Tailscale Service + 2 ProxyGroup Pods" data-node-tag="HTTPS :443" data-node-context="Tailnet identity and encryption boundary">
-          <title>lab-k0s API Proxy · Tailscale Service + 2 ProxyGroup Pods · Tailnet identity and encryption boundary · HTTPS :443</title>
-          <rect x="290" y="50" width="240" height="76" rx="6" class="c-mask"/>
-          <rect x="290" y="50" width="240" height="76" rx="6" class="c-security" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(296 56) scale(0.6875)">
-            <path d="M8 2.2 13 4v3.5c0 3.1-1.8 5.4-5 6.5-3.2-1.1-5-3.4-5-6.5V4Z"/>
-            <path d="m5.8 8 1.5 1.5 3-3"/>
-          </g>
-          <text data-node-label="" data-detail-anchor="" x="410" y="86" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">lab-k0s API Proxy</text>
-        <text data-detail="context" x="410" y="102" class="t-muted" font-size="9" text-anchor="middle">Tailscale Service + 2 ProxyGroup Pods</text>
-        <text data-detail="fine" x="410" y="118" class="t-security" font-size="7" text-anchor="middle">HTTPS :443</text>
-        </g>
-
-        <g id="node-controllers" data-node-id="controllers" data-node-label="3 k0s Controllers" tabindex="0" role="button" aria-label="Focus 3 k0s Controllers, API server + control-plane services, Tailnet identity and encryption boundary" aria-pressed="false" data-node-kind="backend" data-node-sublabel="API server + control-plane services" data-node-tag="100.x:6443" data-node-context="Tailnet identity and encryption boundary">
-          <title>3 k0s Controllers · API server + control-plane services · Tailnet identity and encryption boundary · 100.x:6443</title>
-          <rect x="650" y="50" width="230" height="76" rx="6" class="c-mask"/>
-          <rect x="650" y="50" width="230" height="76" rx="6" class="c-backend" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(656 56) scale(0.6875)">
-            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
-          </g>
-          <text data-node-label="" data-detail-anchor="" x="765" y="86" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">3 k0s Controllers</text>
-        <text data-detail="context" x="765" y="102" class="t-muted" font-size="9" text-anchor="middle">API server + control-plane services</text>
-        <text data-detail="fine" x="765" y="118" class="t-backend" font-size="7" text-anchor="middle">100.x:6443</text>
-        </g>
-
-        <g id="node-etcd" data-node-id="etcd" data-node-label="etcd Quorum" tabindex="0" role="button" aria-label="Focus etcd Quorum, 3 controller-local members, Tailnet identity and encryption boundary" aria-pressed="false" data-node-kind="database" data-node-sublabel="3 controller-local members" data-node-tag="TCP 2379 / 2380" data-node-context="Tailnet identity and encryption boundary">
-          <title>etcd Quorum · 3 controller-local members · Tailnet identity and encryption boundary · TCP 2379 / 2380</title>
-          <rect x="965" y="50" width="210" height="76" rx="6" class="c-mask"/>
-          <rect x="965" y="50" width="210" height="76" rx="6" class="c-database" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(971 56) scale(0.6875)">
-            <ellipse cx="8" cy="4" rx="5" ry="2"/>
-            <path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2"/>
-          </g>
-          <text data-node-label="" data-detail-anchor="" x="1070" y="86" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">etcd Quorum</text>
-        <text data-detail="context" x="1070" y="102" class="t-muted" font-size="9" text-anchor="middle">3 controller-local members</text>
-        <text data-detail="fine" x="1070" y="118" class="t-database" font-size="7" text-anchor="middle">TCP 2379 / 2380</text>
-        </g>
-
-        <g id="node-source_pod" data-node-id="source_pod" data-node-label="Source Pod" tabindex="0" role="button" aria-label="Focus Source Pod, 10.244.x.y, eth0 MTU 1230, Kubernetes workers" aria-pressed="false" data-node-kind="cloud" data-node-sublabel="10.244.x.y, eth0 MTU 1230" data-node-context="Kubernetes workers">
-          <title>Source Pod · 10.244.x.y, eth0 MTU 1230 · Kubernetes workers</title>
-          <rect x="45" y="300" width="190" height="76" rx="6" class="c-mask"/>
-          <rect x="45" y="300" width="190" height="76" rx="6" class="c-cloud" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="cloud" class="semantic-sigil s-cloud" transform="translate(51 306) scale(0.6875)">
+        <g id="node-service_vip" data-node-id="service_vip" data-node-label="Optional ClusterIP" tabindex="0" role="button" aria-label="Focus Optional ClusterIP, virtual 10.96.x.y Service IP, Architecture component" aria-pressed="false" data-node-kind="cloud" data-node-sublabel="virtual 10.96.x.y Service IP" data-node-tag="not routed" data-node-context="Architecture component">
+          <title>Optional ClusterIP · virtual 10.96.x.y Service IP · Architecture component · not routed</title>
+          <rect x="25" y="65" width="170" height="76" rx="6" class="c-mask"/>
+          <rect x="25" y="65" width="170" height="76" rx="6" class="c-cloud" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="cloud" class="semantic-sigil s-cloud" transform="translate(31 71) scale(0.6875)">
             <path d="M4.3 12.5h7.3a2.4 2.4 0 0 0 .2-4.8 4 4 0 0 0-7.5-1.3A3.1 3.1 0 0 0 4.3 12.5Z"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="140" y="336" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Source Pod</text>
-        <text data-detail="context" x="140" y="352" class="t-muted" font-size="9" text-anchor="middle">10.244.x.y, eth0 MTU 1230</text>
+          <text data-node-label="" data-detail-anchor="" x="110" y="101" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Optional ClusterIP</text>
+        <text data-detail="context" x="110" y="117" class="t-muted" font-size="9" text-anchor="middle">virtual 10.96.x.y Service IP</text>
+        <text data-detail="fine" x="110" y="133" class="t-cloud" font-size="7" text-anchor="middle">not routed</text>
         </g>
 
-        <g id="node-source_cilium" data-node-id="source_cilium" data-node-label="Source Cilium eBPF" tabindex="0" role="button" aria-label="Focus Source Cilium eBPF, veth policy, service LB, routing, Kubernetes workers" aria-pressed="false" data-node-kind="messagebus" data-node-sublabel="veth policy, service LB, routing" data-node-tag="no kube-proxy" data-node-context="Kubernetes workers">
-          <title>Source Cilium eBPF · veth policy, service LB, routing · Kubernetes workers · no kube-proxy</title>
-          <rect x="280" y="300" width="225" height="76" rx="6" class="c-mask"/>
-          <rect x="280" y="300" width="225" height="76" rx="6" class="c-messagebus" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="messagebus" class="semantic-sigil s-messagebus" transform="translate(286 306) scale(0.6875)">
+        <g id="node-source_pod" data-node-id="source_pod" data-node-label="Source Pod" tabindex="0" role="button" aria-label="Focus Source Pod, 10.244.1.10, MTU 1230, Worker A: source node" aria-pressed="false" data-node-kind="cloud" data-node-sublabel="10.244.1.10, MTU 1230" data-node-tag="inner source" data-node-context="Worker A: source node">
+          <title>Source Pod · 10.244.1.10, MTU 1230 · Worker A: source node · inner source</title>
+          <rect x="25" y="300" width="150" height="82" rx="6" class="c-mask"/>
+          <rect x="25" y="300" width="150" height="82" rx="6" class="c-cloud" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="cloud" class="semantic-sigil s-cloud" transform="translate(31 306) scale(0.6875)">
+            <path d="M4.3 12.5h7.3a2.4 2.4 0 0 0 .2-4.8 4 4 0 0 0-7.5-1.3A3.1 3.1 0 0 0 4.3 12.5Z"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="100" y="339" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Source Pod</text>
+        <text data-detail="context" x="100" y="355" class="t-muted" font-size="9" text-anchor="middle">10.244.1.10, MTU 1230</text>
+        <text data-detail="fine" x="100" y="374" class="t-cloud" font-size="7" text-anchor="middle">inner source</text>
+        </g>
+
+        <g id="node-source_cilium" data-node-id="source_cilium" data-node-label="Source veth + eBPF" tabindex="0" role="button" aria-label="Focus Source veth + eBPF, policy, Service LB, route, Worker A: source node" aria-pressed="false" data-node-kind="messagebus" data-node-sublabel="policy, Service LB, route" data-node-tag="Worker A" data-node-context="Worker A: source node">
+          <title>Source veth + eBPF · policy, Service LB, route · Worker A: source node · Worker A</title>
+          <rect x="205" y="300" width="170" height="82" rx="6" class="c-mask"/>
+          <rect x="205" y="300" width="170" height="82" rx="6" class="c-messagebus" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="messagebus" class="semantic-sigil s-messagebus" transform="translate(211 306) scale(0.6875)">
             <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/>
             <circle cx="5" cy="4.5" r="1" class="sigil-fill"/>
             <circle cx="10.5" cy="8" r="1" class="sigil-fill"/>
             <circle cx="7" cy="11.5" r="1" class="sigil-fill"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="392.5" y="336" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Source Cilium eBPF</text>
-        <text data-detail="context" x="392.5" y="352" class="t-muted" font-size="9" text-anchor="middle">veth policy, service LB, routing</text>
-        <text data-detail="fine" x="392.5" y="368" class="t-messagebus" font-size="7" text-anchor="middle">no kube-proxy</text>
+          <text data-node-label="" data-detail-anchor="" x="290" y="339" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Source veth + eBPF</text>
+        <text data-detail="context" x="290" y="355" class="t-muted" font-size="9" text-anchor="middle">policy, Service LB, route</text>
+        <text data-detail="fine" x="290" y="374" class="t-messagebus" font-size="7" text-anchor="middle">Worker A</text>
         </g>
 
-        <g id="node-local_pod" data-node-id="local_pod" data-node-label="Same-node Pod" tabindex="0" role="button" aria-label="Focus Same-node Pod, local endpoint veth, Kubernetes workers" aria-pressed="false" data-node-kind="cloud" data-node-sublabel="local endpoint veth" data-node-tag="no tunnel" data-node-context="Kubernetes workers">
-          <title>Same-node Pod · local endpoint veth · Kubernetes workers · no tunnel</title>
-          <rect x="280" y="480" width="205" height="76" rx="6" class="c-mask"/>
-          <rect x="280" y="480" width="205" height="76" rx="6" class="c-cloud" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="cloud" class="semantic-sigil s-cloud" transform="translate(286 486) scale(0.6875)">
-            <path d="M4.3 12.5h7.3a2.4 2.4 0 0 0 .2-4.8 4 4 0 0 0-7.5-1.3A3.1 3.1 0 0 0 4.3 12.5Z"/>
-          </g>
-          <text data-node-label="" data-detail-anchor="" x="382.5" y="516" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Same-node Pod</text>
-        <text data-detail="context" x="382.5" y="532" class="t-muted" font-size="9" text-anchor="middle">local endpoint veth</text>
-        <text data-detail="fine" x="382.5" y="548" class="t-cloud" font-size="7" text-anchor="middle">no tunnel</text>
-        </g>
-
-        <g id="node-worker_nllb" data-node-id="worker_nllb" data-node-label="Worker-local Envoy" tabindex="0" role="button" aria-label="Focus Worker-local Envoy, k0s node-local API load balancer, Kubernetes workers" aria-pressed="false" data-node-kind="backend" data-node-sublabel="k0s node-local API load balancer" data-node-tag="127.0.0.1:7443" data-node-context="Kubernetes workers">
-          <title>Worker-local Envoy · k0s node-local API load balancer · Kubernetes workers · 127.0.0.1:7443</title>
-          <rect x="515" y="480" width="225" height="76" rx="6" class="c-mask"/>
-          <rect x="515" y="480" width="225" height="76" rx="6" class="c-backend" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(521 486) scale(0.6875)">
-            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
-          </g>
-          <text data-node-label="" data-detail-anchor="" x="627.5" y="516" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Worker-local Envoy</text>
-        <text data-detail="context" x="627.5" y="532" class="t-muted" font-size="9" text-anchor="middle">k0s node-local API load balancer</text>
-        <text data-detail="fine" x="627.5" y="548" class="t-backend" font-size="7" text-anchor="middle">127.0.0.1:7443</text>
-        </g>
-
-        <g id="node-tailnet" data-node-id="tailnet" data-node-label="Tailscale Underlay" tabindex="0" role="button" aria-label="Focus Tailscale Underlay, WireGuard, direct peer or DERP fallback, Tailnet identity and encryption boundary" aria-pressed="false" data-node-kind="security" data-node-sublabel="WireGuard, direct peer or DERP fallback" data-node-tag="tailscale0 MTU 1280" data-node-context="Tailnet identity and encryption boundary">
-          <title>Tailscale Underlay · WireGuard, direct peer or DERP fallback · Tailnet identity and encryption boundary · tailscale0 MTU 1280</title>
-          <rect x="600" y="300" width="250" height="76" rx="6" class="c-mask"/>
-          <rect x="600" y="300" width="250" height="76" rx="6" class="c-security" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(606 306) scale(0.6875)">
-            <path d="M8 2.2 13 4v3.5c0 3.1-1.8 5.4-5 6.5-3.2-1.1-5-3.4-5-6.5V4Z"/>
-            <path d="m5.8 8 1.5 1.5 3-3"/>
-          </g>
-          <text data-node-label="" data-detail-anchor="" x="725" y="336" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Tailscale Underlay</text>
-        <text data-detail="context" x="725" y="352" class="t-muted" font-size="9" text-anchor="middle">WireGuard, direct peer or DERP fallback</text>
-        <text data-detail="fine" x="725" y="368" class="t-security" font-size="7" text-anchor="middle">tailscale0 MTU 1280</text>
-        </g>
-
-        <g id="node-destination_cilium" data-node-id="destination_cilium" data-node-label="Destination Cilium eBPF" tabindex="0" role="button" aria-label="Focus Destination Cilium eBPF, VXLAN decap, policy, endpoint route, Kubernetes workers" aria-pressed="false" data-node-kind="messagebus" data-node-sublabel="VXLAN decap, policy, endpoint route" data-node-tag="cilium_vxlan" data-node-context="Kubernetes workers">
-          <title>Destination Cilium eBPF · VXLAN decap, policy, endpoint route · Kubernetes workers · cilium_vxlan</title>
-          <rect x="920" y="300" width="250" height="76" rx="6" class="c-mask"/>
-          <rect x="920" y="300" width="250" height="76" rx="6" class="c-messagebus" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="messagebus" class="semantic-sigil s-messagebus" transform="translate(926 306) scale(0.6875)">
+        <g id="node-vxlan_encap" data-node-id="vxlan_encap" data-node-label="VXLAN Encapsulation" tabindex="0" role="button" aria-label="Focus VXLAN Encapsulation, add VXLAN outer headers, Worker A: source node" aria-pressed="false" data-node-kind="messagebus" data-node-sublabel="add VXLAN outer headers" data-node-tag="cilium_vxlan" data-node-context="Worker A: source node">
+          <title>VXLAN Encapsulation · add VXLAN outer headers · Worker A: source node · cilium_vxlan</title>
+          <rect x="400" y="300" width="160" height="82" rx="6" class="c-mask"/>
+          <rect x="400" y="300" width="160" height="82" rx="6" class="c-messagebus" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="messagebus" class="semantic-sigil s-messagebus" transform="translate(406 306) scale(0.6875)">
             <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/>
             <circle cx="5" cy="4.5" r="1" class="sigil-fill"/>
             <circle cx="10.5" cy="8" r="1" class="sigil-fill"/>
             <circle cx="7" cy="11.5" r="1" class="sigil-fill"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="1045" y="336" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Destination Cilium eBPF</text>
-        <text data-detail="context" x="1045" y="352" class="t-muted" font-size="9" text-anchor="middle">VXLAN decap, policy, endpoint route</text>
-        <text data-detail="fine" x="1045" y="368" class="t-messagebus" font-size="7" text-anchor="middle">cilium_vxlan</text>
+          <text data-node-label="" data-detail-anchor="" x="480" y="339" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">VXLAN Encapsulation</text>
+        <text data-detail="context" x="480" y="355" class="t-muted" font-size="9" text-anchor="middle">add VXLAN outer headers</text>
+        <text data-detail="fine" x="480" y="374" class="t-messagebus" font-size="7" text-anchor="middle">cilium_vxlan</text>
         </g>
 
-        <g id="node-remote_pod" data-node-id="remote_pod" data-node-label="Remote Pod" tabindex="0" role="button" aria-label="Focus Remote Pod, destination worker endpoint, Kubernetes workers" aria-pressed="false" data-node-kind="cloud" data-node-sublabel="destination worker endpoint" data-node-tag="10.244.a.b" data-node-context="Kubernetes workers">
-          <title>Remote Pod · destination worker endpoint · Kubernetes workers · 10.244.a.b</title>
-          <rect x="1200" y="300" width="165" height="76" rx="6" class="c-mask"/>
-          <rect x="1200" y="300" width="165" height="76" rx="6" class="c-cloud" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="cloud" class="semantic-sigil s-cloud" transform="translate(1206 306) scale(0.6875)">
+        <g id="node-tailnet" data-node-id="tailnet" data-node-label="Tailscale Node Underlay" tabindex="0" role="button" aria-label="Focus Tailscale Node Underlay, WireGuard peer transport, Encrypted node-to-node transport" aria-pressed="false" data-node-kind="security" data-node-sublabel="WireGuard peer transport" data-node-tag="tailscale0 MTU 1280" data-node-context="Encrypted node-to-node transport">
+          <title>Tailscale Node Underlay · WireGuard peer transport · Encrypted node-to-node transport · tailscale0 MTU 1280</title>
+          <rect x="590" y="300" width="175" height="82" rx="6" class="c-mask"/>
+          <rect x="590" y="300" width="175" height="82" rx="6" class="c-security" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(596 306) scale(0.6875)">
+            <path d="M8 2.2 13 4v3.5c0 3.1-1.8 5.4-5 6.5-3.2-1.1-5-3.4-5-6.5V4Z"/>
+            <path d="m5.8 8 1.5 1.5 3-3"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="677.5" y="339" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Tailscale Node Underlay</text>
+        <text data-detail="context" x="677.5" y="355" class="t-muted" font-size="9" text-anchor="middle">WireGuard peer transport</text>
+        <text data-detail="fine" x="677.5" y="374" class="t-security" font-size="7" text-anchor="middle">tailscale0 MTU 1280</text>
+        </g>
+
+        <g id="node-vxlan_decap" data-node-id="vxlan_decap" data-node-label="VXLAN Decapsulation" tabindex="0" role="button" aria-label="Focus VXLAN Decapsulation, remove outer headers, Worker B: destination node" aria-pressed="false" data-node-kind="messagebus" data-node-sublabel="remove outer headers" data-node-tag="cilium_vxlan" data-node-context="Worker B: destination node">
+          <title>VXLAN Decapsulation · remove outer headers · Worker B: destination node · cilium_vxlan</title>
+          <rect x="800" y="300" width="160" height="82" rx="6" class="c-mask"/>
+          <rect x="800" y="300" width="160" height="82" rx="6" class="c-messagebus" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="messagebus" class="semantic-sigil s-messagebus" transform="translate(806 306) scale(0.6875)">
+            <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/>
+            <circle cx="5" cy="4.5" r="1" class="sigil-fill"/>
+            <circle cx="10.5" cy="8" r="1" class="sigil-fill"/>
+            <circle cx="7" cy="11.5" r="1" class="sigil-fill"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="880" y="339" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">VXLAN Decapsulation</text>
+        <text data-detail="context" x="880" y="355" class="t-muted" font-size="9" text-anchor="middle">remove outer headers</text>
+        <text data-detail="fine" x="880" y="374" class="t-messagebus" font-size="7" text-anchor="middle">cilium_vxlan</text>
+        </g>
+
+        <g id="node-destination_cilium" data-node-id="destination_cilium" data-node-label="Destination eBPF + veth" tabindex="0" role="button" aria-label="Focus Destination eBPF + veth, policy and endpoint route, Worker B: destination node" aria-pressed="false" data-node-kind="messagebus" data-node-sublabel="policy and endpoint route" data-node-tag="Worker B" data-node-context="Worker B: destination node">
+          <title>Destination eBPF + veth · policy and endpoint route · Worker B: destination node · Worker B</title>
+          <rect x="990" y="300" width="170" height="82" rx="6" class="c-mask"/>
+          <rect x="990" y="300" width="170" height="82" rx="6" class="c-messagebus" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="messagebus" class="semantic-sigil s-messagebus" transform="translate(996 306) scale(0.6875)">
+            <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/>
+            <circle cx="5" cy="4.5" r="1" class="sigil-fill"/>
+            <circle cx="10.5" cy="8" r="1" class="sigil-fill"/>
+            <circle cx="7" cy="11.5" r="1" class="sigil-fill"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="1075" y="339" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Destination eBPF + veth</text>
+        <text data-detail="context" x="1075" y="355" class="t-muted" font-size="9" text-anchor="middle">policy and endpoint route</text>
+        <text data-detail="fine" x="1075" y="374" class="t-messagebus" font-size="7" text-anchor="middle">Worker B</text>
+        </g>
+
+        <g id="node-remote_pod" data-node-id="remote_pod" data-node-label="Destination Pod" tabindex="0" role="button" aria-label="Focus Destination Pod, 10.244.2.20 on Worker B, Worker B: destination node" aria-pressed="false" data-node-kind="cloud" data-node-sublabel="10.244.2.20 on Worker B" data-node-tag="inner destination" data-node-context="Worker B: destination node">
+          <title>Destination Pod · 10.244.2.20 on Worker B · Worker B: destination node · inner destination</title>
+          <rect x="1190" y="300" width="155" height="82" rx="6" class="c-mask"/>
+          <rect x="1190" y="300" width="155" height="82" rx="6" class="c-cloud" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="cloud" class="semantic-sigil s-cloud" transform="translate(1196 306) scale(0.6875)">
             <path d="M4.3 12.5h7.3a2.4 2.4 0 0 0 .2-4.8 4 4 0 0 0-7.5-1.3A3.1 3.1 0 0 0 4.3 12.5Z"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="1282.5" y="336" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Remote Pod</text>
-        <text data-detail="context" x="1282.5" y="352" class="t-muted" font-size="9" text-anchor="middle">destination worker endpoint</text>
-        <text data-detail="fine" x="1282.5" y="368" class="t-cloud" font-size="7" text-anchor="middle">10.244.a.b</text>
+          <text data-node-label="" data-detail-anchor="" x="1267.5" y="339" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Destination Pod</text>
+        <text data-detail="context" x="1267.5" y="355" class="t-muted" font-size="9" text-anchor="middle">10.244.2.20 on Worker B</text>
+        <text data-detail="fine" x="1267.5" y="374" class="t-cloud" font-size="7" text-anchor="middle">inner destination</text>
         </g>
 
-        <g id="node-internet" data-node-id="internet" data-node-label="Internet" tabindex="0" role="button" aria-label="Focus Internet, registries and external services, Architecture component" aria-pressed="false" data-node-kind="external" data-node-sublabel="registries and external services" data-node-tag="worker eth0" data-node-context="Architecture component">
-          <title>Internet · registries and external services · Architecture component · worker eth0</title>
-          <rect x="45" y="610" width="205" height="76" rx="6" class="c-mask"/>
-          <rect x="45" y="610" width="205" height="76" rx="6" class="c-external" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(51 616) scale(0.6875)">
+        <g id="node-local_pod" data-node-id="local_pod" data-node-label="Same-node Pod" tabindex="0" role="button" aria-label="Focus Same-node Pod, local veth on Worker A, Worker A: source node" aria-pressed="false" data-node-kind="cloud" data-node-sublabel="local veth on Worker A" data-node-tag="no tunnel" data-node-context="Worker A: source node">
+          <title>Same-node Pod · local veth on Worker A · Worker A: source node · no tunnel</title>
+          <rect x="205" y="505" width="170" height="76" rx="6" class="c-mask"/>
+          <rect x="205" y="505" width="170" height="76" rx="6" class="c-cloud" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="cloud" class="semantic-sigil s-cloud" transform="translate(211 511) scale(0.6875)">
+            <path d="M4.3 12.5h7.3a2.4 2.4 0 0 0 .2-4.8 4 4 0 0 0-7.5-1.3A3.1 3.1 0 0 0 4.3 12.5Z"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="290" y="541" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Same-node Pod</text>
+        <text data-detail="context" x="290" y="557" class="t-muted" font-size="9" text-anchor="middle">local veth on Worker A</text>
+        <text data-detail="fine" x="290" y="573" class="t-cloud" font-size="7" text-anchor="middle">no tunnel</text>
+        </g>
+
+        <g id="node-internet" data-node-id="internet" data-node-label="Internet" tabindex="0" role="button" aria-label="Focus Internet, through Worker A eth0, Architecture component" aria-pressed="false" data-node-kind="external" data-node-sublabel="through Worker A eth0" data-node-tag="BPF SNAT" data-node-context="Architecture component">
+          <title>Internet · through Worker A eth0 · Architecture component · BPF SNAT</title>
+          <rect x="660" y="505" width="180" height="76" rx="6" class="c-mask"/>
+          <rect x="660" y="505" width="180" height="76" rx="6" class="c-external" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(666 511) scale(0.6875)">
             <rect x="2.5" y="5" width="8.5" height="8" rx="1.5"/>
             <path d="M8 2.5h5.5V8M13.5 2.5 7.5 8.5"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="147.5" y="646" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Internet</text>
-        <text data-detail="context" x="147.5" y="662" class="t-muted" font-size="9" text-anchor="middle">registries and external services</text>
-        <text data-detail="fine" x="147.5" y="678" class="t-external" font-size="7" text-anchor="middle">worker eth0</text>
+          <text data-node-label="" data-detail-anchor="" x="750" y="541" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Internet</text>
+        <text data-detail="context" x="750" y="557" class="t-muted" font-size="9" text-anchor="middle">through Worker A eth0</text>
+        <text data-detail="fine" x="750" y="573" class="t-external" font-size="7" text-anchor="middle">BPF SNAT</text>
         </g>
 
         <!-- Connection labels -->
-        <g data-detail="context" data-edge-from="administrator" data-edge-to="api_proxy" data-edge-label="Tailscale identity + HTTPS :443" data-edge-key="0" data-edge-id="routine_kubectl">
-          <rect x="183.10000000000002" y="130" width="158.79999999999998" height="14" rx="3" class="c-mask"/>
-          <text x="262.5" y="140" class="t-security" font-size="8" text-anchor="middle">Tailscale identity + HTTPS :443</text>
+        <g data-detail="context" data-edge-from="service_vip" data-edge-to="source_cilium" data-edge-label="eBPF selects Pod backend" data-edge-key="0" data-edge-id="service_lookup">
+          <rect x="137.4" y="200.5" width="125.19999999999999" height="14" rx="3" class="c-mask"/>
+          <text x="200" y="210.5" class="t-messagebus" font-size="8" text-anchor="middle">eBPF selects Pod backend</text>
         </g>
-        <g data-detail="context" data-edge-from="api_proxy" data-edge-to="controllers" data-edge-label="impersonation headers, HTTPS :6443" data-edge-key="1" data-edge-id="proxy_api">
-          <rect x="503.4" y="130" width="173.2" height="14" rx="3" class="c-mask"/>
-          <text x="590" y="140" class="t-security" font-size="8" text-anchor="middle">impersonation headers, HTTPS :6443</text>
+        <g data-detail="context" data-edge-from="source_pod" data-edge-to="source_cilium" data-edge-label="inner IP: 10.244.1.10 → 10.244.2.20" data-edge-key="1" data-edge-id="pod_veth">
+          <rect x="101" y="388" width="178" height="14" rx="3" class="c-mask"/>
+          <text x="190" y="398" class="t-backend" font-size="8" text-anchor="middle">inner IP: 10.244.1.10 → 10.244.2.20</text>
         </g>
-        <g data-detail="context" data-edge-from="controllers" data-edge-to="etcd" data-edge-label="client :2379 + peer quorum :2380 over Tailscale" data-edge-key="2" data-edge-id="controller_etcd">
-          <rect x="804.7" y="130" width="235.6" height="14" rx="3" class="c-mask"/>
-          <text x="922.5" y="140" class="t-security" font-size="8" text-anchor="middle">client :2379 + peer quorum :2380 over Tailscale</text>
+        <g data-detail="context" data-edge-from="source_cilium" data-edge-to="vxlan_encap" data-edge-label="remote Pod CIDR → tunnel" data-edge-key="2" data-edge-id="route_remote">
+          <rect x="325.4" y="412" width="125.19999999999999" height="14" rx="3" class="c-mask"/>
+          <text x="388" y="422" class="t-backend" font-size="8" text-anchor="middle">remote Pod CIDR → tunnel</text>
         </g>
-        <g data-detail="context" data-edge-from="source_pod" data-edge-to="source_cilium" data-edge-label="Pod eth0 → veth → eBPF policy" data-edge-key="3" data-edge-id="pod_veth">
-          <rect x="182.9" y="286" width="149.2" height="14" rx="3" class="c-mask"/>
-          <text x="257.5" y="296" class="t-backend" font-size="8" text-anchor="middle">Pod eth0 → veth → eBPF policy</text>
+        <g data-detail="context" data-edge-from="vxlan_encap" data-edge-to="tailnet" data-edge-label="outer IP: Worker A 100.x → Worker B 100.y, UDP :8472" data-edge-key="3" data-edge-id="vxlan_packet">
+          <rect x="445.2" y="388" width="259.6" height="14" rx="3" class="c-mask"/>
+          <text x="575" y="398" class="t-backend" font-size="8" text-anchor="middle">outer IP: Worker A 100.x → Worker B 100.y, UDP :8472</text>
         </g>
-        <g data-detail="context" data-edge-from="source_cilium" data-edge-to="local_pod" data-edge-label="local endpoint route + destination policy" data-edge-key="4" data-edge-id="same_node">
-          <rect x="326.6" y="590" width="206.79999999999998" height="14" rx="3" class="c-mask"/>
-          <text x="430" y="600" class="t-backend" font-size="8" text-anchor="middle">local endpoint route + destination policy</text>
+        <g data-detail="context" data-edge-from="tailnet" data-edge-to="vxlan_decap" data-edge-label="Tailscale encrypts the complete VXLAN packet" data-edge-key="4" data-edge-id="wireguard_transport">
+          <rect x="672.4" y="412" width="221.2" height="14" rx="3" class="c-mask"/>
+          <text x="783" y="422" class="t-security" font-size="8" text-anchor="middle">Tailscale encrypts the complete VXLAN packet</text>
         </g>
-        <g data-detail="context" data-edge-from="source_cilium" data-edge-to="tailnet" data-edge-label="VXLAN UDP :8472, outer dst = remote 100.x" data-edge-key="5" data-edge-id="vxlan_encap">
-          <rect x="449.1" y="286" width="206.79999999999998" height="14" rx="3" class="c-mask"/>
-          <text x="552.5" y="296" class="t-backend" font-size="8" text-anchor="middle">VXLAN UDP :8472, outer dst = remote 100.x</text>
+        <g data-detail="context" data-edge-from="vxlan_decap" data-edge-to="destination_cilium" data-edge-label="restore unchanged inner Pod packet" data-edge-key="5" data-edge-id="restore_inner">
+          <rect x="888.4" y="388" width="173.2" height="14" rx="3" class="c-mask"/>
+          <text x="975" y="398" class="t-backend" font-size="8" text-anchor="middle">restore unchanged inner Pod packet</text>
         </g>
-        <g data-detail="context" data-edge-from="tailnet" data-edge-to="destination_cilium" data-edge-label="WireGuard-encrypted peer path → VXLAN decap" data-edge-key="6" data-edge-id="wireguard_transport">
-          <rect x="776.8" y="286" width="216.4" height="14" rx="3" class="c-mask"/>
-          <text x="885" y="296" class="t-security" font-size="8" text-anchor="middle">WireGuard-encrypted peer path → VXLAN decap</text>
+        <g data-detail="context" data-edge-from="destination_cilium" data-edge-to="remote_pod" data-edge-label="policy pass → destination veth" data-edge-key="6" data-edge-id="remote_delivery">
+          <rect x="1098" y="412" width="154" height="14" rx="3" class="c-mask"/>
+          <text x="1175" y="422" class="t-backend" font-size="8" text-anchor="middle">policy pass → destination veth</text>
         </g>
-        <g data-detail="context" data-edge-from="destination_cilium" data-edge-to="remote_pod" data-edge-label="ingress policy → endpoint veth" data-edge-key="7" data-edge-id="remote_delivery">
-          <rect x="1108" y="286" width="154" height="14" rx="3" class="c-mask"/>
-          <text x="1185" y="296" class="t-backend" font-size="8" text-anchor="middle">ingress policy → endpoint veth</text>
+        <g data-detail="context" data-edge-from="source_cilium" data-edge-to="local_pod" data-edge-label="local endpoint route; bypass VXLAN and Tailscale" data-edge-key="7" data-edge-id="same_node">
+          <rect x="159.8" y="450" width="240.39999999999998" height="14" rx="3" class="c-mask"/>
+          <text x="280" y="460" class="t-backend" font-size="8" text-anchor="middle">local endpoint route; bypass VXLAN and Tailscale</text>
         </g>
-        <g data-detail="context" data-edge-from="source_cilium" data-edge-to="worker_nllb" data-edge-label="host-network clients use local API proxy" data-edge-key="8" data-edge-id="worker_api_local">
-          <rect x="719" y="590" width="202" height="14" rx="3" class="c-mask"/>
-          <text x="820" y="600" class="t-muted" font-size="8" text-anchor="middle">host-network clients use local API proxy</text>
-        </g>
-        <g data-detail="context" data-edge-from="worker_nllb" data-edge-to="tailnet" data-edge-label="select healthy controller :6443" data-edge-key="9" data-edge-id="worker_api_underlay">
-          <rect x="596.85" y="408" width="158.79999999999998" height="14" rx="3" class="c-mask"/>
-          <text x="676.25" y="418" class="t-security" font-size="8" text-anchor="middle">select healthy controller :6443</text>
-        </g>
-        <g data-detail="context" data-edge-from="tailnet" data-edge-to="controllers" data-edge-label="API, kubelet, konnectivity, SSH, node traffic" data-edge-key="10" data-edge-id="underlay_control">
-          <rect x="632" y="193" width="226" height="14" rx="3" class="c-mask"/>
-          <text x="745" y="203" class="t-security" font-size="8" text-anchor="middle">API, kubelet, konnectivity, SSH, node traffic</text>
-        </g>
-        <g data-detail="context" data-edge-from="source_cilium" data-edge-to="internet" data-edge-label="BPF SNAT to worker eth0 address" data-edge-key="11" data-edge-id="pod_egress">
-          <rect x="105.60000000000001" y="552" width="158.79999999999998" height="14" rx="3" class="c-mask"/>
-          <text x="185" y="562" class="t-messagebus" font-size="8" text-anchor="middle">BPF SNAT to worker eth0 address</text>
+        <g data-detail="context" data-edge-from="source_cilium" data-edge-to="internet" data-edge-label="SNAT Pod IP → Worker A eth0 IP" data-edge-key="8" data-edge-id="pod_egress">
+          <rect x="588" y="450" width="154" height="14" rx="3" class="c-mask"/>
+          <text x="665" y="460" class="t-messagebus" font-size="8" text-anchor="middle">SNAT Pod IP → Worker A eth0 IP</text>
         </g>
 
         <!-- Boundary labels (foreground masks keep routes out of titles) -->
-        <g data-graph-role="structural-frame-label" data-composition-frame-id="0" data-composition-frame-kind="security-group" data-composition-frame-label="Tailnet identity and encryption boundary">
-          <rect data-graph-role="structural-frame-label-mask" x="268" y="29" width="226.00002399999997" height="17" rx="3" class="c-mask"/>
-          <text data-boundary-label="" x="272" y="42.000001" class="t-security" font-size="9.000001" font-weight="600">Tailnet identity and encryption boundary</text>
+        <g data-graph-role="structural-frame-label" data-composition-frame-id="0" data-composition-frame-kind="region" data-composition-frame-label="Worker A: source node">
+          <rect data-graph-role="structural-frame-label-mask" x="5" y="279" width="123.40001259999998" height="17" rx="3" class="c-mask"/>
+          <text data-boundary-label="" x="9" y="292.000001" class="t-cloud" font-size="9.000001" font-weight="600">Worker A: source node</text>
         </g>
 
-        <g data-graph-role="structural-frame-label" data-composition-frame-id="1" data-composition-frame-kind="region" data-composition-frame-label="Kubernetes workers">
-          <rect data-graph-role="structural-frame-label-mask" x="25" y="279" width="107.20001079999999" height="17" rx="3" class="c-mask"/>
-          <text data-boundary-label="" x="29" y="292.000001" class="t-cloud" font-size="9.000001" font-weight="600">Kubernetes workers</text>
+        <g data-graph-role="structural-frame-label" data-composition-frame-id="1" data-composition-frame-kind="security-group" data-composition-frame-label="Encrypted node-to-node transport">
+          <rect data-graph-role="structural-frame-label-mask" x="570" y="279" width="182.80001919999998" height="17" rx="3" class="c-mask"/>
+          <text data-boundary-label="" x="574" y="292.000001" class="t-security" font-size="9.000001" font-weight="600">Encrypted node-to-node transport</text>
+        </g>
+
+        <g data-graph-role="structural-frame-label" data-composition-frame-id="2" data-composition-frame-kind="region" data-composition-frame-label="Worker B: destination node">
+          <rect data-graph-role="structural-frame-label-mask" x="780" y="279" width="150.4000156" height="17" rx="3" class="c-mask"/>
+          <text data-boundary-label="" x="784" y="292.000001" class="t-cloud" font-size="9.000001" font-weight="600">Worker B: destination node</text>
         </g>
 
         <!-- Legend -->
-
+        <g data-legend="" data-legend-bridge="">
+          <text x="40" y="684" class="t-primary" font-size="12" font-weight="650">Legend</text>
+          <g data-legend-semantic-kind="cloud" data-legend-kind="cloud" data-legend-label="Cloud" data-legend-x="40" data-legend-baseline="704" data-legend-width="68">
+            <rect x="40" y="695" width="16" height="10" rx="2.5" class="c-cloud" stroke-width="1"/>
+            <text x="62" y="704" class="t-muted" font-size="10" font-weight="500">Cloud</text>
+          </g>
+          <g data-legend-semantic-kind="security" data-legend-kind="security" data-legend-label="Security" data-legend-x="130" data-legend-baseline="704" data-legend-width="83">
+            <rect x="130" y="695" width="16" height="10" rx="2.5" class="c-security" stroke-width="1"/>
+            <text x="152" y="704" class="t-muted" font-size="10" font-weight="500">Security</text>
+          </g>
+          <g data-legend-semantic-kind="messagebus" data-legend-kind="messagebus" data-legend-label="Message bus" data-legend-x="235" data-legend-baseline="704" data-legend-width="98">
+            <rect x="235" y="695" width="16" height="10" rx="2.5" class="c-messagebus" stroke-width="1"/>
+            <text x="257" y="704" class="t-muted" font-size="10" font-weight="500">Message bus</text>
+          </g>
+          <g data-legend-semantic-kind="external" data-legend-kind="external" data-legend-label="External" data-legend-x="355" data-legend-baseline="704" data-legend-width="83">
+            <rect x="355" y="695" width="16" height="10" rx="2.5" class="c-external" stroke-width="1"/>
+            <text x="377" y="704" class="t-muted" font-size="10" font-weight="500">External</text>
+          </g>
+        </g>
       </svg>
       <p class="intent-trace-status no-print" id="intent-trace-status" role="status" aria-live="polite" aria-atomic="true"></p>
       <div class="share-chapter-cue no-print" id="share-chapter-cue" hidden role="status" aria-live="polite">
@@ -5454,36 +5445,36 @@
       <div class="card">
         <div class="card-header">
           <div class="card-dot cyan"></div>
-          <h3>Service translation</h3>
+          <h3>What is inside what?</h3>
         </div>
         <ul>
-          <li>&bull; ClusterIP 10.96.0.0/12 is virtual; eBPF selects a Pod backend</li>
-          <li>&bull; socketLB.hostNamespaceOnly sends Pod service lookup to tc on the veth</li>
-          <li>&bull; NodePort direct-routing device is tailscale0; default mode is SNAT</li>
+          <li>&bull; Inner packet remains 10.244.1.10 → 10.244.2.20</li>
+          <li>&bull; Cilium adds node IP 100.x → 100.y, UDP 8472, and VXLAN</li>
+          <li>&bull; Tailscale encrypts and transports that complete outer packet</li>
         </ul>
       </div>
 
       <div class="card">
         <div class="card-header">
           <div class="card-dot violet"></div>
-          <h3>Encapsulation and return</h3>
+          <h3>At Worker B</h3>
         </div>
         <ul>
-          <li>&bull; Cross-node inner Pod packet keeps 10.244 source and destination IPs</li>
-          <li>&bull; VXLAN adds 50 bytes; Tailscale encrypts the outer node packet</li>
-          <li>&bull; Reply traffic follows reverse policy, conntrack, decap, and veth stages</li>
+          <li>&bull; Tailscale decrypts and delivers the VXLAN packet</li>
+          <li>&bull; Cilium decapsulates, applies policy, and routes to the veth</li>
+          <li>&bull; Replies are independently encapsulated and encrypted in reverse</li>
         </ul>
       </div>
 
       <div class="card">
         <div class="card-header">
           <div class="card-dot amber"></div>
-          <h3>Routing invariants</h3>
+          <h3>Routing and MTU invariants</h3>
         </div>
         <ul>
-          <li>&bull; Never advertise 10.244.0.0/16 or 10.96.0.0/12 through Tailscale</li>
-          <li>&bull; tailscale0 MTU stays 1280 and Cilium MTU stays 1230</li>
-          <li>&bull; Controllers run no workloads; Pod endpoints exist on five workers</li>
+          <li>&bull; Tailscale routes node 100.x addresses, not 10.244.0.0/16</li>
+          <li>&bull; Cilium MTU 1230 + VXLAN 50 bytes = tailscale0 MTU 1280</li>
+          <li>&bull; Same-node traffic branches before VXLAN and tailscale0</li>
         </ul>
       </div>
     </div>

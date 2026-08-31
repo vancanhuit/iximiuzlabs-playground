@@ -2,308 +2,267 @@
   "schema_version": 1,
   "diagram_type": "architecture",
   "meta": {
-    "title": "Kubernetes Network Data Paths over Tailscale and Cilium",
+    "title": "Pod Packet Paths across Cilium and Tailscale",
+    "locale": "en",
     "output": "docs/k0s/architecture/network-data-paths.html",
     "quality_profile": "showcase",
     "repository": {
       "url": "https://github.com/vancanhuit/iximiuzlabs-playground",
-      "revision": "a0bec2fd49317a14fd074e3bc19e83cbd308de31"
+      "revision": "7d2d5a10d7b4c09b60846806f31a2ac2b55308ba"
     },
-    "viewBox": [1395, 715],
+    "viewBox": [1395, 720],
     "views": [
       {
-        "id": "pod-to-pod",
-        "label": "Pod to Pod",
-        "focus": ["source_pod", "source_cilium", "local_pod", "tailnet", "destination_cilium", "remote_pod"],
-        "note": "Same-node traffic stays local; cross-node traffic adds VXLAN and traverses the encrypted Tailscale underlay."
+        "id": "cross-node",
+        "label": "Cross-node Pod path",
+        "focus": ["source_pod", "source_cilium", "vxlan_encap", "tailnet", "vxlan_decap", "destination_cilium", "remote_pod"],
+        "note": "Follow the unchanged inner Pod packet inside a VXLAN node packet, then through Tailscale encryption to Worker B."
       },
       {
-        "id": "node-control",
-        "label": "Node and control",
-        "focus": ["worker_nllb", "tailnet", "controllers", "etcd"],
-        "note": "Worker components use local Envoy, while controllers, kubelet, etcd, and SSH communicate over Tailscale addresses."
+        "id": "same-node",
+        "label": "Same-node Pod path",
+        "focus": ["source_pod", "source_cilium", "local_pod"],
+        "note": "A local destination branches after source policy and routing; it never enters VXLAN or tailscale0."
       },
       {
-        "id": "service-node",
-        "label": "Service and node",
-        "focus": ["source_pod", "source_cilium", "worker_nllb", "controllers", "destination_cilium", "remote_pod"],
-        "note": "Cilium eBPF replaces kube-proxy for ClusterIP, NodePort, LoadBalancer, externalIP, and hostPort forwarding."
+        "id": "service-backend",
+        "label": "Service to backend",
+        "focus": ["service_vip", "source_cilium", "local_pod", "vxlan_encap", "tailnet", "vxlan_decap", "destination_cilium", "remote_pod"],
+        "note": "The Service IP is virtual: eBPF selects a backend, then forwarding uses the same-node or cross-node Pod path."
       },
       {
-        "id": "external-access",
-        "label": "External paths",
-        "focus": ["administrator", "api_proxy", "controllers", "source_pod", "source_cilium", "internet"],
-        "note": "Routine kubectl uses Tailscale identity; Pod Internet egress is masqueraded to the worker eth0 address."
+        "id": "internet-egress",
+        "label": "Internet egress",
+        "focus": ["source_pod", "source_cilium", "internet"],
+        "note": "BPF masquerading changes the source Pod IP to Worker A's eth0 address before Internet routing."
       }
     ]
   },
   "components": [
     {
-      "id": "administrator",
-      "type": "external",
-      "label": "Administrator",
-      "sublabel": "kubectl or SSH on the tailnet",
-      "pos": [45, 50],
-      "size": [190, 76],
-      "sources": [{"path": "docs/k0s/README.md", "line": 264, "end_line": 292, "label": "Recovery API path"}]
-    },
-    {
-      "id": "api_proxy",
-      "type": "security",
-      "label": "lab-k0s API Proxy",
-      "sublabel": "Tailscale Service + 2 ProxyGroup Pods",
-      "tag": "HTTPS :443",
-      "pos": [290, 50],
-      "size": [240, 76],
-      "sources": [{"path": "docs/k0s/README.md", "line": 514, "end_line": 535, "label": "ProxyGroup"}]
-    },
-    {
-      "id": "controllers",
-      "type": "backend",
-      "label": "3 k0s Controllers",
-      "sublabel": "API server + control-plane services",
-      "tag": "100.x:6443",
-      "pos": [650, 50],
-      "size": [230, 76],
-      "sources": [{"path": "docs/k0s/k0s.yaml", "line": 6, "end_line": 30, "label": "Controller addresses"}]
-    },
-    {
-      "id": "etcd",
-      "type": "database",
-      "label": "etcd Quorum",
-      "sublabel": "3 controller-local members",
-      "tag": "TCP 2379 / 2380",
-      "pos": [965, 50],
-      "size": [210, 76],
-      "sources": [{"path": "docs/k0s/README.md", "line": 243, "end_line": 253, "label": "Quorum verification"}]
+      "id": "service_vip",
+      "type": "cloud",
+      "label": "Optional ClusterIP",
+      "sublabel": "virtual 10.96.x.y Service IP",
+      "tag": "not routed",
+      "pos": [25, 65],
+      "size": [170, 76],
+      "sources": [{"path": "docs/k0s/README.md", "line": 69, "label": "Service lookup"}]
     },
     {
       "id": "source_pod",
       "type": "cloud",
       "label": "Source Pod",
-      "sublabel": "10.244.x.y, eth0 MTU 1230",
-      "pos": [45, 300],
-      "size": [190, 76],
+      "sublabel": "10.244.1.10, MTU 1230",
+      "tag": "inner source",
+      "pos": [25, 300],
+      "size": [150, 82],
       "sources": [{"path": "docs/k0s/cilium-values.yaml", "line": 24, "end_line": 32, "label": "Pod MTU and CIDR"}]
     },
     {
       "id": "source_cilium",
       "type": "messagebus",
-      "label": "Source Cilium eBPF",
-      "sublabel": "veth policy, service LB, routing",
-      "tag": "no kube-proxy",
-      "pos": [280, 300],
-      "size": [225, 76],
-      "sources": [{"path": "docs/k0s/cilium-values.yaml", "line": 1, "end_line": 23, "label": "Datapath settings"}]
+      "label": "Source veth + eBPF",
+      "sublabel": "policy, Service LB, route",
+      "tag": "Worker A",
+      "pos": [205, 300],
+      "size": [170, 82],
+      "sources": [{"path": "docs/k0s/cilium-values.yaml", "line": 1, "end_line": 23, "label": "eBPF datapath"}]
     },
     {
-      "id": "local_pod",
-      "type": "cloud",
-      "label": "Same-node Pod",
-      "sublabel": "local endpoint veth",
-      "tag": "no tunnel",
-      "pos": [280, 480],
-      "size": [205, 76]
-    },
-    {
-      "id": "worker_nllb",
-      "type": "backend",
-      "label": "Worker-local Envoy",
-      "sublabel": "k0s node-local API load balancer",
-      "tag": "127.0.0.1:7443",
-      "pos": [515, 480],
-      "size": [225, 76],
-      "sources": [
-        {"path": "docs/k0s/k0s.yaml", "line": 92, "end_line": 96, "label": "NLLB enabled"},
-        {"path": "docs/k0s/cilium-values.yaml", "line": 13, "end_line": 15, "label": "Local API endpoint"}
-      ]
+      "id": "vxlan_encap",
+      "type": "messagebus",
+      "label": "VXLAN Encapsulation",
+      "sublabel": "add VXLAN outer headers",
+      "tag": "cilium_vxlan",
+      "pos": [400, 300],
+      "size": [160, 82],
+      "sources": [{"path": "docs/k0s/README.md", "line": 67, "label": "Cross-node path"}]
     },
     {
       "id": "tailnet",
       "type": "security",
-      "label": "Tailscale Underlay",
-      "sublabel": "WireGuard, direct peer or DERP fallback",
+      "label": "Tailscale Node Underlay",
+      "sublabel": "WireGuard peer transport",
       "tag": "tailscale0 MTU 1280",
-      "pos": [600, 300],
-      "size": [250, 76],
-      "sources": [{"path": "docs/k0s/README.md", "line": 24, "end_line": 32, "label": "Network layers"}]
+      "pos": [590, 300],
+      "size": [175, 82],
+      "sources": [{"path": "docs/k0s/README.md", "line": 24, "end_line": 32, "label": "Node underlay"}]
+    },
+    {
+      "id": "vxlan_decap",
+      "type": "messagebus",
+      "label": "VXLAN Decapsulation",
+      "sublabel": "remove outer headers",
+      "tag": "cilium_vxlan",
+      "pos": [800, 300],
+      "size": [160, 82],
+      "sources": [{"path": "docs/k0s/README.md", "line": 67, "label": "Cross-node path"}]
     },
     {
       "id": "destination_cilium",
       "type": "messagebus",
-      "label": "Destination Cilium eBPF",
-      "sublabel": "VXLAN decap, policy, endpoint route",
-      "tag": "cilium_vxlan",
-      "pos": [920, 300],
-      "size": [250, 76],
+      "label": "Destination eBPF + veth",
+      "sublabel": "policy and endpoint route",
+      "tag": "Worker B",
+      "pos": [990, 300],
+      "size": [170, 82],
       "sources": [{"path": "docs/k0s/cilium-values.yaml", "line": 21, "end_line": 25, "label": "VXLAN overlay"}]
     },
     {
       "id": "remote_pod",
       "type": "cloud",
-      "label": "Remote Pod",
-      "sublabel": "destination worker endpoint",
-      "tag": "10.244.a.b",
-      "pos": [1200, 300],
-      "size": [165, 76]
+      "label": "Destination Pod",
+      "sublabel": "10.244.2.20 on Worker B",
+      "tag": "inner destination",
+      "pos": [1190, 300],
+      "size": [155, 82]
+    },
+    {
+      "id": "local_pod",
+      "type": "cloud",
+      "label": "Same-node Pod",
+      "sublabel": "local veth on Worker A",
+      "tag": "no tunnel",
+      "pos": [205, 505],
+      "size": [170, 76]
     },
     {
       "id": "internet",
       "type": "external",
       "label": "Internet",
-      "sublabel": "registries and external services",
-      "tag": "worker eth0",
-      "pos": [45, 610],
-      "size": [205, 76],
-      "sources": [{"path": "docs/k0s/cilium-values.yaml", "line": 7, "end_line": 19, "label": "BPF devices"}]
+      "sublabel": "through Worker A eth0",
+      "tag": "BPF SNAT",
+      "pos": [660, 505],
+      "size": [180, 76],
+      "sources": [{"path": "docs/k0s/cilium-values.yaml", "line": 7, "end_line": 19, "label": "BPF masquerade"}]
     }
   ],
   "boundaries": [
     {
+      "kind": "region",
+      "label": "Worker A: source node",
+      "wraps": ["source_pod", "source_cilium", "vxlan_encap", "local_pod"],
+      "pad": 24
+    },
+    {
       "kind": "security-group",
-      "label": "Tailnet identity and encryption boundary",
-      "wraps": ["api_proxy", "controllers", "etcd", "tailnet"],
-      "pad": 26
+      "label": "Encrypted node-to-node transport",
+      "wraps": ["tailnet"],
+      "pad": 24
     },
     {
       "kind": "region",
-      "label": "Kubernetes workers",
-      "wraps": ["source_pod", "source_cilium", "local_pod", "worker_nllb", "destination_cilium", "remote_pod"],
+      "label": "Worker B: destination node",
+      "wraps": ["vxlan_decap", "destination_cilium", "remote_pod"],
       "pad": 24
     }
   ],
   "connections": [
     {
-      "id": "routine_kubectl",
-      "from": "administrator",
-      "to": "api_proxy",
-      "label": "Tailscale identity + HTTPS :443",
-      "variant": "security",
-      "labelDy": 62
-    },
-    {
-      "id": "proxy_api",
-      "from": "api_proxy",
-      "to": "controllers",
-      "label": "impersonation headers, HTTPS :6443",
-      "variant": "security",
-      "labelDy": 62
-    },
-    {
-      "id": "controller_etcd",
-      "from": "controllers",
-      "to": "etcd",
-      "label": "client :2379 + peer quorum :2380 over Tailscale",
-      "variant": "security",
-      "labelDy": 62
+      "id": "service_lookup",
+      "from": "service_vip",
+      "to": "source_cilium",
+      "label": "eBPF selects Pod backend",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
     },
     {
       "id": "pod_veth",
       "from": "source_pod",
       "to": "source_cilium",
-      "label": "Pod eth0 → veth → eBPF policy",
+      "label": "inner IP: 10.244.1.10 → 10.244.2.20",
       "variant": "emphasis",
-      "labelDy": -32
+      "labelAt": [190, 398]
     },
     {
-      "id": "same_node",
+      "id": "route_remote",
       "from": "source_cilium",
-      "to": "local_pod",
-      "label": "local endpoint route + destination policy",
+      "to": "vxlan_encap",
+      "label": "remote Pod CIDR → tunnel",
       "variant": "emphasis",
-      "fromSide": "bottom",
-      "toSide": "top",
-      "labelAt": [430, 600]
+      "labelAt": [388, 422]
     },
     {
-      "id": "vxlan_encap",
-      "from": "source_cilium",
+      "id": "vxlan_packet",
+      "from": "vxlan_encap",
       "to": "tailnet",
-      "label": "VXLAN UDP :8472, outer dst = remote 100.x",
+      "label": "outer IP: Worker A 100.x → Worker B 100.y, UDP :8472",
       "variant": "emphasis",
-      "labelDy": -32
+      "labelAt": [575, 398]
     },
     {
       "id": "wireguard_transport",
       "from": "tailnet",
-      "to": "destination_cilium",
-      "label": "WireGuard-encrypted peer path → VXLAN decap",
+      "to": "vxlan_decap",
+      "label": "Tailscale encrypts the complete VXLAN packet",
       "variant": "security",
-      "labelDy": -32
+      "labelAt": [783, 422]
+    },
+    {
+      "id": "restore_inner",
+      "from": "vxlan_decap",
+      "to": "destination_cilium",
+      "label": "restore unchanged inner Pod packet",
+      "variant": "emphasis",
+      "labelAt": [975, 398]
     },
     {
       "id": "remote_delivery",
       "from": "destination_cilium",
       "to": "remote_pod",
-      "label": "ingress policy → endpoint veth",
+      "label": "policy pass → destination veth",
       "variant": "emphasis",
-      "labelDy": -32
+      "labelAt": [1175, 422]
     },
     {
-      "id": "worker_api_local",
+      "id": "same_node",
       "from": "source_cilium",
-      "to": "worker_nllb",
-      "label": "host-network clients use local API proxy",
+      "to": "local_pod",
+      "label": "local endpoint route; bypass VXLAN and Tailscale",
+      "variant": "emphasis",
       "fromSide": "bottom",
       "toSide": "top",
-      "labelAt": [820, 600]
-    },
-    {
-      "id": "worker_api_underlay",
-      "from": "worker_nllb",
-      "to": "tailnet",
-      "label": "select healthy controller :6443",
-      "variant": "security",
-      "fromSide": "top",
-      "toSide": "bottom"
-    },
-    {
-      "id": "underlay_control",
-      "from": "tailnet",
-      "to": "controllers",
-      "label": "API, kubelet, konnectivity, SSH, node traffic",
-      "variant": "security",
-      "fromSide": "top",
-      "toSide": "bottom"
+      "labelAt": [280, 460]
     },
     {
       "id": "pod_egress",
       "from": "source_cilium",
       "to": "internet",
-      "label": "BPF SNAT to worker eth0 address",
+      "label": "SNAT Pod IP → Worker A eth0 IP",
       "variant": "dashed",
-      "fromSide": "left",
+      "fromSide": "bottom",
       "toSide": "top",
-      "via": [[260, 338], [260, 570], [147.5, 570]],
-      "labelAt": [185, 562]
+      "labelAt": [665, 460]
     }
   ],
   "cards": [
     {
       "dot": "cyan",
-      "title": "Service translation",
+      "title": "What is inside what?",
       "items": [
-        "ClusterIP 10.96.0.0/12 is virtual; eBPF selects a Pod backend",
-        "socketLB.hostNamespaceOnly sends Pod service lookup to tc on the veth",
-        "NodePort direct-routing device is tailscale0; default mode is SNAT"
+        "Inner packet remains 10.244.1.10 → 10.244.2.20",
+        "Cilium adds node IP 100.x → 100.y, UDP 8472, and VXLAN",
+        "Tailscale encrypts and transports that complete outer packet"
       ]
     },
     {
       "dot": "violet",
-      "title": "Encapsulation and return",
+      "title": "At Worker B",
       "items": [
-        "Cross-node inner Pod packet keeps 10.244 source and destination IPs",
-        "VXLAN adds 50 bytes; Tailscale encrypts the outer node packet",
-        "Reply traffic follows reverse policy, conntrack, decap, and veth stages"
+        "Tailscale decrypts and delivers the VXLAN packet",
+        "Cilium decapsulates, applies policy, and routes to the veth",
+        "Replies are independently encapsulated and encrypted in reverse"
       ]
     },
     {
       "dot": "amber",
-      "title": "Routing invariants",
+      "title": "Routing and MTU invariants",
       "items": [
-        "Never advertise 10.244.0.0/16 or 10.96.0.0/12 through Tailscale",
-        "tailscale0 MTU stays 1280 and Cilium MTU stays 1230",
-        "Controllers run no workloads; Pod endpoints exist on five workers"
+        "Tailscale routes node 100.x addresses, not 10.244.0.0/16",
+        "Cilium MTU 1230 + VXLAN 50 bytes = tailscale0 MTU 1280",
+        "Same-node traffic branches before VXLAN and tailscale0"
       ]
     }
   ]
