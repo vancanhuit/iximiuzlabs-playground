@@ -178,17 +178,6 @@ labctl ssh playground_id --machine node_name --user root -- \
   rm -f /run/tailscale-auth-key
 ```
 
-From an interactive node shell, enter the key through standard input. Press `Ctrl-D`, then enroll the node:
-
-```bash
-sudo install -m 600 /dev/stdin /run/tailscale-auth-key
-sudo tailscale up \
-  --auth-key=file:/run/tailscale-auth-key \
-  --advertise-tags=tag:lab \
-  --ssh
-sudo rm -f /run/tailscale-auth-key
-```
-
 Repeat enrollment for all eight nodes. A one-use key can enroll only one machine and is not suitable for this procedure.
 
 Never place auth keys in shell history, manifests, plaintext Git files, or command arguments. Do not enable `--accept-routes` without an explicit routed-subnet requirement and a CIDR review.
