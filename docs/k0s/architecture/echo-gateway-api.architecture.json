@@ -9,7 +9,7 @@
       "url": "https://github.com/vancanhuit/iximiuzlabs-playground",
       "revision": "fbe2671ceebad17b658a3ea2647054f53363bd31"
     },
-    "viewBox": [1370, 950],
+    "viewBox": [1370, 700],
     "views": [
       {
         "id": "request-path",
@@ -327,34 +327,27 @@
   "cards": [
     {
       "dot": "violet",
-      "title": "Private request invariant",
+      "title": "Private request path",
       "items": [
-        "Cloudflare publishes DNS but never proxies application traffic",
-        "The Tailscale proxy forwards TCP to Envoy's generated Service"
+        "Cloudflare publishes DNS but does not proxy application traffic",
+        "Tailscale forwards TCP to Envoy; Envoy sees the proxy Pod as its peer",
+        "Do not trust client XFF or enable PROXY protocol without a sender"
       ]
     },
     {
       "dot": "emerald",
       "title": "Automated lifecycle",
       "items": [
-        "ExternalDNS synchronizes owned records from accepted Gateway API routes",
-        "cert-manager renews the certificate through Cloudflare DNS-01"
+        "ExternalDNS publishes owned records from accepted Gateway API routes",
+        "cert-manager renews the ECDSA certificate through DNS-01"
       ]
     },
     {
       "dot": "amber",
       "title": "Controller ownership",
       "items": [
-        "Envoy Gateway creates the Envoy Deployment, Service, and xDS config",
-        "Tailscale observes that Service and creates the external proxy identity"
-      ]
-    },
-    {
-      "dot": "rose",
-      "title": "Client address limit",
-      "items": [
-        "Envoy sees the Tailscale proxy Pod as its TCP peer",
-        "Do not trust client XFF or enable PROXY protocol without a sender"
+        "Envoy Gateway owns the Deployment, Service, and xDS config",
+        "Tailscale observes the Service and creates the proxy identity"
       ]
     }
   ]

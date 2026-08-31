@@ -9,7 +9,7 @@
       "url": "https://github.com/vancanhuit/iximiuzlabs-playground",
       "revision": "fbe2671ceebad17b658a3ea2647054f53363bd31"
     },
-    "viewBox": [1380, 900],
+    "viewBox": [1380, 720],
     "views": [
       {
         "id": "request-path",
@@ -102,7 +102,7 @@
       "label": "cert-manager",
       "sublabel": "Issuer + Certificate controller",
       "tag": "DNS-01 renewal",
-      "pos": [850, 680],
+      "pos": [850, 590],
       "size": [200, 76]
     },
     {
@@ -111,7 +111,7 @@
       "label": "hubble-ui-tls Secret",
       "sublabel": "ECDSA certificate + private key",
       "tag": "kube-system",
-      "pos": [1080, 680],
+      "pos": [1080, 590],
       "size": [220, 76]
     },
     {
@@ -204,7 +204,7 @@
       "to": "tls_secret",
       "label": "write renewed keypair",
       "variant": "security",
-      "labelAt": [1075, 770]
+      "labelAt": [1075, 680]
     },
     {
       "id": "reload_certificate",
@@ -247,16 +247,17 @@
       "dot": "violet",
       "title": "Request path",
       "items": [
-        "Cloudflare answers DNS but never proxies application traffic",
-        "The Tailscale proxy forwards TCP to the Service selecting ingress-nginx"
+        "Cloudflare answers DNS but does not proxy application traffic",
+        "Tailscale forwards TCP to the Service selecting ingress-nginx",
+        "The proxy Pod is the TCP peer; tailnet grants remain the boundary"
       ]
     },
     {
       "dot": "emerald",
       "title": "Certificate lifecycle",
       "items": [
-        "DNS-01 validates the hostname without exposing Hubble UI publicly",
-        "cert-manager renews the Secret and ingress-nginx reloads it automatically"
+        "DNS-01 validates the hostname without public Hubble exposure",
+        "cert-manager renews the Secret and ingress-nginx reloads it"
       ]
     },
     {
@@ -264,15 +265,7 @@
       "title": "Provisioning ownership",
       "items": [
         "Helm installs ingress-nginx; Ingress objects configure its routes",
-        "The LoadBalancer Service causes Tailscale to create the external proxy"
-      ]
-    },
-    {
-      "dot": "rose",
-      "title": "Client address limit",
-      "items": [
-        "ingress-nginx sees the Tailscale proxy Pod as its TCP peer",
-        "Tailnet grants, not source-IP headers, remain the access boundary"
+        "The LoadBalancer Service causes Tailscale to create the proxy"
       ]
     }
   ]
