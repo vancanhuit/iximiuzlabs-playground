@@ -778,7 +778,11 @@ openssl s_client \
 
 **Client IP limitation:** This deployment exposes ingress-nginx through a Tailscale Layer 3 `LoadBalancer` Service. The dedicated Tailscale proxy Pod forwards the connection to ingress-nginx, so ingress-nginx sees the proxy Pod IP rather than the tailnet client's `100.x` address. Setting `externalTrafficPolicy: Local`, `use-forwarded-headers`, or `proxy-real-ip-cidr` cannot recover an address that the Tailscale proxy did not pass in a trusted header or PROXY protocol record. Do not trust arbitrary incoming forwarding headers or enable PROXY protocol unless every connection comes from a trusted sender that emits it.
 
+Track upstream support in [tailscale/tailscale#11024](https://github.com/tailscale/tailscale/issues/11024), with the related Tailscale Serve proxy work in [tailscale/tailscale#14531](https://github.com/tailscale/tailscale/issues/14531). The forwarded-header trust boundary is also documented by [kubernetes/ingress-nginx#9163](https://github.com/kubernetes/ingress-nginx/issues/9163).
+
 Native Tailscale Layer 7 Ingress (`ingressClassName: tailscale`) uses Tailscale Serve and can provide sanitized Tailscale identity headers, but it terminates TLS at Tailscale and uses a tailnet `*.ts.net` hostname and certificate. It is not a drop-in replacement for this custom-domain, cert-manager, ingress-nginx design. Preserving a trustworthy client IP while retaining this design requires a deliberate topology change, such as co-locating Tailscale with ingress-nginx and using required PROXY protocol v2.
+
+Track custom-domain support for the native Layer 7 alternative in [tailscale/tailscale#12709](https://github.com/tailscale/tailscale/issues/12709) and identity metadata for Layer 3 Services in [tailscale/tailscale#15657](https://github.com/tailscale/tailscale/issues/15657).
 
 **If it fails:** Inspect `Certificate`, `Order`, and `Challenge` events; verify the Cloudflare token permissions and public TXT propagation; check ingress-nginx, the `hubble-ui` endpoints, the Tailscale Service and operator logs, the tailnet grant for `tag:k8s` on TCP ports `80` and `443`, and that the application `A` record remains DNS-only.
 
@@ -937,7 +941,11 @@ openssl s_client \
 
 **Client IP limitation:** Echo Server does not see the tailnet client's `100.x` address with this topology. The Tailscale operator forwards the connection from its dedicated proxy Pod to Envoy, so Envoy receives the proxy Pod IP and writes that address to `X-Forwarded-For` and `X-Envoy-External-Address`. The generated Envoy Service already uses `externalTrafficPolicy: Local`, but that cannot preserve an address across the separate Tailscale proxy hop.
 
+Track the missing source-address handoff in [tailscale/tailscale#11024](https://github.com/tailscale/tailscale/issues/11024), with the related proxy implementation work in [tailscale/tailscale#14531](https://github.com/tailscale/tailscale/issues/14531).
+
 Keep the current configuration unless the topology is deliberately changed. Do not trust an incoming `X-Forwarded-For` header with `ClientTrafficPolicy.clientIPDetection`; clients can supply that header themselves. Do not enable required PROXY protocol on Envoy because the Tailscale LoadBalancer proxy does not emit a PROXY header and connections will be reset. Optional PROXY protocol neither restores the client address nor provides a safe trust boundary. A trustworthy client IP requires a different ingress design, such as placing Tailscale in Envoy's network namespace or introducing a trusted frontend that emits PROXY protocol.
+
+For the downstream trust model, follow [envoyproxy/gateway#8542](https://github.com/envoyproxy/gateway/issues/8542) and [envoyproxy/gateway#7825](https://github.com/envoyproxy/gateway/issues/7825). Envoy Gateway's separate transparent-source forwarding proposal is tracked in [envoyproxy/gateway#3359](https://github.com/envoyproxy/gateway/issues/3359), but it cannot reconstruct an address already replaced by the Tailscale proxy.
 
 **If it fails:** Check Gateway and `HTTPRoute` conditions first, then inspect the Envoy Gateway, Tailscale operator, ExternalDNS, and cert-manager logs. Confirm both Cloudflare tokens are limited to the expected zone, the Gateway address is present, the DNS record is not proxied, and tailnet grants permit clients to reach `gateway-envoy` on TCP `443`.
 
