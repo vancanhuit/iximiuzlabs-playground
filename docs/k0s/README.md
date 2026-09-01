@@ -504,8 +504,7 @@ Edit secrets only with `sops secrets/lab.sops.yaml`. Disable shell tracing befor
 Create the namespace:
 
 ```bash
-kubectl create namespace tailscale \
-  --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace tailscale
 ```
 
 Create the OAuth Secret without exposing credentials in command arguments:
@@ -540,10 +539,9 @@ Kubernetes Secrets need API-server encryption for encryption at rest. Use an ext
 Install the operator:
 
 ```bash
-helm repo add tailscale https://pkgs.tailscale.com/helmcharts
-helm repo update
 helm upgrade --install tailscale-operator \
-  tailscale/tailscale-operator \
+  tailscale-operator \
+  --repo https://pkgs.tailscale.com/helmcharts \
   --version 1.102.3 \
   --namespace tailscale \
   --set-string apiServerProxyConfig.allowImpersonation=true \
@@ -857,10 +855,8 @@ helm upgrade cert-manager \
   --kube-context tailscale-k0s \
   --wait
 
-kubectl --context tailscale-k0s create namespace echo \
-  --dry-run=client -o yaml | kubectl --context tailscale-k0s apply -f -
-kubectl --context tailscale-k0s create namespace external-dns \
-  --dry-run=client -o yaml | kubectl --context tailscale-k0s apply -f -
+kubectl --context tailscale-k0s create namespace echo
+kubectl --context tailscale-k0s create namespace external-dns
 ```
 
 Create separate least-privilege Cloudflare Secrets for cert-manager and ExternalDNS. Both tokens need `Zone - DNS - Edit` and `Zone - Zone - Read` for `canhdinh.com`. Keep the ClusterIssuer token in cert-manager's cluster resource namespace so application workloads cannot mount it:
