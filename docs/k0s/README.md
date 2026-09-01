@@ -1,7 +1,7 @@
 # Build and operate a k0s cluster over Tailscale
 
 **Owner:** Lab operator | **Frequency:** As needed
-**Last updated:** 2026-08-30 | **Last run:** 2026-08-30
+**Last updated:** 2026-09-01 | **Last run:** 2026-09-01
 
 This runbook builds and operates an eight-node Kubernetes cluster across two iximiuz Labs playgrounds. Use it for initial deployment, validation, upgrades, recovery, and teardown.
 
@@ -91,6 +91,7 @@ Treat these versions as one tested set. Validate upgrades in a fresh playground 
 | Envoy Gateway | `v1.9.1` |
 | ExternalDNS | chart `1.21.1`, controller `v0.21.0` |
 | Echo Server | `0.9.2` |
+| kube-prometheus-stack | chart `88.6.2`, Prometheus Operator `v0.93.1` |
 | Sonobuoy | `v0.57.5` |
 
 The repository pins client tools in [`../../mise.toml`](../../mise.toml).
@@ -960,6 +961,156 @@ For the downstream trust model, follow [envoyproxy/gateway#8542](https://github.
 
 **If it fails:** Check Gateway and `HTTPRoute` conditions first, then inspect the Envoy Gateway, Tailscale operator, ExternalDNS, and cert-manager logs. Confirm both Cloudflare tokens are limited to the expected zone, the Gateway address is present, the DNS record is not proxied, and tailnet grants permit clients to reach `gateway-envoy` on TCP `443`.
 
+### Deploy monitoring through Gateway API
+
+Install kube-prometheus-stack to collect cluster and node metrics and run Prometheus, Alertmanager, Grafana, Prometheus Operator, kube-state-metrics, and node-exporter. One Gateway owns three HTTPS listeners and one private Tailscale Service address. Its dedicated `GatewayClass` and `EnvoyProxy` give the generated LoadBalancer Service the unique Tailscale hostname `monitoring-gateway`; one ProxyGroup cannot attach two Services with the same Tailscale hostname. The tailnet policy must auto-approve the exact `svc:monitoring-gateway` identity for `tag:k8s`. Separate routes send each application hostname to its chart-managed ClusterIP Service. cert-manager issues one certificate per listener, and ExternalDNS creates the three DNS-only Cloudflare records from the accepted routes.
+
+Open the [interactive monitoring Gateway API architecture](architecture/monitoring-gateway-api.html) to trace private HTTPS requests, DNS and certificate automation, or controller ownership.
+
+[![Private Kubernetes monitoring through Gateway API](architecture/monitoring-gateway-api.svg)](architecture/monitoring-gateway-api.html)
+
+This cluster has no StorageClass. The checked-in values therefore use ephemeral storage and bound Prometheus retention to three days or 8 GB. Prometheus and Alertmanager history, silences, and Grafana database changes are lost when their Pods are recreated or moved. Add a tested StorageClass and explicit persistence values before treating this as durable production monitoring.
+
+Alertmanager uses the chart's default null receiver. Alerts appear in Prometheus, Alertmanager, and Grafana, but no email, chat, paging, or webhook notification leaves the cluster until an operator adds and tests a receiver with its credentials stored in a Kubernetes Secret.
+
+The k0s controllers do not run as Kubernetes Pods, and kube-proxy is disabled. The values disable the kube-controller-manager, scheduler, etcd, and kube-proxy scrape targets so the deployment does not create permanently failing targets or alerts for components this topology cannot discover.
+
+Install the pinned chart and wait for its controllers and workloads:
+
+```bash
+helm upgrade --install monitoring \
+  kube-prometheus-stack \
+  --repo https://prometheus-community.github.io/helm-charts \
+  --version 88.6.2 \
+  --namespace monitoring \
+  --create-namespace \
+  --values docs/k0s/kube-prometheus-stack-values.yaml \
+  --kube-context tailscale-k0s \
+  --wait \
+  --timeout 10m
+
+kubectl --context tailscale-k0s -n monitoring \
+  rollout status deployment/monitoring-kube-prometheus-operator --timeout=5m
+kubectl --context tailscale-k0s -n monitoring \
+  rollout status deployment/monitoring-grafana --timeout=5m
+kubectl --context tailscale-k0s -n monitoring \
+  rollout status statefulset/prometheus-monitoring-kube-prometheus-prometheus --timeout=5m
+kubectl --context tailscale-k0s -n monitoring \
+  rollout status statefulset/alertmanager-monitoring-kube-prometheus-alertmanager --timeout=5m
+```
+
+Apply the Gateway and routes, then wait for the data plane, certificates, routes, and Tailscale-backed address:
+
+```bash
+kubectl --context tailscale-k0s apply \
+  -f docs/k0s/monitoring-gateway.yaml
+
+kubectl --context tailscale-k0s wait gatewayclass/monitoring-tailscale \
+  --for=condition=Accepted=True --timeout=2m
+kubectl --context tailscale-k0s -n monitoring \
+  wait gateway/monitoring --for=condition=Programmed=True --timeout=5m
+kubectl --context tailscale-k0s -n monitoring \
+  wait certificate --all --for=condition=Ready=True --timeout=5m
+kubectl --context tailscale-k0s -n monitoring \
+  wait httproute --all \
+  --for=jsonpath='{.status.parents[0].conditions[?(@.type=="Accepted")].status}'=True \
+  --timeout=5m
+kubectl --context tailscale-k0s -n envoy-gateway-system \
+  wait service \
+  -l gateway.envoyproxy.io/owning-gateway-name=monitoring \
+  --for=jsonpath='{.status.conditions[?(@.type=="TailscaleIngressSvcConfigured")].status}'=True \
+  --timeout=5m
+```
+
+The exact `svc:monitoring-gateway` auto-approver in [`tailnet-policy.hujson`](tailnet-policy.hujson) should approve both ProxyGroup backends. If that policy change has not reached the tailnet yet, approve only this Service with the encrypted API token:
+
+```bash
+(
+  set -euo pipefail
+  token=$(sops decrypt --extract \
+    '["tailscale"]["access_token"]' secrets/lab.sops.yaml)
+  trap 'unset token' EXIT
+  api='https://api.tailscale.com/api/v2/tailnet/-/services'
+  hosts=$(curl --fail-with-body --silent --show-error \
+    -H "Authorization: Bearer $token" \
+    "$api/svc%3Amonitoring-gateway/devices")
+  while IFS= read -r node_id; do
+    curl --fail-with-body --silent --show-error \
+      --request POST \
+      -H "Authorization: Bearer $token" \
+      -H 'Content-Type: application/json' \
+      --data '{"approved":true}' \
+      "$api/svc%3Amonitoring-gateway/device/${node_id}/approved"
+  done < <(jq -r '.hosts[].nodeId' <<<"$hosts")
+)
+```
+
+Rotate or revoke the owner-scoped API token after use.
+
+Retrieve the generated Grafana administrator password without printing it to shell history:
+
+```bash
+kubectl --context tailscale-k0s -n monitoring \
+  get secret monitoring-grafana \
+  -o jsonpath='{.data.admin-password}' | base64 --decode
+printf '\n'
+```
+
+Create or reconcile the API-managed Kubernetes command-center dashboard from the checked-in definition. A temporary curl configuration keeps the generated password out of command arguments, shell history, and tracked files:
+
+```bash
+(
+  set -euo pipefail
+  password=$(kubectl --context tailscale-k0s -n monitoring \
+    get secret monitoring-grafana \
+    -o jsonpath='{.data.admin-password}' | base64 --decode)
+  payload=$(mktemp)
+  curl_config=$(mktemp)
+  trap 'unset password; rm -f "$payload" "$curl_config"' EXIT
+  chmod 600 "$payload" "$curl_config"
+
+  jq -Rrn --arg credentials "admin:$password" '
+    "user = " + ($credentials | @json)
+  ' >"$curl_config"
+  unset password
+
+  jq '{
+    dashboard: .,
+    overwrite: true,
+    message: "Reconcile Kubernetes cluster command center"
+  }' docs/k0s/grafana-kubernetes-dashboard.json >"$payload"
+
+  curl --fail-with-body --silent --show-error \
+    --config "$curl_config" \
+    --header 'Content-Type: application/json' \
+    --data-binary @"$payload" \
+    https://grafana.playground.canhdinh.com/api/dashboards/db
+)
+```
+
+Open `https://grafana.playground.canhdinh.com/d/kubernetes-command-center/kubernetes-cluster-command-center`. The dashboard combines node readiness, Pod health, CPU and memory capacity, restarts, actionable alerts, namespace resource usage, network throughput, API request rate, and unavailable workloads. Use its namespace and node variables for focused investigation, then follow the dashboard links to the chart-provisioned drill-down dashboards.
+
+The API-created dashboard is stored in Grafana's local database and is therefore ephemeral in this cluster. Re-run the reconciliation command after a Grafana Pod replacement until persistent storage or file provisioning is configured.
+
+Verify all three private endpoints from a policy-authorized tailnet client:
+
+```bash
+dig +short prometheus.playground.canhdinh.com A
+dig +short alertmanager.playground.canhdinh.com A
+dig +short grafana.playground.canhdinh.com A
+tailscale ping monitoring-gateway
+curl --fail --show-error \
+  https://prometheus.playground.canhdinh.com/-/ready
+curl --fail --show-error \
+  https://alertmanager.playground.canhdinh.com/-/ready
+curl --fail --show-error --head \
+  https://grafana.playground.canhdinh.com/login
+```
+
+**Expected result:** The Gateway is programmed with a private `100.x` address, every route is accepted, all three certificates are Ready, Prometheus and Alertmanager return readiness responses, and Grafana returns its login page. All three DNS names resolve to the same DNS-only Tailscale Service address. Cloudflare never proxies application traffic.
+
+**If it fails:** Inspect Gateway listener and route parent conditions first. Then check Prometheus Operator, Envoy Gateway, Tailscale operator, cert-manager, and ExternalDNS logs. Confirm the chart Services and endpoints exist, certificates reference the listener Secrets, records are DNS-only, and tailnet grants permit clients to reach `monitoring-gateway` on TCP `443`.
+
 ## Verification
 
 Complete every check before recording a successful run:
@@ -974,7 +1125,8 @@ Complete every check before recording a successful run:
 - [ ] Both API paths return `ok` when the ProxyGroup is installed
 - [ ] `hubble-ui.playground.canhdinh.com` presents a valid certificate and reaches Hubble UI only from the tailnet
 - [ ] The Echo Gateway and route are accepted, its Certificate is ready, and private HTTPS returns the expected body
-- [ ] `ProxyGroup/lab-ingress` has two Ready replicas, and both application Services report `2/2 proxy backends ready and advertising`
+- [ ] The monitoring Gateway and three routes are accepted, all Certificates are ready, and Prometheus, Alertmanager, and Grafana respond through private HTTPS
+- [ ] `ProxyGroup/lab-ingress` has two Ready replicas, and the Hubble UI, Echo, and monitoring Services report `2/2 proxy backends ready and advertising`
 
 Verify both API paths and ProxyGroup replicas:
 
@@ -996,6 +1148,10 @@ kubectl --context tailscale-k0s get service \
 kubectl --context tailscale-k0s get service \
   -n envoy-gateway-system \
   -l gateway.envoyproxy.io/owning-gateway-name=echo \
+  -o jsonpath='{.items[0].status.conditions[?(@.type=="TailscaleIngressSvcConfigured")].message}{"\n"}'
+kubectl --context tailscale-k0s get service \
+  -n envoy-gateway-system \
+  -l gateway.envoyproxy.io/owning-gateway-name=monitoring \
   -o jsonpath='{.items[0].status.conditions[?(@.type=="TailscaleIngressSvcConfigured")].message}{"\n"}'
 ```
 
@@ -1324,6 +1480,28 @@ kubectl --context tailscale-k0s delete namespace echo
 
 The Tailscale operator removes the Envoy Tailscale Service advertisement after the Gateway disappears; `ProxyGroup/lab-ingress` remains for Hubble UI and other consumers. If the DNS record remains after two ExternalDNS reconciliation intervals, inspect the controller logs and remove only `echo.playground.canhdinh.com` plus its ExternalDNS ownership TXT record after confirming their owner ID is `lab-k0s-gateway`. Do not uninstall shared controllers merely to remove Echo Server.
 
+To remove monitoring while preserving the shared Gateway API, DNS, and certificate controllers, remove its routes and Gateway first. Wait for ExternalDNS to remove the three owned Cloudflare records, then remove monitoring's dedicated GatewayClass and EnvoyProxy before uninstalling the chart:
+
+```bash
+kubectl --context tailscale-k0s -n monitoring delete \
+  httproute prometheus alertmanager grafana gateway monitoring
+
+until [[ -z $(dig +short prometheus.playground.canhdinh.com A) ]] && \
+      [[ -z $(dig +short alertmanager.playground.canhdinh.com A) ]] && \
+      [[ -z $(dig +short grafana.playground.canhdinh.com A) ]]; do
+  sleep 5
+done
+
+kubectl --context tailscale-k0s delete \
+  gatewayclass monitoring-tailscale
+kubectl --context tailscale-k0s -n envoy-gateway-system delete \
+  envoyproxy.gateway.envoyproxy.io monitoring-proxy
+helm --kube-context tailscale-k0s -n monitoring uninstall monitoring
+kubectl --context tailscale-k0s delete namespace monitoring
+```
+
+The monitoring chart installs Prometheus Operator CRDs that Helm retains during uninstall. Remove those cluster-scoped CRDs only after confirming no other Prometheus Operator release or custom resource uses them.
+
 Remove the shared components only when no other Gateways, routes, certificates, or managed DNS records depend on them:
 
 ```bash
@@ -1376,6 +1554,7 @@ Update this table after every deployment, upgrade, recovery, or teardown:
 | 2026-08-30 | Repository owner and OpenCode | Rebuilt two playgrounds from scratch; verified k0s, Cilium connectivity, Sonobuoy quick mode, and both Kubernetes API paths |
 | 2026-08-30 | Repository owner and OpenCode | Exposed Hubble UI through a private Tailscale LoadBalancer; installed cert-manager and ingress-nginx; issued and verified a Let's Encrypt ECDSA certificate with Cloudflare DNS-01 |
 | 2026-08-30 | Repository owner and OpenCode | Deployed Echo Server through Envoy Gateway and a private Tailscale LoadBalancer; automated Cloudflare DNS with ExternalDNS and issued a Let's Encrypt ECDSA certificate with DNS-01 |
+| 2026-09-01 | Repository owner and OpenCode | Deployed kube-prometheus-stack and its Kubernetes command-center dashboard; exposed Prometheus, Alertmanager, and Grafana through one private Envoy Gateway with ExternalDNS and Let's Encrypt DNS-01 certificates |
 
 ## Supporting references
 
@@ -1405,3 +1584,4 @@ Use these sources to validate version-specific behavior:
 - [cert-manager Cloudflare DNS-01](https://cert-manager.io/docs/configuration/acme/dns01/cloudflare/)
 - [cert-manager Gateway certificates](https://cert-manager.io/docs/usage/gateway/)
 - [ingress-nginx installation](https://kubernetes.github.io/ingress-nginx/deploy/)
+- [kube-prometheus-stack chart](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack)

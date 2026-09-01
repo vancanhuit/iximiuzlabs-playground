@@ -1,0 +1,143 @@
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: monitoring-proxy
+  namespace: envoy-gateway-system
+spec:
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyService:
+        type: LoadBalancer
+        loadBalancerClass: tailscale
+        externalTrafficPolicy: Cluster
+        annotations:
+          tailscale.com/hostname: monitoring-gateway
+          tailscale.com/proxy-group: lab-ingress
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: monitoring-tailscale
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+  parametersRef:
+    group: gateway.envoyproxy.io
+    kind: EnvoyProxy
+    name: monitoring-proxy
+    namespace: envoy-gateway-system
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: monitoring
+  namespace: monitoring
+  labels:
+    external-dns: enabled
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-cloudflare
+    cert-manager.io/private-key-algorithm: ECDSA
+    cert-manager.io/private-key-size: "256"
+    external-dns.kubernetes.io/cloudflare-proxied: "false"
+spec:
+  gatewayClassName: monitoring-tailscale
+  listeners:
+    - name: prometheus
+      hostname: prometheus.playground.canhdinh.com
+      port: 443
+      protocol: HTTPS
+      allowedRoutes:
+        namespaces:
+          from: Same
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - group: ""
+            kind: Secret
+            name: prometheus-playground-canhdinh-com-tls
+    - name: alertmanager
+      hostname: alertmanager.playground.canhdinh.com
+      port: 443
+      protocol: HTTPS
+      allowedRoutes:
+        namespaces:
+          from: Same
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - group: ""
+            kind: Secret
+            name: alertmanager-playground-canhdinh-com-tls
+    - name: grafana
+      hostname: grafana.playground.canhdinh.com
+      port: 443
+      protocol: HTTPS
+      allowedRoutes:
+        namespaces:
+          from: Same
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - group: ""
+            kind: Secret
+            name: grafana-playground-canhdinh-com-tls
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: prometheus
+  namespace: monitoring
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: monitoring
+      sectionName: prometheus
+  hostnames:
+    - prometheus.playground.canhdinh.com
+  rules:
+    - backendRefs:
+        - group: ""
+          kind: Service
+          name: monitoring-kube-prometheus-prometheus
+          port: 9090
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: alertmanager
+  namespace: monitoring
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: monitoring
+      sectionName: alertmanager
+  hostnames:
+    - alertmanager.playground.canhdinh.com
+  rules:
+    - backendRefs:
+        - group: ""
+          kind: Service
+          name: monitoring-kube-prometheus-alertmanager
+          port: 9093
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: grafana
+  namespace: monitoring
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: monitoring
+      sectionName: grafana
+  hostnames:
+    - grafana.playground.canhdinh.com
+  rules:
+    - backendRefs:
+        - group: ""
+          kind: Service
+          name: monitoring-grafana
+          port: 80

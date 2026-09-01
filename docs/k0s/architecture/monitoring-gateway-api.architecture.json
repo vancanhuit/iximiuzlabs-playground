@@ -1,0 +1,326 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Private Kubernetes Monitoring through Gateway API",
+    "output": "docs/k0s/architecture/monitoring-gateway-api.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/vancanhuit/iximiuzlabs-playground",
+      "revision": "77154f0012eaaff6acf95b51dbdea65d902ff903"
+    },
+    "viewBox": [1370, 700],
+    "views": [
+      {
+        "id": "request-path",
+        "label": "Private HTTPS request",
+        "focus": ["client", "tailnet", "tailscale_proxy", "envoy", "monitoring_stack"],
+        "note": "One private Tailscale VIP reaches Envoy, which selects Prometheus, Alertmanager, or Grafana by hostname."
+      },
+      {
+        "id": "dns-and-tls",
+        "label": "DNS and certificates",
+        "focus": ["gateway_api", "external_dns", "cloudflare_dns", "cert_manager", "tls_secrets", "envoy"],
+        "note": "ExternalDNS owns DNS-only A records while cert-manager maintains three ECDSA listener certificates through DNS-01."
+      },
+      {
+        "id": "ownership",
+        "label": "Controller ownership",
+        "focus": ["gateway_api", "envoy_controller", "envoy", "tailscale_operator", "tailscale_proxy"],
+        "note": "A dedicated GatewayClass gives monitoring a unique Tailscale Service identity and reuses the shared two-replica ProxyGroup."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "client",
+      "type": "external",
+      "label": "Authorized Tailnet Client",
+      "pos": [25, 560],
+      "size": [180, 76]
+    },
+    {
+      "id": "cloudflare_dns",
+      "type": "cloud",
+      "label": "Cloudflare DNS",
+      "sublabel": "3 A records + ACME TXT records",
+      "tag": "DNS only",
+      "pos": [25, 100],
+      "size": [230, 78]
+    },
+    {
+      "id": "external_dns",
+      "type": "backend",
+      "label": "ExternalDNS",
+      "sublabel": "gateway-httproute source",
+      "tag": "policy: sync",
+      "pos": [300, 100],
+      "size": [210, 78],
+      "sources": [
+        {
+          "path": "docs/k0s/external-dns-values.yaml",
+          "line": 1,
+          "end_line": 20,
+          "label": "Cloudflare synchronization"
+        }
+      ]
+    },
+    {
+      "id": "gateway_api",
+      "type": "backend",
+      "label": "Monitoring Gateway API",
+      "sublabel": "GatewayClass + Gateway + 3 HTTPRoutes",
+      "tag": "3 HTTPS listeners",
+      "pos": [600, 210],
+      "size": [250, 78]
+    },
+    {
+      "id": "cert_manager",
+      "type": "security",
+      "label": "cert-manager",
+      "sublabel": "ClusterIssuer + Gateway shim",
+      "tag": "Cloudflare DNS-01",
+      "pos": [1100, 100],
+      "size": [220, 78],
+      "sources": [
+        {
+          "path": "docs/k0s/cert-manager-cloudflare.yaml",
+          "line": 1,
+          "end_line": 19,
+          "label": "ClusterIssuer"
+        }
+      ]
+    },
+    {
+      "id": "tailnet",
+      "type": "security",
+      "label": "Tailscale Tailnet",
+      "sublabel": "identity policy + WireGuard",
+      "tag": "private network",
+      "pos": [230, 560],
+      "size": [180, 76]
+    },
+    {
+      "id": "tailscale_proxy",
+      "type": "security",
+      "label": "Ingress ProxyGroup",
+      "sublabel": "2 shared proxy replicas",
+      "tag": "private 100.x VIP :443",
+      "pos": [435, 560],
+      "size": [185, 76]
+    },
+    {
+      "id": "envoy",
+      "type": "backend",
+      "label": "Generated Envoy Data Plane",
+      "sublabel": "LoadBalancer + TLS + HTTPRoutes",
+      "tag": "svc:monitoring-gateway",
+      "pos": [650, 560],
+      "size": [220, 76]
+    },
+    {
+      "id": "monitoring_stack",
+      "type": "database",
+      "label": "Monitoring Stack",
+      "sublabel": "Prometheus | Alertmanager | Grafana",
+      "tag": "ephemeral storage",
+      "pos": [1100, 560],
+      "size": [220, 76]
+    },
+    {
+      "id": "tls_secrets",
+      "type": "database",
+      "label": "3 TLS Secrets",
+      "sublabel": "ECDSA certificates + private keys",
+      "tag": "monitoring namespace",
+      "pos": [1090, 310],
+      "size": [210, 78]
+    },
+    {
+      "id": "envoy_controller",
+      "type": "backend",
+      "label": "Envoy Gateway Controller",
+      "sublabel": "reconciles infrastructure + xDS",
+      "tag": "v1.9.1",
+      "pos": [770, 380],
+      "size": [200, 76]
+    },
+    {
+      "id": "tailscale_operator",
+      "type": "backend",
+      "label": "Tailscale Operator",
+      "sublabel": "watches classed Services",
+      "tag": "maintains shared proxies",
+      "pos": [435, 380],
+      "size": [185, 76]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "security-group",
+      "label": "Tailnet-only application path",
+      "wraps": ["tailnet", "tailscale_proxy", "envoy", "monitoring_stack"],
+      "pad": 24
+    },
+    {
+      "kind": "region",
+      "label": "k0s Kubernetes cluster",
+      "wraps": ["external_dns", "gateway_api", "cert_manager", "tailscale_operator", "tailscale_proxy", "envoy_controller", "envoy", "monitoring_stack", "tls_secrets"],
+      "pad": 22
+    }
+  ],
+  "connections": [
+    {
+      "id": "resolve_monitoring",
+      "from": "client",
+      "to": "cloudflare_dns",
+      "label": "resolve DNS-only A record",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "labelAt": [105, 340]
+    },
+    {
+      "id": "authenticate_tailnet",
+      "from": "client",
+      "to": "tailnet",
+      "label": "authenticated device",
+      "variant": "security",
+      "labelAt": [210, 655]
+    },
+    {
+      "id": "private_https",
+      "from": "tailnet",
+      "to": "tailscale_proxy",
+      "label": "WireGuard HTTPS :443",
+      "variant": "security",
+      "labelAt": [415, 655]
+    },
+    {
+      "id": "proxy_to_envoy",
+      "from": "tailscale_proxy",
+      "to": "envoy",
+      "label": "forward TCP to Service",
+      "variant": "emphasis",
+      "labelAt": [635, 655]
+    },
+    {
+      "id": "route_backend",
+      "from": "envoy",
+      "to": "monitoring_stack",
+      "label": "route by hostname",
+      "variant": "emphasis",
+      "labelAt": [985, 655]
+    },
+    {
+      "id": "reconcile_envoy",
+      "from": "gateway_api",
+      "to": "envoy_controller",
+      "label": "watch desired state",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "create_data_plane",
+      "from": "envoy_controller",
+      "to": "envoy",
+      "label": "create Service + Pod + xDS",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [790, 500]
+    },
+    {
+      "id": "watch_envoy_service",
+      "from": "envoy",
+      "to": "tailscale_operator",
+      "label": "watch class: tailscale",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "labelAt": [640, 495]
+    },
+    {
+      "id": "provision_tailscale_proxy",
+      "from": "tailscale_operator",
+      "to": "tailscale_proxy",
+      "label": "advertise VIP from 2 replicas",
+      "labelAt": [430, 510]
+    },
+    {
+      "id": "watch_gateway",
+      "from": "gateway_api",
+      "to": "external_dns",
+      "label": "watch routes + Gateway VIP",
+      "variant": "dashed",
+      "labelAt": [310, 236]
+    },
+    {
+      "id": "publish_dns",
+      "from": "external_dns",
+      "to": "cloudflare_dns",
+      "label": "sync 3 A + ownership TXT",
+      "fromSide": "left",
+      "toSide": "right",
+      "labelAt": [265, 190]
+    },
+    {
+      "id": "request_certificates",
+      "from": "cert_manager",
+      "to": "cloudflare_dns",
+      "label": "complete 3 DNS-01 challenges",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "top",
+      "via": [[1210, 45], [140, 45]],
+      "labelAt": [750, 35]
+    },
+    {
+      "id": "store_keypairs",
+      "from": "cert_manager",
+      "to": "tls_secrets",
+      "label": "write renewed keypairs",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [1180, 275]
+    },
+    {
+      "id": "load_certificates",
+      "from": "tls_secrets",
+      "to": "envoy",
+      "label": "load 3 listener certificates",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "right",
+      "via": [[1195, 490], [920, 490], [920, 598]],
+      "labelAt": [1055, 480]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "violet",
+      "title": "Private ingress",
+      "items": [
+        "Cloudflare publishes DNS but never proxies application traffic",
+        "One private VIP serves all three monitoring hostnames",
+        "Tailnet policy remains the network access boundary"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Controller ownership",
+      "items": [
+        "Envoy Gateway owns the generated Service, Pod, and xDS configuration",
+        "Tailscale advertises the unique monitoring Service through both shared proxies"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Durability boundary",
+      "items": [
+        "The cluster has no StorageClass",
+        "Metrics, silences, and Grafana database changes are ephemeral"
+      ]
+    }
+  ]
+}

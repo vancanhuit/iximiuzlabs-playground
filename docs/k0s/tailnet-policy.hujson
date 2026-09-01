@@ -37,7 +37,8 @@
     "services": {
       "svc:lab-k0s": ["tag:k8s"],
       "svc:hubble-ui": ["tag:k8s"],
-      "svc:gateway-envoy": ["tag:k8s"]
+      "svc:gateway-envoy": ["tag:k8s"],
+      "svc:monitoring-gateway": ["tag:k8s"]
     }
   }
 }

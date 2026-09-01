@@ -1,0 +1,28 @@
+grafana:
+  grafana.ini:
+    server:
+      domain: grafana.playground.canhdinh.com
+      root_url: https://grafana.playground.canhdinh.com
+
+kubeControllerManager:
+  enabled: false
+
+kubeEtcd:
+  enabled: false
+
+kubeProxy:
+  enabled: false
+
+kubeScheduler:
+  enabled: false
+
+prometheus:
+  prometheusSpec:
+    externalUrl: https://prometheus.playground.canhdinh.com
+    retention: 3d
+    retentionSize: 8GB
+
+alertmanager:
+  alertmanagerSpec:
+    externalUrl: https://alertmanager.playground.canhdinh.com
+    retention: 72h
