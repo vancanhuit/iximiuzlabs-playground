@@ -83,8 +83,8 @@ Treat these versions as one tested set. Validate upgrades in a fresh playground 
 | Component | Version |
 | --- | --- |
 | k0sctl | `v0.32.2` |
-| k0s and Kubernetes | `v1.36.3+k0s.0` |
-| Cilium | `v1.20.0` |
+| k0s and Kubernetes | `v1.36.4+k0s.0` |
+| Cilium | `v1.20.1` |
 | Tailscale Kubernetes Operator | `1.102.3` |
 | cert-manager | `v1.21.1` |
 | ingress-nginx | chart `4.15.1`, controller `v1.15.1` |
@@ -322,7 +322,7 @@ Install Cilium with the checked-in values:
 
 ```bash
 cilium install \
-  --version 1.20.0 \
+  --version 1.20.1 \
   --values docs/k0s/cilium-values.yaml
 cilium status --wait
 ```
@@ -360,19 +360,34 @@ cilium status --wait
 Run focused connectivity tests after bootstrap, network changes, and Cilium upgrades:
 
 ```bash
-cilium connectivity test \
-  --ip-families ipv4 \
-  --test '^no-policies/' \
-  --test '^client-egress/' \
-  --hubble=false \
-  --flow-validation disabled \
-  --junit-file /tmp/cilium-connectivity-junit.xml \
-  --timeout 15m
+(
+  set -euo pipefail
+  context=tailscale-k0s
+  cilium hubble port-forward \
+    --context "$context" >/tmp/hubble-port-forward.log 2>&1 &
+  port_forward_pid=$!
+  trap 'kill "$port_forward_pid" 2>/dev/null || true; \
+    cilium connectivity test --context "$context" --cleanup' EXIT
 
-cilium connectivity test --cleanup
+  until timeout 1 bash -c '</dev/tcp/127.0.0.1/4245' 2>/dev/null; do
+    kill -0 "$port_forward_pid"
+    sleep 1
+  done
+
+  hubble status --server localhost:4245
+
+  cilium connectivity test \
+    --context "$context" \
+    --ip-families ipv4 \
+    --test '^no-policies/' \
+    --test '^client-egress/' \
+    --flow-validation disabled \
+    --junit-file /tmp/cilium-connectivity-junit.xml \
+    --timeout 15m
+)
 ```
 
-The selectors test Pod traffic, ClusterIP and NodePort Services, Domain Name System (DNS), and client egress. They omit the `dns-only` Layer 7 test because this cluster has no Envoy proxy.
+The selectors test Pod traffic, ClusterIP and NodePort Services, Domain Name System (DNS), and client egress. They omit the `dns-only` Layer 7 test because this cluster has no Envoy proxy. The explicit Hubble status check verifies Relay access. Per-action flow matching remains disabled because socket load balancing can translate a ClusterIP before Hubble observes the flow; traffic test failures remain fatal.
 
 Always run cleanup after a failed or interrupted test. The tested configuration executes 70 actions.
 
@@ -1250,14 +1265,14 @@ Deployment             cilium-operator  Desired: 2, Ready: 2/2, Available: 2/2
 Deployment             hubble-relay     Desired: 1, Ready: 1/1, Available: 1/1
 Deployment             hubble-ui        Desired: 1, Ready: 1/1, Available: 1/1
 Cluster Pods:          8/8 managed by Cilium
-Helm chart version:    1.20.0
+Helm chart version:    1.20.1
 ```
 
 Controllers are intentionally absent from `kubectl get nodes`. Query each controller directly to confirm its k0s process and role:
 
 ```console
 $ ssh root@control-plane-01 k0s status
-Version: v1.36.3+k0s.0
+Version: v1.36.4+k0s.0
 Process ID: 2157
 Role: controller
 Workloads: false
@@ -1430,6 +1445,40 @@ This snapshot demonstrates the completed monitoring deployment: all scrape targe
 ## Recurring operations
 
 Use these procedures after deployment without repeating the full bootstrap.
+
+### Upgrade Cilium within the 1.20 release
+
+Render and inspect the target chart with the complete checked-in values before changing the cluster:
+
+```bash
+helm template cilium cilium/cilium \
+  --version 1.20.1 \
+  --namespace kube-system \
+  --values docs/k0s/cilium-values.yaml >/dev/null
+
+helm upgrade cilium cilium/cilium \
+  --version 1.20.1 \
+  --namespace kube-system \
+  --kube-context tailscale-k0s \
+  --values docs/k0s/cilium-values.yaml \
+  --dry-run=server
+```
+
+Apply the reviewed release and wait for the rollout:
+
+```bash
+helm upgrade cilium cilium/cilium \
+  --version 1.20.1 \
+  --namespace kube-system \
+  --kube-context tailscale-k0s \
+  --values docs/k0s/cilium-values.yaml \
+  --rollback-on-failure \
+  --timeout 20m
+
+cilium status --context tailscale-k0s --wait
+```
+
+Keep `upgradeCompatibility: "1.20"` set to the cluster's initial Cilium release series. Run the focused connectivity tests from Step 9 after every upgrade. That procedure forwards Hubble Relay before enabling flow validation and removes generated resources even when the test fails or is interrupted.
 
 ### Reconcile a node address change
 
@@ -1632,6 +1681,7 @@ Update this table after every deployment, upgrade, recovery, or teardown:
 | 2026-08-30 | Repository owner and OpenCode | Exposed Hubble UI through a private Tailscale LoadBalancer; installed cert-manager and ingress-nginx; issued and verified a Let's Encrypt ECDSA certificate with Cloudflare DNS-01 |
 | 2026-08-30 | Repository owner and OpenCode | Deployed Echo Server through Envoy Gateway and a private Tailscale LoadBalancer; automated Cloudflare DNS with ExternalDNS and issued a Let's Encrypt ECDSA certificate with DNS-01 |
 | 2026-09-01 | Repository owner and OpenCode | Deployed kube-prometheus-stack and its Kubernetes command-center dashboard; exposed Prometheus, Alertmanager, and Grafana through one private Envoy Gateway with ExternalDNS and Let's Encrypt DNS-01 certificates |
+| 2026-09-01 | Repository owner and OpenCode | Upgraded all eight hosts to k0s `v1.36.4+k0s.0` and Cilium to `1.20.1`; verified API and etcd health, five Ready workers, 70 focused connectivity actions with Hubble Relay forwarded, ingress endpoints, and 32 healthy Prometheus targets |
 
 ## Supporting references
 

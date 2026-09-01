@@ -1,5 +1,9 @@
 kubeProxyReplacement: true
 l7Proxy: false
+upgradeCompatibility: "1.20"
+
+cluster:
+  name: tailscale-k0s
 
 socketLB:
   hostNamespaceOnly: true
