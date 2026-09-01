@@ -27,7 +27,7 @@
         "id": "provisioning",
         "label": "Controller provisioning",
         "focus": ["ingress_resources", "ingress_nginx", "lb_service", "tailscale_operator", "tailscale_proxy"],
-        "note": "Helm creates ingress-nginx; the hand-authored LoadBalancer Service causes Tailscale to create its proxy."
+        "note": "Helm creates ingress-nginx; the LoadBalancer Service attaches to the shared two-replica ingress ProxyGroup."
       }
     ]
   },
@@ -61,8 +61,8 @@
     {
       "id": "tailscale_proxy",
       "type": "security",
-      "label": "Tailscale Proxy Pod",
-      "sublabel": "StatefulSet + tailnet identity",
+      "label": "Ingress ProxyGroup",
+      "sublabel": "2 shared proxy replicas",
       "tag": "stable 100.x Service IP",
       "pos": [440, 450],
       "size": [185, 72]
@@ -237,7 +237,7 @@
       "id": "provision_proxy",
       "from": "tailscale_operator",
       "to": "tailscale_proxy",
-      "label": "create StatefulSet + identity",
+      "label": "maintain 2 replicas + identities",
       "variant": "default",
       "labelAt": [430, 350]
     }
@@ -249,7 +249,7 @@
       "items": [
         "Cloudflare answers DNS but does not proxy application traffic",
         "Tailscale forwards TCP to the Service selecting ingress-nginx",
-        "ingress-nginx sees the proxy Pod IP; tailnet grants authorize clients"
+        "ingress-nginx sees a proxy Pod IP; tailnet grants authorize clients"
       ]
     },
     {
@@ -265,7 +265,7 @@
       "title": "Provisioning ownership",
       "items": [
         "Helm installs ingress-nginx; Ingress objects configure its routes",
-        "The LoadBalancer Service causes Tailscale to create the proxy"
+        "The Service attaches to the shared two-replica ingress ProxyGroup"
       ]
     }
   ]

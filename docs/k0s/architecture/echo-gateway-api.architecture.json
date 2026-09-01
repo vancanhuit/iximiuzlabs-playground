@@ -33,7 +33,7 @@
         "id": "ownership",
         "label": "Controller ownership",
         "focus": ["gateway_api", "envoy_controller", "envoy_service", "tailscale_operator", "tailscale_proxy", "envoy", "echo_workload"],
-        "note": "Gateway API declares intent; Envoy, Tailscale, ExternalDNS, and cert-manager reconcile distinct parts of the deployment."
+        "note": "Gateway API declares intent; the generated Service attaches to a shared two-replica Tailscale ingress ProxyGroup."
       }
     ]
   },
@@ -99,8 +99,8 @@
     {
       "id": "tailscale_proxy",
       "type": "security",
-      "label": "gateway-envoy Proxy",
-      "sublabel": "operator-managed StatefulSet",
+      "label": "Ingress ProxyGroup",
+      "sublabel": "2 shared proxy replicas",
       "tag": "stable 100.x Service IP :443",
       "pos": [435, 560],
       "size": [185, 76],
@@ -157,7 +157,7 @@
       "type": "backend",
       "label": "Tailscale Operator",
       "sublabel": "watches classed Services",
-      "tag": "creates tailnet proxy",
+      "tag": "maintains shared proxies",
       "pos": [435, 380],
       "size": [185, 76]
     }
@@ -270,7 +270,7 @@
       "id": "provision_tailscale_proxy",
       "from": "tailscale_operator",
       "to": "tailscale_proxy",
-      "label": "create StatefulSet + identity",
+      "label": "maintain 2 replicas + identities",
       "variant": "default",
       "labelAt": [430, 510]
     },
@@ -330,7 +330,7 @@
       "title": "Private request path",
       "items": [
         "Cloudflare publishes DNS but does not proxy application traffic",
-        "Tailscale forwards TCP to Envoy; Envoy sees the proxy Pod as its peer",
+        "Tailscale forwards through either replica; Envoy sees that proxy Pod as its peer",
         "Do not trust client XFF or enable PROXY protocol without a sender"
       ]
     },
@@ -347,7 +347,7 @@
       "title": "Controller ownership",
       "items": [
         "Envoy Gateway owns the Deployment, Service, and xDS config",
-        "Tailscale observes the Service and creates the proxy identity"
+        "Tailscale attaches the Service VIP to both shared proxy identities"
       ]
     }
   ]

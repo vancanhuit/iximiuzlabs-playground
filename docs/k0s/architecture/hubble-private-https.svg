@@ -325,7 +325,7 @@ rect.c-bg-rect { fill: var(--bg); }
         <path data-edge-from="tls_secret" data-edge-to="ingress_nginx" data-edge-label="watch and reload certificate" data-edge-key="7" data-edge-id="reload_certificate" data-composition-points="1190,590;1190,556;962.5,556;962.5,522" d="M 1190 590 L 1190 564 Q 1190 556 1182 556 L 970.5 556 Q 962.5 556 962.5 548 L 962.5 522" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
         <path data-edge-from="ingress_resources" data-edge-to="ingress_nginx" data-edge-label="render NGINX config" data-edge-key="8" data-edge-id="watch_ingress" data-composition-points="962.5,272;962.5,450" d="M 962.5 272 L 962.5 450" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
         <path data-edge-from="lb_service" data-edge-to="tailscale_operator" data-edge-label="watch class: tailscale" data-edge-key="9" data-edge-id="watch_lb_service" data-composition-points="747.5,450;747.5,361;532.5,361;532.5,272" d="M 747.5 450 L 747.5 369 Q 747.5 361 739.5 361 L 540.5 361 Q 532.5 361 532.5 353 L 532.5 272" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
-        <path data-edge-from="tailscale_operator" data-edge-to="tailscale_proxy" data-edge-label="create StatefulSet + identity" data-edge-key="10" data-edge-id="provision_proxy" data-composition-points="532.5,272;532.5,450" d="M 532.5 272 L 532.5 450" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="tailscale_operator" data-edge-to="tailscale_proxy" data-edge-label="maintain 2 replicas + identities" data-edge-key="10" data-edge-id="provision_proxy" data-composition-points="532.5,272;532.5,450" d="M 532.5 272 L 532.5 450" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
 
         <!-- Components -->
         <g id="node-browser" data-node-id="browser" data-node-label="Tailnet Browser" tabindex="0" role="button" aria-label="Focus Tailnet Browser, policy-authorized client, Architecture component" aria-pressed="false" data-node-kind="external" data-node-sublabel="policy-authorized client" data-node-context="Architecture component">
@@ -365,16 +365,16 @@ rect.c-bg-rect { fill: var(--bg); }
         <text x="320" y="514" class="t-security" font-size="7" text-anchor="middle">private 100.64.0.0/10</text>
         </g>
 
-        <g id="node-tailscale_proxy" data-node-id="tailscale_proxy" data-node-label="Tailscale Proxy Pod" tabindex="0" role="button" aria-label="Focus Tailscale Proxy Pod, StatefulSet + tailnet identity, Kubernetes cluster › Tailnet-only application path" aria-pressed="false" data-node-kind="security" data-node-sublabel="StatefulSet + tailnet identity" data-node-tag="stable 100.x Service IP" data-node-context="Kubernetes cluster › Tailnet-only application path">
-          <title>Tailscale Proxy Pod · StatefulSet + tailnet identity · Kubernetes cluster › Tailnet-only application path · stable 100.x Service IP</title>
+        <g id="node-tailscale_proxy" data-node-id="tailscale_proxy" data-node-label="Ingress ProxyGroup" tabindex="0" role="button" aria-label="Focus Ingress ProxyGroup, 2 shared proxy replicas, Kubernetes cluster › Tailnet-only application path" aria-pressed="false" data-node-kind="security" data-node-sublabel="2 shared proxy replicas" data-node-tag="stable 100.x Service IP" data-node-context="Kubernetes cluster › Tailnet-only application path">
+          <title>Ingress ProxyGroup · 2 shared proxy replicas · Kubernetes cluster › Tailnet-only application path · stable 100.x Service IP</title>
           <rect x="440" y="450" width="185" height="72" rx="6" class="c-mask"/>
           <rect x="440" y="450" width="185" height="72" rx="6" class="c-security" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(446 456) scale(0.6875)">
             <path d="M8 2.2 13 4v3.5c0 3.1-1.8 5.4-5 6.5-3.2-1.1-5-3.4-5-6.5V4Z"/>
             <path d="m5.8 8 1.5 1.5 3-3"/>
           </g>
-          <text data-node-label="" x="532.5" y="484" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Tailscale Proxy Pod</text>
-        <text x="532.5" y="500" class="t-muted" font-size="9" text-anchor="middle">StatefulSet + tailnet identity</text>
+          <text data-node-label="" x="532.5" y="484" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Ingress ProxyGroup</text>
+        <text x="532.5" y="500" class="t-muted" font-size="9" text-anchor="middle">2 shared proxy replicas</text>
         <text x="532.5" y="514" class="t-security" font-size="7" text-anchor="middle">stable 100.x Service IP</text>
         </g>
 
@@ -508,9 +508,9 @@ rect.c-bg-rect { fill: var(--bg); }
           <rect x="612.2" y="325" width="115.6" height="14" rx="3" class="c-mask"/>
           <text x="670" y="335" class="t-messagebus" font-size="8" text-anchor="middle">watch class: tailscale</text>
         </g>
-        <g data-edge-from="tailscale_operator" data-edge-to="tailscale_proxy" data-edge-label="create StatefulSet + identity" data-edge-key="10" data-edge-id="provision_proxy">
-          <rect x="355.4" y="340" width="149.2" height="14" rx="3" class="c-mask"/>
-          <text x="430" y="350" class="t-muted" font-size="8" text-anchor="middle">create StatefulSet + identity</text>
+        <g data-edge-from="tailscale_operator" data-edge-to="tailscale_proxy" data-edge-label="maintain 2 replicas + identities" data-edge-key="10" data-edge-id="provision_proxy">
+          <rect x="348.2" y="340" width="163.6" height="14" rx="3" class="c-mask"/>
+          <text x="430" y="350" class="t-muted" font-size="8" text-anchor="middle">maintain 2 replicas + identities</text>
         </g>
 
         <!-- Boundary labels (foreground masks keep routes out of titles) -->

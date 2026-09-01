@@ -35,7 +35,9 @@
 
   "autoApprovers": {
     "services": {
-      "svc:lab-k0s": ["tag:k8s"]
+      "svc:lab-k0s": ["tag:k8s"],
+      "svc:hubble-ui": ["tag:k8s"],
+      "svc:gateway-envoy": ["tag:k8s"]
     }
   }
 }

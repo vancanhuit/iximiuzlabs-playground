@@ -680,11 +680,11 @@ This deployment separates the ingress controller from its external entry point:
 
 1. Helm installs the `IngressClass/nginx`, the ingress-nginx controller `Deployment`, its admission webhook, RBAC, and controller `ConfigMap`. `controller.service.enabled=false` deliberately prevents the chart from creating its usual public-facing controller Service.
 2. The hand-authored `Ingress/hubble-ui` declares host and path routing. The ingress-nginx controller watches resources whose `ingressClassName` is `nginx`, resolves the referenced `hubble-ui` Service endpoints, reads `Secret/hubble-ui-tls`, and renders those objects into its running NGINX configuration.
-3. The separate `Service/ingress-nginx/hubble-ui-tailscale` selects the ingress-nginx controller Pod and declares `type: LoadBalancer` with `loadBalancerClass: tailscale`. Kubernetes itself does not allocate an external address for this class.
-4. The Tailscale operator watches that Service, creates a dedicated proxy `StatefulSet` and state Secret in the `tailscale` namespace, registers the proxy as the `hubble-ui` tailnet device, and writes its `100.x` address and `*.ts.net` name into the Service status.
-5. The proxy forwards ports 80 and 443 to the Service ClusterIP. Kubernetes service routing selects the ingress-nginx Pod; ingress-nginx terminates TLS, matches the host and path from the Ingress, and connects directly to a Hubble UI endpoint.
+3. `ProxyGroup/lab-ingress` maintains two shared ingress proxy Pods. The separate `Service/ingress-nginx/hubble-ui-tailscale` selects the ingress-nginx controller Pod, declares `type: LoadBalancer` with `loadBalancerClass: tailscale`, and attaches to that ProxyGroup.
+4. The Tailscale operator creates `svc:hubble-ui`, configures both ProxyGroup replicas to advertise its stable `100.x` virtual IP, and writes that address and `*.ts.net` name into the Service status.
+5. Either ProxyGroup replica forwards ports 80 and 443 to the Service ClusterIP. Kubernetes service routing selects the ingress-nginx Pod; ingress-nginx terminates TLS, matches the host and path from the Ingress, and connects directly to a Hubble UI endpoint.
 
-The `LoadBalancer` Service therefore represents desired state, not an external appliance. The actual load-balancer implementation is the operator-created Tailscale proxy Pod. Removing the Service causes the operator to remove that proxy and tailnet endpoint; changing the Ingress only changes NGINX routing and does not provision another Tailscale device.
+The `LoadBalancer` Service therefore represents desired state, not an external appliance. Its Tailscale Service virtual IP is advertised by both shared ProxyGroup replicas. Removing the Service removes its routing and advertisement without removing the shared proxies; changing the Ingress only changes NGINX routing.
 
 ```bash
 helm upgrade --install cert-manager \
@@ -747,13 +747,19 @@ Render the ACME email from SOPS, apply the issuer, certificate, ingress, and Tai
 )
 
 kubectl --context tailscale-k0s apply \
+  -f docs/k0s/ingress-proxygroup.yaml
+kubectl --context tailscale-k0s wait proxygroup/lab-ingress \
+  --for=condition=ProxyGroupAvailable=true \
+  --timeout=5m
+
+kubectl --context tailscale-k0s apply \
   -f docs/k0s/hubble-ui-tailscale.yaml
 kubectl --context tailscale-k0s -n kube-system \
   wait certificate/hubble-ui --for=condition=Ready=True \
   --timeout=5m
 kubectl --context tailscale-k0s -n ingress-nginx \
   wait service/hubble-ui-tailscale \
-  --for=jsonpath='{.status.loadBalancer.ingress[0].ip}' \
+  --for=jsonpath='{.status.conditions[?(@.type=="TailscaleIngressSvcConfigured")].status}'=True \
   --timeout=5m
 ```
 
@@ -776,7 +782,7 @@ openssl s_client \
 
 **Expected result:** DNS returns the Service's `100.x` address, HTTP redirects to HTTPS, the certificate subject covers `hubble-ui.playground.canhdinh.com`, and HTTPS returns the Hubble UI only from a policy-authorized tailnet client. cert-manager renews the certificate and ingress-nginx reloads the updated Secret automatically.
 
-**Client IP limitation:** This deployment exposes ingress-nginx through a Tailscale Layer 3 `LoadBalancer` Service. The dedicated Tailscale proxy Pod forwards the connection to ingress-nginx, so ingress-nginx sees the proxy Pod IP rather than the tailnet client's `100.x` address. Setting `externalTrafficPolicy: Local`, `use-forwarded-headers`, or `proxy-real-ip-cidr` cannot recover an address that the Tailscale proxy did not pass in a trusted header or PROXY protocol record. Do not trust arbitrary incoming forwarding headers or enable PROXY protocol unless every connection comes from a trusted sender that emits it.
+**Client IP limitation:** This deployment exposes ingress-nginx through a Tailscale Layer 3 `LoadBalancer` Service. The selected ProxyGroup Pod forwards the connection to ingress-nginx, so ingress-nginx sees that proxy Pod IP rather than the tailnet client's `100.x` address. Setting `externalTrafficPolicy: Local`, `use-forwarded-headers`, or `proxy-real-ip-cidr` cannot recover an address that the Tailscale proxy did not pass in a trusted header or PROXY protocol record. Do not trust arbitrary incoming forwarding headers or enable PROXY protocol unless every connection comes from a trusted sender that emits it.
 
 Track upstream support in [tailscale/tailscale#11024](https://github.com/tailscale/tailscale/issues/11024), with the related Tailscale Serve proxy work in [tailscale/tailscale#14531](https://github.com/tailscale/tailscale/issues/14531). The forwarded-header trust boundary is also documented by [kubernetes/ingress-nginx#9163](https://github.com/kubernetes/ingress-nginx/issues/9163).
 
@@ -800,9 +806,9 @@ Gateway API separates infrastructure selection, listener configuration, and appl
 2. The `EnvoyProxy` resource tells Envoy Gateway to create its managed data-plane Service as `type: LoadBalancer` with `loadBalancerClass: tailscale` and the requested Tailscale hostname `gateway-envoy`.
 3. `Gateway/echo` requests an HTTPS listener for `echo.playground.canhdinh.com`, references its TLS Secret, and allows routes only from the same namespace. `HTTPRoute/echo` attaches to that listener and maps `/` to `Service/echo-server:80`.
 4. The Envoy Gateway controller validates those references, creates and owns an Envoy proxy `Deployment` and its `Service` in `envoy-gateway-system`, and continuously translates the Gateway and HTTPRoute into xDS listener, TLS, route, cluster, and endpoint configuration for Envoy.
-5. The generated Service has `loadBalancerClass: tailscale`. The Tailscale operator independently observes it, creates a dedicated proxy `StatefulSet` and state Secret in the `tailscale` namespace, registers `gateway-envoy`, and publishes the resulting `100.x` address and `*.ts.net` name to the Service status.
+5. The generated Service has `loadBalancerClass: tailscale` and attaches to `ProxyGroup/lab-ingress`. The Tailscale operator creates `svc:gateway-envoy`, configures both shared replicas to advertise its `100.x` virtual IP, and publishes the address and `*.ts.net` name to the Service status.
 6. Envoy Gateway copies that Service address into `Gateway.status.addresses`. ExternalDNS reads the accepted Gateway and HTTPRoute and synchronizes the custom DNS-only Cloudflare record. cert-manager reads the Gateway annotations and listener certificate reference, completes DNS-01, and maintains the TLS Secret consumed by Envoy.
-7. At request time, the client resolves the custom hostname to the private `100.x` address, crosses the tailnet to the Tailscale proxy, reaches the generated Envoy Service and Pod, terminates TLS at Envoy, and follows the HTTPRoute to an Echo Server endpoint.
+7. At request time, the client resolves the custom hostname to the private `100.x` address, reaches either advertising ProxyGroup replica, crosses the generated Envoy Service to an Envoy Pod, terminates TLS at Envoy, and follows the HTTPRoute to an Echo Server endpoint.
 
 Unlike the ingress-nginx deployment, the Envoy data-plane Deployment and LoadBalancer Service are generated resources. Change the `Gateway`, `HTTPRoute`, or referenced `EnvoyProxy`; do not hand-edit the generated `envoy-echo-*` resources because the Envoy Gateway controller will reconcile them back to declared state.
 
@@ -922,6 +928,11 @@ kubectl --context tailscale-k0s -n echo \
   wait httproute/echo \
   --for=jsonpath='{.status.parents[0].conditions[?(@.type=="Accepted")].status}'=True \
   --timeout=5m
+kubectl --context tailscale-k0s -n envoy-gateway-system \
+  wait service \
+  -l gateway.envoyproxy.io/owning-gateway-name=echo \
+  --for=jsonpath='{.status.conditions[?(@.type=="TailscaleIngressSvcConfigured")].status}'=True \
+  --timeout=5m
 ```
 
 Verify from a policy-authorized tailnet client:
@@ -939,7 +950,7 @@ openssl s_client \
 
 **Expected result:** ExternalDNS creates a DNS-only `A` record containing the Gateway's private `100.x` Tailscale address, cert-manager obtains an ECDSA certificate through Cloudflare DNS-01, the `HTTPRoute` is accepted, and HTTPS returns `"gateway-api"` from Echo Server. Cloudflare never proxies application traffic.
 
-**Client IP limitation:** Echo Server does not see the tailnet client's `100.x` address with this topology. The Tailscale operator forwards the connection from its dedicated proxy Pod to Envoy, so Envoy receives the proxy Pod IP and writes that address to `X-Forwarded-For` and `X-Envoy-External-Address`. The generated Envoy Service already uses `externalTrafficPolicy: Local`, but that cannot preserve an address across the separate Tailscale proxy hop.
+**Client IP limitation:** Echo Server does not see the tailnet client's `100.x` address with this topology. The selected ProxyGroup Pod forwards the connection to Envoy, so Envoy receives the proxy Pod IP and writes that address to `X-Forwarded-For` and `X-Envoy-External-Address`. The generated Envoy Service uses `externalTrafficPolicy: Cluster` so either shared ProxyGroup replica can reach the Envoy Pod on another node. This does not preserve an address across the separate Tailscale proxy hop.
 
 Track the missing source-address handoff in [tailscale/tailscale#11024](https://github.com/tailscale/tailscale/issues/11024), with the related proxy implementation work in [tailscale/tailscale#14531](https://github.com/tailscale/tailscale/issues/14531).
 
@@ -963,6 +974,7 @@ Complete every check before recording a successful run:
 - [ ] Both API paths return `ok` when the ProxyGroup is installed
 - [ ] `hubble-ui.playground.canhdinh.com` presents a valid certificate and reaches Hubble UI only from the tailnet
 - [ ] The Echo Gateway and route are accepted, its Certificate is ready, and private HTTPS returns the expected body
+- [ ] `ProxyGroup/lab-ingress` has two Ready replicas, and both application Services report `2/2 proxy backends ready and advertising`
 
 Verify both API paths and ProxyGroup replicas:
 
@@ -974,6 +986,17 @@ kubectl --context tailscale-k0s wait proxygroup/lab-k0s \
   --for=condition=ProxyGroupReady=true --timeout=30s
 kubectl --context tailscale-k0s -n tailscale get pods \
   -l tailscale.com/parent-resource=lab-k0s -o wide
+kubectl --context tailscale-k0s wait proxygroup/lab-ingress \
+  --for=condition=ProxyGroupReady=true --timeout=30s
+kubectl --context tailscale-k0s -n tailscale get pods \
+  -l tailscale.com/parent-resource=lab-ingress -o wide
+kubectl --context tailscale-k0s get service \
+  -n ingress-nginx hubble-ui-tailscale \
+  -o jsonpath='{.status.conditions[?(@.type=="TailscaleIngressSvcConfigured")].message}{"\n"}'
+kubectl --context tailscale-k0s get service \
+  -n envoy-gateway-system \
+  -l gateway.envoyproxy.io/owning-gateway-name=echo \
+  -o jsonpath='{.items[0].status.conditions[?(@.type=="TailscaleIngressSvcConfigured")].message}{"\n"}'
 ```
 
 ### Live status reference
@@ -1179,7 +1202,7 @@ Use observed symptoms to select the narrowest corrective action:
 | Echo `HTTPRoute` is not accepted | Its hostname, parent reference, listener, or namespace policy does not match | Inspect `status.parents` and keep the route in the `echo` namespace unless the Gateway policy is intentionally broadened |
 | Echo DNS resolves to a stale address | ExternalDNS is unhealthy or cannot update the Cloudflare zone | Compare the Gateway address with the DNS-only `A` record; inspect ExternalDNS logs, token scope, zone filter, and TXT ownership record |
 | Echo Certificate remains `Ready=False` | The ClusterIssuer, cert-manager namespace token, or DNS-01 propagation failed | Inspect the ClusterIssuer, Certificate, Order, and Challenge without printing the token |
-| Echo reports the Tailscale proxy Pod IP as the client | The dedicated Tailscale LoadBalancer proxy is the TCP peer seen by Envoy | This is expected; do not trust client-supplied forwarding headers or enable PROXY protocol without a trusted sender |
+| Echo reports a Tailscale proxy Pod IP as the client | The selected ingress ProxyGroup replica is the TCP peer seen by Envoy | This is expected; do not trust client-supplied forwarding headers or enable PROXY protocol without a trusted sender |
 | `_acme-challenge` TXT remains after issuance | Challenge cleanup failed or another ACME flow owns the record | Inspect active Challenges before deleting anything; let cert-manager reconcile first |
 
 ## Rollback and safe teardown
@@ -1215,13 +1238,15 @@ done
 kubectl --context tailscale-k0s delete namespace echo
 ```
 
-The Tailscale operator removes the Envoy LoadBalancer proxy after the Gateway disappears. If the DNS record remains after two ExternalDNS reconciliation intervals, inspect the controller logs and remove only `echo.playground.canhdinh.com` plus its ExternalDNS ownership TXT record after confirming their owner ID is `lab-k0s-gateway`. Do not uninstall shared controllers merely to remove Echo Server.
+The Tailscale operator removes the Envoy Tailscale Service advertisement after the Gateway disappears; `ProxyGroup/lab-ingress` remains for Hubble UI and other consumers. If the DNS record remains after two ExternalDNS reconciliation intervals, inspect the controller logs and remove only `echo.playground.canhdinh.com` plus its ExternalDNS ownership TXT record after confirming their owner ID is `lab-k0s-gateway`. Do not uninstall shared controllers merely to remove Echo Server.
 
 Remove the shared components only when no other Gateways, routes, certificates, or managed DNS records depend on them:
 
 ```bash
 kubectl --context tailscale-k0s delete \
   -f docs/k0s/envoy-gateway-tailscale.yaml
+kubectl --context tailscale-k0s delete \
+  -f docs/k0s/ingress-proxygroup.yaml
 helm --kube-context tailscale-k0s -n external-dns \
   uninstall external-dns
 kubectl --context tailscale-k0s delete namespace external-dns

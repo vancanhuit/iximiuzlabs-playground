@@ -10,8 +10,10 @@ spec:
       envoyService:
         type: LoadBalancer
         loadBalancerClass: tailscale
+        externalTrafficPolicy: Cluster
         annotations:
           tailscale.com/hostname: gateway-envoy
+          tailscale.com/proxy-group: lab-ingress
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: GatewayClass
