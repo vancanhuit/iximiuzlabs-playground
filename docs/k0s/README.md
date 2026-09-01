@@ -1110,6 +1110,90 @@ SingleNode: false
 
 Healthy output has five `Ready` workers, no non-running workload in the full `kubectl get all --all-namespaces` output, all desired Cilium replicas available, and every controller reporting `Role: controller` with `Workloads: false`.
 
+#### Post-deployment application status
+
+The following output was captured after deploying Hubble UI, Echo Server, and the shared HA ingress ProxyGroup on 2026-09-01. Ages, Pod IPs, generated names, node placement, and Tailscale Service addresses change across rebuilds.
+
+Confirm that both API and ingress ProxyGroups are Ready and that the ingress replicas run on different workers:
+
+```console
+$ kubectl --context tailscale-k0s get proxygroup
+NAME          STATUS            URL                                 TYPE             AGE
+lab-ingress   ProxyGroupReady                                       ingress          54m
+lab-k0s       ProxyGroupReady   https://lab-k0s.tailaa4bf1.ts.net   kube-apiserver   2d5h
+
+$ kubectl --context tailscale-k0s -n tailscale get pods \
+    -l tailscale.com/parent-resource=lab-ingress -o wide
+NAME            READY   STATUS    RESTARTS   AGE   IP             NODE
+lab-ingress-0   1/1     Running   0          12m   10.244.3.190   node-01
+lab-ingress-1   1/1     Running   0          53m   10.244.4.241   node-04
+```
+
+Inspect both Tailscale-backed application Services. A Ready Service reports that every ingress replica advertises its virtual IP:
+
+```console
+$ kubectl --context tailscale-k0s get service \
+    -n ingress-nginx hubble-ui-tailscale
+NAME                  TYPE           CLUSTER-IP       EXTERNAL-IP     PORT(S)                      AGE
+hubble-ui-tailscale   LoadBalancer   10.101.237.207   100.99.104.91   80:32718/TCP,443:31195/TCP   2d1h
+
+$ kubectl --context tailscale-k0s get service \
+    -n envoy-gateway-system \
+    -l gateway.envoyproxy.io/owning-gateway-name=echo
+NAME                       TYPE           CLUSTER-IP      EXTERNAL-IP       PORT(S)         AGE
+envoy-echo-echo-85befeca   LoadBalancer   10.111.10.133   100.107.252.170   443:30553/TCP   2d
+
+$ kubectl --context tailscale-k0s -n ingress-nginx \
+    get service hubble-ui-tailscale \
+    -o jsonpath='{.status.conditions[?(@.type=="TailscaleIngressSvcConfigured")].message}{"\n"}'
+2/2 proxy backends ready and advertising
+
+$ kubectl --context tailscale-k0s -n envoy-gateway-system \
+    get service -l gateway.envoyproxy.io/owning-gateway-name=echo \
+    -o jsonpath='{.items[0].status.conditions[?(@.type=="TailscaleIngressSvcConfigured")].message}{"\n"}'
+2/2 proxy backends ready and advertising
+```
+
+Confirm the application workloads, Gateway API state, and certificates:
+
+```console
+$ kubectl --context tailscale-k0s get deployment --all-namespaces \
+    -l 'app.kubernetes.io/name in (ingress-nginx,echo-server,external-dns,cert-manager)'
+NAMESPACE       NAME                       READY   UP-TO-DATE   AVAILABLE   AGE
+cert-manager    cert-manager               1/1     1            1           2d1h
+echo            echo-server                2/2     2            2           2d
+external-dns    external-dns               1/1     1            1           2d1h
+ingress-nginx   ingress-nginx-controller   1/1     1            1           2d1h
+
+$ kubectl --context tailscale-k0s -n echo get gateway,httproute
+NAME                                     CLASS       ADDRESS           PROGRAMMED   AGE
+gateway.gateway.networking.k8s.io/echo   tailscale   100.107.252.170   True         2d
+
+NAME                                       HOSTNAMES                          AGE
+httproute.gateway.networking.k8s.io/echo   ["echo.playground.canhdinh.com"]   2d
+
+$ kubectl --context tailscale-k0s get certificate --all-namespaces
+NAMESPACE     NAME                               READY   SECRET                             AGE
+echo          echo-playground-canhdinh-com-tls   True    echo-playground-canhdinh-com-tls   2d
+kube-system   hubble-ui                          True    hubble-ui-tls                      2d1h
+```
+
+Finally, verify both private HTTPS paths from an authorized tailnet client:
+
+```console
+$ curl --fail --show-error --head \
+    https://hubble-ui.playground.canhdinh.com/
+HTTP/2 200
+content-type: text/html
+strict-transport-security: max-age=31536000; includeSubDomains
+
+$ curl --fail --show-error \
+    'https://echo.playground.canhdinh.com/?echo_body=gateway-api'
+"gateway-api"
+```
+
+This snapshot demonstrates the completed lab: Hubble UI and Echo each have a private Tailscale Service VIP, both VIPs are advertised by two shared proxies, both TLS certificates are Ready, and both HTTPS endpoints respond successfully.
+
 ## Recurring operations
 
 Use these procedures after deployment without repeating the full bootstrap.
