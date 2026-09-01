@@ -3,6 +3,12 @@ grafana:
     server:
       domain: grafana.playground.canhdinh.com
       root_url: https://grafana.playground.canhdinh.com
+  sidecar:
+    datasources:
+      extraJsonData:
+        manageAlerts: true
+        prometheusType: Prometheus
+        prometheusVersion: 3.14.0
 
 kubeControllerManager:
   enabled: false

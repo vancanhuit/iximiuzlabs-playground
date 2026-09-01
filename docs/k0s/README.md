@@ -971,7 +971,7 @@ Open the [interactive monitoring Gateway API architecture](architecture/monitori
 
 This cluster has no StorageClass. The checked-in values therefore use ephemeral storage and bound Prometheus retention to three days or 8 GB. Prometheus and Alertmanager history, silences, and Grafana database changes are lost when their Pods are recreated or moved. Add a tested StorageClass and explicit persistence values before treating this as durable production monitoring.
 
-Alertmanager uses the chart's default null receiver. Alerts appear in Prometheus, Alertmanager, and Grafana, but no email, chat, paging, or webhook notification leaves the cluster until an operator adds and tests a receiver with its credentials stored in a Kubernetes Secret.
+Grafana loads Prometheus's alert and recording rules as read-only data-source-managed rules. Use **Alerting > Alert rules** to inspect rule health and active instances, and select the provisioned Alertmanager data source to inspect active alerts and silences. Alertmanager uses the chart's default null receiver, so no email, chat, paging, or webhook notification leaves the cluster. Grafana does not duplicate or forward these rules.
 
 The k0s controllers do not run as Kubernetes Pods, and kube-proxy is disabled. The values disable the kube-controller-manager, scheduler, etcd, and kube-proxy scrape targets so the deployment does not create permanently failing targets or alerts for components this topology cannot discover.
 
@@ -1285,7 +1285,7 @@ lab-ingress-0   1/1     Running   0          12m   10.244.3.190   node-01
 lab-ingress-1   1/1     Running   0          53m   10.244.4.241   node-04
 ```
 
-Inspect both Tailscale-backed application Services. A Ready Service reports that every ingress replica advertises its virtual IP:
+Inspect the Tailscale-backed application Services. A Ready Service reports that every ingress replica advertises its virtual IP:
 
 ```console
 $ kubectl --context tailscale-k0s get service \
@@ -1349,6 +1349,83 @@ $ curl --fail --show-error \
 ```
 
 This snapshot demonstrates the completed lab: Hubble UI and Echo each have a private Tailscale Service VIP, both VIPs are advertised by two shared proxies, both TLS certificates are Ready, and both HTTPS endpoints respond successfully.
+
+#### Monitoring stack status
+
+The following output was captured after installing kube-prometheus-stack, exposing its three interfaces through Gateway API, enabling read-only Prometheus rule visibility in Grafana, and reconciling the API-managed Kubernetes command-center dashboard on 2026-09-01. Ages, Pod IPs, generated names, and Tailscale Service addresses change across rebuilds.
+
+Confirm that every monitoring workload is Ready. The node-exporter Pods use host networking and therefore show each worker's Tailscale InternalIP:
+
+```console
+$ kubectl --context tailscale-k0s -n monitoring get pods -o wide
+NAME                                                     READY   STATUS    RESTARTS   NODE
+alertmanager-monitoring-kube-prometheus-alertmanager-0   2/2     Running   0          node-05
+monitoring-grafana-7b7975d6d7-s82vl                      3/3     Running   0          node-04
+monitoring-kube-prometheus-operator-8dccd655b-6fm62      1/1     Running   0          node-05
+monitoring-kube-state-metrics-7b56559c6f-2rdh4           1/1     Running   0          node-01
+monitoring-prometheus-node-exporter-5h65t                1/1     Running   0          node-02
+monitoring-prometheus-node-exporter-mw9hc                1/1     Running   0          node-01
+monitoring-prometheus-node-exporter-qr8b5                1/1     Running   0          node-03
+monitoring-prometheus-node-exporter-rmjtj                1/1     Running   0          node-05
+monitoring-prometheus-node-exporter-zrff8                1/1     Running   0          node-04
+prometheus-monitoring-kube-prometheus-prometheus-0       2/2     Running   0          node-04
+```
+
+Inspect the Gateway, routes, certificates, and generated Tailscale LoadBalancer Service:
+
+```console
+$ kubectl --context tailscale-k0s -n monitoring get gateway,httproute
+NAME                                           CLASS                  ADDRESS          PROGRAMMED
+gateway.gateway.networking.k8s.io/monitoring   monitoring-tailscale   100.89.207.205   True
+
+NAME                                               HOSTNAMES
+httproute.gateway.networking.k8s.io/alertmanager   ["alertmanager.playground.canhdinh.com"]
+httproute.gateway.networking.k8s.io/grafana        ["grafana.playground.canhdinh.com"]
+httproute.gateway.networking.k8s.io/prometheus     ["prometheus.playground.canhdinh.com"]
+
+$ kubectl --context tailscale-k0s -n monitoring get certificate
+NAME                                       READY   SECRET
+alertmanager-playground-canhdinh-com-tls   True    alertmanager-playground-canhdinh-com-tls
+grafana-playground-canhdinh-com-tls        True    grafana-playground-canhdinh-com-tls
+prometheus-playground-canhdinh-com-tls     True    prometheus-playground-canhdinh-com-tls
+
+$ kubectl --context tailscale-k0s -n envoy-gateway-system get service \
+    -l gateway.envoyproxy.io/owning-gateway-name=monitoring
+NAME                                   TYPE           CLUSTER-IP       EXTERNAL-IP      PORT(S)
+envoy-monitoring-monitoring-9b4a98e3   LoadBalancer   10.103.128.133   100.89.207.205   443:31004/TCP
+
+$ kubectl --context tailscale-k0s -n envoy-gateway-system get service \
+    -l gateway.envoyproxy.io/owning-gateway-name=monitoring \
+    -o jsonpath='{.items[0].status.conditions[?(@.type=="TailscaleIngressSvcConfigured")].message}{"\n"}'
+2/2 proxy backends ready and advertising
+```
+
+Verify scrape health and the loaded rule set through Prometheus:
+
+```console
+$ curl --fail --silent --show-error \
+    https://prometheus.playground.canhdinh.com/api/v1/targets | \
+    jq '{active: (.data.activeTargets | length), up: ([.data.activeTargets[] | select(.health == "up")] | length), down: ([.data.activeTargets[] | select(.health != "up")] | length)}'
+{
+  "active": 32,
+  "up": 32,
+  "down": 0
+}
+
+$ curl --fail --silent --show-error \
+    https://prometheus.playground.canhdinh.com/api/v1/rules | \
+    jq '{groups: (.data.groups | length), alertRules: ([.data.groups[].rules[] | select(.type == "alerting")] | length), recordingRules: ([.data.groups[].rules[] | select(.type == "recording")] | length), firing: [.data.groups[].rules[] | select(.type == "alerting" and .state == "firing") | .name]}'
+{
+  "groups": 30,
+  "alertRules": 134,
+  "recordingRules": 85,
+  "firing": ["Watchdog"]
+}
+```
+
+Grafana's provisioned Prometheus data source has `manageAlerts: true`, so **Alerting > Alert rules** displays these 134 rules as read-only data-source-managed rules. The expected always-firing `Watchdog` is the only active rule in this snapshot. The reconciled `Kubernetes / Cluster Command Center` dashboard has UID `kubernetes-command-center`, version `1`, and 17 panels. Because Grafana uses ephemeral storage, a Helm upgrade that recreates its Pod removes this API-managed dashboard; rerun the dashboard reconciliation command before recording the deployment as complete.
+
+This snapshot demonstrates the completed monitoring deployment: all scrape targets are healthy, the three interfaces share one private Gateway VIP and valid certificates, both ingress proxies advertise the Service, Grafana displays the Prometheus rule set, and no external notification receiver is configured for this lab.
 
 ## Recurring operations
 
