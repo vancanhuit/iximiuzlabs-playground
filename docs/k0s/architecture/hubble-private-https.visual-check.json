@@ -6,8 +6,8 @@
   "visualReview": "pending",
   "artifact": {
     "path": "/home/canhdinh/workspace/iximiuzlabs-playground/docs/k0s/architecture/hubble-private-https.html",
-    "sha256": "e9cedf6990db135806b9da33e8a04c6cf3404db1c208d8cb7f3e74f71791b9cd",
-    "bytes": 721842
+    "sha256": "bcb7b16d7d4d507ffe222c6495de5c244692f887caccfb4d63d460583ebcc969",
+    "bytes": 721930
   },
   "state": {
     "detail": "read",

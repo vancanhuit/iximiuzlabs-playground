@@ -6,7 +6,7 @@
     "output": "docs/k0s/architecture/api-impersonation.html",
     "quality_profile": "showcase",
     "column_fit": "spread",
-    "viewBox": [1080, 550],
+    "viewBox": [1080, 585],
     "views": [
       {
         "id": "tailnet-authentication",
@@ -139,7 +139,7 @@
       "from": "rbac",
       "to": "apiserver",
       "y": 390,
-      "label": "allow or deny from RoleBindings",
+      "label": "allow or deny from RoleBinding / ClusterRoleBinding",
       "variant": "return"
     },
     {
@@ -151,11 +151,19 @@
       "variant": "emphasis"
     },
     {
-      "id": "kubectl-response",
+      "id": "apiserver-response",
       "from": "apiserver",
-      "to": "kubectl",
+      "to": "proxy",
       "y": 460,
-      "label": "result or 403 Forbidden through proxy",
+      "label": "return result or 403 Forbidden",
+      "variant": "return"
+    },
+    {
+      "id": "kubectl-response",
+      "from": "proxy",
+      "to": "kubectl",
+      "y": 495,
+      "label": "relay API response over the tailnet",
       "variant": "return"
     }
   ],
@@ -163,7 +171,7 @@
     {
       "participant": "proxy",
       "from": 195,
-      "to": 470,
+      "to": 505,
       "type": "security"
     },
     {

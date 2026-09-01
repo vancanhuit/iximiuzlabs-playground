@@ -44,7 +44,7 @@
     {"id": "cilium", "type": "messagebus", "label": "Cilium Data Plane", "sublabel": "VXLAN + eBPF", "tag": "5 workers Ready", "pos": [710, 245], "size": [145, 72]},
     {"id": "proof", "type": "security", "label": "Verification", "sublabel": "network + conformance", "tag": "zero test failures", "pos": [880, 245], "size": [145, 72]},
     {"id": "identity_api", "type": "security", "label": "Tailscale API Proxy", "sublabel": "lab-k0s, two replicas", "tag": "HTTPS + RBAC", "pos": [1050, 245], "size": [145, 72]},
-    {"id": "shared_lab", "type": "frontend", "label": "Guest Access", "sublabel": "scoped RBAC", "tag": "wildcard grant removed", "pos": [1220, 245], "size": [145, 72]},
+    {"id": "shared_lab", "type": "frontend", "label": "Shared Access", "sublabel": "grants + scoped RBAC", "tag": "remove wildcard first", "pos": [1220, 245], "size": [145, 72]},
     {"id": "stop_repair", "type": "security", "label": "Stop + Repair", "sublabel": "never build on red", "pos": [370, 430], "size": [145, 72]},
     {"id": "direct_recovery", "type": "security", "label": "Direct Recovery", "sublabel": "controller kubeconfig", "tag": "independent path", "pos": [540, 430], "size": [145, 72]}
   ],
@@ -60,8 +60,8 @@
     {"id": "plan", "from": "preflight", "to": "k0s", "label": "reviewed plan", "variant": "emphasis", "labelAt": [528, 331]},
     {"id": "network", "from": "k0s", "to": "cilium", "label": "add data plane", "variant": "emphasis", "labelDy": -32},
     {"id": "test", "from": "cilium", "to": "proof", "label": "run verification", "variant": "emphasis", "labelDy": -32},
-    {"id": "publish", "from": "proof", "to": "identity_api", "label": "zero failures", "variant": "security", "labelAt": [1038, 331]},
-    {"id": "authorize", "from": "identity_api", "to": "shared_lab", "label": "least-privilege access", "variant": "emphasis", "labelAt": [1207, 331]},
+    {"id": "publish", "from": "proof", "to": "identity_api", "label": "install when sharing", "variant": "security", "labelAt": [1038, 331]},
+    {"id": "authorize", "from": "identity_api", "to": "shared_lab", "label": "tighten grants + bind RBAC", "variant": "emphasis", "labelAt": [1207, 331]},
     {"id": "stop", "from": "preflight", "to": "stop_repair", "label": "red stops here", "variant": "security", "fromSide": "bottom", "toSide": "top", "labelAt": [400, 365]},
     {"id": "recover", "from": "k0s", "to": "direct_recovery", "label": "preserve recovery", "variant": "dashed", "fromSide": "bottom", "toSide": "top", "labelAt": [675, 365]}
   ]

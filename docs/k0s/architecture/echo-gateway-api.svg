@@ -318,7 +318,7 @@ rect.c-bg-rect { fill: var(--bg); }
         <path data-edge-from="client" data-edge-to="cloudflare_dns" data-edge-label="resolve DNS-only A record" data-edge-key="0" data-edge-id="resolve_gateway" data-composition-points="115,560;115,369;140,369;140,178" d="M 115 560 L 115 377 Q 115 369 123 369 L 132 369 Q 140 369 140 361 L 140 178" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
         <path data-edge-from="client" data-edge-to="tailnet" data-edge-label="authenticated device" data-edge-key="1" data-edge-id="authenticate_tailnet" data-composition-points="205,598;230,598" d="M 205 598 L 230 598" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
         <path data-edge-from="tailnet" data-edge-to="tailscale_proxy" data-edge-label="WireGuard HTTPS :443" data-edge-key="2" data-edge-id="private_https" data-composition-points="410,598;435,598" d="M 410 598 L 435 598" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
-        <path data-edge-from="tailscale_proxy" data-edge-to="envoy_service" data-edge-label="DNAT to ClusterIP" data-edge-key="3" data-edge-id="proxy_to_envoy" data-composition-points="620,598;650,598" d="M 620 598 L 650 598" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="tailscale_proxy" data-edge-to="envoy_service" data-edge-label="forward TCP to Service ClusterIP" data-edge-key="3" data-edge-id="proxy_to_envoy" data-composition-points="620,598;650,598" d="M 620 598 L 650 598" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
         <path data-edge-from="envoy_service" data-edge-to="envoy" data-edge-label="select Envoy Pod" data-edge-key="4" data-edge-id="service_to_envoy" data-composition-points="850,598;880,598" d="M 850 598 L 880 598" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
         <path data-edge-from="envoy" data-edge-to="echo_workload" data-edge-label="HTTPRoute backend :80" data-edge-key="5" data-edge-id="route_backend" data-composition-points="1080,598;1110,598" d="M 1080 598 L 1110 598" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
         <path data-edge-from="gateway_api" data-edge-to="envoy_controller" data-edge-label="watch desired state" data-edge-key="6" data-edge-id="reconcile_envoy" data-composition-points="725,288;725,334;870,334;870,380" d="M 725 288 L 725 326 Q 725 334 733 334 L 862 334 Q 870 334 870 342 L 870 380" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
@@ -368,8 +368,8 @@ rect.c-bg-rect { fill: var(--bg); }
         <text x="405" y="170" class="t-backend" font-size="7" text-anchor="middle">policy: sync</text>
         </g>
 
-        <g id="node-gateway_api" data-node-id="gateway_api" data-node-label="Gateway API Resources" tabindex="0" role="button" aria-label="Focus Gateway API Resources, GatewayClass + Gateway + HTTPRoute, k0s Kubernetes cluster" aria-pressed="false" data-node-kind="backend" data-node-sublabel="GatewayClass + Gateway + HTTPRoute" data-node-tag="echo namespace" data-node-context="k0s Kubernetes cluster">
-          <title>Gateway API Resources · GatewayClass + Gateway + HTTPRoute · k0s Kubernetes cluster · echo namespace</title>
+        <g id="node-gateway_api" data-node-id="gateway_api" data-node-label="Gateway API Resources" tabindex="0" role="button" aria-label="Focus Gateway API Resources, GatewayClass + Gateway + HTTPRoute, k0s Kubernetes cluster" aria-pressed="false" data-node-kind="backend" data-node-sublabel="GatewayClass + Gateway + HTTPRoute" data-node-tag="mixed cluster/namespace scope" data-node-context="k0s Kubernetes cluster">
+          <title>Gateway API Resources · GatewayClass + Gateway + HTTPRoute · k0s Kubernetes cluster · mixed cluster/namespace scope</title>
           <rect x="600" y="210" width="250" height="78" rx="6" class="c-mask"/>
           <rect x="600" y="210" width="250" height="78" rx="6" class="c-backend" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(606 216) scale(0.6875)">
@@ -377,7 +377,7 @@ rect.c-bg-rect { fill: var(--bg); }
           </g>
           <text data-node-label="" x="725" y="247" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Gateway API Resources</text>
         <text x="725" y="263" class="t-muted" font-size="9" text-anchor="middle">GatewayClass + Gateway + HTTPRoute</text>
-        <text x="725" y="280" class="t-backend" font-size="7" text-anchor="middle">echo namespace</text>
+        <text x="725" y="280" class="t-backend" font-size="7" text-anchor="middle">mixed cluster/namespace scope</text>
         </g>
 
         <g id="node-cert_manager" data-node-id="cert_manager" data-node-label="cert-manager" tabindex="0" role="button" aria-label="Focus cert-manager, ClusterIssuer + Gateway shim, k0s Kubernetes cluster" aria-pressed="false" data-node-kind="security" data-node-sublabel="ClusterIssuer + Gateway shim" data-node-tag="Cloudflare DNS-01" data-node-context="k0s Kubernetes cluster">
@@ -406,8 +406,8 @@ rect.c-bg-rect { fill: var(--bg); }
         <text x="320" y="628" class="t-security" font-size="7" text-anchor="middle">private network</text>
         </g>
 
-        <g id="node-tailscale_proxy" data-node-id="tailscale_proxy" data-node-label="gateway-envoy Proxy" tabindex="0" role="button" aria-label="Focus gateway-envoy Proxy, operator-managed StatefulSet, k0s Kubernetes cluster › Tailnet-only application path" aria-pressed="false" data-node-kind="security" data-node-sublabel="operator-managed StatefulSet" data-node-tag="100.70.228.74 :443" data-node-context="k0s Kubernetes cluster › Tailnet-only application path">
-          <title>gateway-envoy Proxy · operator-managed StatefulSet · k0s Kubernetes cluster › Tailnet-only application path · 100.70.228.74 :443</title>
+        <g id="node-tailscale_proxy" data-node-id="tailscale_proxy" data-node-label="gateway-envoy Proxy" tabindex="0" role="button" aria-label="Focus gateway-envoy Proxy, operator-managed StatefulSet, k0s Kubernetes cluster › Tailnet-only application path" aria-pressed="false" data-node-kind="security" data-node-sublabel="operator-managed StatefulSet" data-node-tag="stable 100.x Service IP :443" data-node-context="k0s Kubernetes cluster › Tailnet-only application path">
+          <title>gateway-envoy Proxy · operator-managed StatefulSet · k0s Kubernetes cluster › Tailnet-only application path · stable 100.x Service IP :443</title>
           <rect x="435" y="560" width="185" height="76" rx="6" class="c-mask"/>
           <rect x="435" y="560" width="185" height="76" rx="6" class="c-security" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(441 566) scale(0.6875)">
@@ -416,7 +416,7 @@ rect.c-bg-rect { fill: var(--bg); }
           </g>
           <text data-node-label="" x="527.5" y="596" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">gateway-envoy Proxy</text>
         <text x="527.5" y="612" class="t-muted" font-size="9" text-anchor="middle">operator-managed StatefulSet</text>
-        <text x="527.5" y="628" class="t-security" font-size="7" text-anchor="middle">100.70.228.74 :443</text>
+        <text x="527.5" y="628" class="t-security" font-size="7" text-anchor="middle">stable 100.x Service IP :443</text>
         </g>
 
         <g id="node-envoy_service" data-node-id="envoy_service" data-node-label="Generated Envoy Service" tabindex="0" role="button" aria-label="Focus Generated Envoy Service, LoadBalancer + ClusterIP, k0s Kubernetes cluster › Tailnet-only application path" aria-pressed="false" data-node-kind="backend" data-node-sublabel="LoadBalancer + ClusterIP" data-node-tag="class: tailscale" data-node-context="k0s Kubernetes cluster › Tailnet-only application path">
@@ -505,9 +505,9 @@ rect.c-bg-rect { fill: var(--bg); }
           <rect x="362" y="645" width="106" height="14" rx="3" class="c-mask"/>
           <text x="415" y="655" class="t-security" font-size="8" text-anchor="middle">WireGuard HTTPS :443</text>
         </g>
-        <g data-edge-from="tailscale_proxy" data-edge-to="envoy_service" data-edge-label="DNAT to ClusterIP" data-edge-key="3" data-edge-id="proxy_to_envoy">
-          <rect x="589.2" y="645" width="91.6" height="14" rx="3" class="c-mask"/>
-          <text x="635" y="655" class="t-backend" font-size="8" text-anchor="middle">DNAT to ClusterIP</text>
+        <g data-edge-from="tailscale_proxy" data-edge-to="envoy_service" data-edge-label="forward TCP to Service ClusterIP" data-edge-key="3" data-edge-id="proxy_to_envoy">
+          <rect x="553.2" y="645" width="163.6" height="14" rx="3" class="c-mask"/>
+          <text x="635" y="655" class="t-backend" font-size="8" text-anchor="middle">forward TCP to Service ClusterIP</text>
         </g>
         <g data-edge-from="envoy_service" data-edge-to="envoy" data-edge-label="select Envoy Pod" data-edge-key="4" data-edge-id="service_to_envoy">
           <rect x="831.6" y="645" width="86.8" height="14" rx="3" class="c-mask"/>

@@ -324,8 +324,8 @@ rect.c-bg-rect { fill: var(--bg); }
         <path data-edge-from="preflight" data-edge-to="k0s" data-edge-label="reviewed plan" data-edge-key="2" data-edge-id="plan" data-composition-points="515,281;540,281" d="M 515 281 L 540 281" class="a-emphasis" data-animate="edge" style="--step:2" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
         <path data-edge-from="k0s" data-edge-to="cilium" data-edge-label="add data plane" data-edge-key="3" data-edge-id="network" data-composition-points="685,281;710,281" d="M 685 281 L 710 281" class="a-emphasis" data-animate="edge" style="--step:3" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
         <path data-edge-from="cilium" data-edge-to="proof" data-edge-label="run verification" data-edge-key="4" data-edge-id="test" data-composition-points="855,281;880,281" d="M 855 281 L 880 281" class="a-emphasis" data-animate="edge" style="--step:4" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="proof" data-edge-to="identity_api" data-edge-label="zero failures" data-edge-key="5" data-edge-id="publish" data-composition-points="1025,281;1050,281" d="M 1025 281 L 1050 281" class="a-security" data-animate="edge" style="--step:5" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
-        <path data-edge-from="identity_api" data-edge-to="shared_lab" data-edge-label="least-privilege access" data-edge-key="6" data-edge-id="authorize" data-composition-points="1195,281;1220,281" d="M 1195 281 L 1220 281" class="a-emphasis" data-animate="edge" style="--step:6" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="proof" data-edge-to="identity_api" data-edge-label="install when sharing" data-edge-key="5" data-edge-id="publish" data-composition-points="1025,281;1050,281" d="M 1025 281 L 1050 281" class="a-security" data-animate="edge" style="--step:5" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
+        <path data-edge-from="identity_api" data-edge-to="shared_lab" data-edge-label="tighten grants + bind RBAC" data-edge-key="6" data-edge-id="authorize" data-composition-points="1195,281;1220,281" d="M 1195 281 L 1220 281" class="a-emphasis" data-animate="edge" style="--step:6" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
         <path data-edge-from="preflight" data-edge-to="stop_repair" data-edge-label="red stops here" data-edge-key="7" data-edge-id="stop" data-composition-points="442.5,317;442.5,430" d="M 442.5 317 L 442.5 430" class="a-security" data-animate="edge" style="--step:7" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
         <path data-edge-from="k0s" data-edge-to="direct_recovery" data-edge-label="preserve recovery" data-edge-key="8" data-edge-id="recover" data-composition-points="612.5,317;612.5,430" d="M 612.5 317 L 612.5 430" class="a-dashed" data-animate="edge" style="--step:8" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
 
@@ -420,8 +420,8 @@ rect.c-bg-rect { fill: var(--bg); }
         <text x="1122.5" y="309" class="t-security" font-size="7" text-anchor="middle">HTTPS + RBAC</text>
         </g>
 
-        <g id="node-shared_lab" data-node-id="shared_lab" data-node-label="Guest Access" tabindex="0" role="button" aria-label="Focus Guest Access, scoped RBAC, Share through identity" aria-pressed="false" data-node-kind="frontend" data-node-sublabel="scoped RBAC" data-node-tag="wildcard grant removed" data-node-context="Share through identity">
-          <title>Guest Access · scoped RBAC · Share through identity · wildcard grant removed</title>
+        <g id="node-shared_lab" data-node-id="shared_lab" data-node-label="Shared Access" tabindex="0" role="button" aria-label="Focus Shared Access, grants + scoped RBAC, Share through identity" aria-pressed="false" data-node-kind="frontend" data-node-sublabel="grants + scoped RBAC" data-node-tag="remove wildcard first" data-node-context="Share through identity">
+          <title>Shared Access · grants + scoped RBAC · Share through identity · remove wildcard first</title>
           <rect x="1220" y="245" width="145" height="72" rx="6" class="c-mask"/>
           <rect x="1220" y="245" width="145" height="72" rx="6" class="c-frontend" data-animate="node" style="--step:7" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="frontend" class="semantic-sigil s-frontend" transform="translate(1226 251) scale(0.6875)">
@@ -430,9 +430,9 @@ rect.c-bg-rect { fill: var(--bg); }
             <circle cx="4.1" cy="4.8" r=".7" class="sigil-fill"/>
             <circle cx="6.3" cy="4.8" r=".7" class="sigil-fill"/>
           </g>
-          <text data-node-label="" x="1292.5" y="279" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Guest Access</text>
-        <text x="1292.5" y="295" class="t-muted" font-size="9" text-anchor="middle">scoped RBAC</text>
-        <text x="1292.5" y="309" class="t-frontend" font-size="7" text-anchor="middle">wildcard grant removed</text>
+          <text data-node-label="" x="1292.5" y="279" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Shared Access</text>
+        <text x="1292.5" y="295" class="t-muted" font-size="9" text-anchor="middle">grants + scoped RBAC</text>
+        <text x="1292.5" y="309" class="t-frontend" font-size="7" text-anchor="middle">remove wildcard first</text>
         </g>
 
         <g id="node-stop_repair" data-node-id="stop_repair" data-node-label="Stop + Repair" tabindex="0" role="button" aria-label="Focus Stop + Repair, never build on red, Stop + recovery paths" aria-pressed="false" data-node-kind="security" data-node-sublabel="never build on red" data-node-context="Stop + recovery paths">
@@ -481,13 +481,13 @@ rect.c-bg-rect { fill: var(--bg); }
           <rect x="824.1" y="229" width="86.8" height="14" rx="3" class="c-mask"/>
           <text x="867.5" y="239" class="t-backend" font-size="8" text-anchor="middle">run verification</text>
         </g>
-        <g data-edge-from="proof" data-edge-to="identity_api" data-edge-label="zero failures" data-edge-key="5" data-edge-id="publish">
-          <rect x="1001.8" y="321" width="72.4" height="14" rx="3" class="c-mask"/>
-          <text x="1038" y="331" class="t-security" font-size="8" text-anchor="middle">zero failures</text>
+        <g data-edge-from="proof" data-edge-to="identity_api" data-edge-label="install when sharing" data-edge-key="5" data-edge-id="publish">
+          <rect x="985" y="321" width="106" height="14" rx="3" class="c-mask"/>
+          <text x="1038" y="331" class="t-security" font-size="8" text-anchor="middle">install when sharing</text>
         </g>
-        <g data-edge-from="identity_api" data-edge-to="shared_lab" data-edge-label="least-privilege access" data-edge-key="6" data-edge-id="authorize">
-          <rect x="1149.2" y="321" width="115.6" height="14" rx="3" class="c-mask"/>
-          <text x="1207" y="331" class="t-backend" font-size="8" text-anchor="middle">least-privilege access</text>
+        <g data-edge-from="identity_api" data-edge-to="shared_lab" data-edge-label="tighten grants + bind RBAC" data-edge-key="6" data-edge-id="authorize">
+          <rect x="1139.6" y="321" width="134.8" height="14" rx="3" class="c-mask"/>
+          <text x="1207" y="331" class="t-backend" font-size="8" text-anchor="middle">tighten grants + bind RBAC</text>
         </g>
         <g data-edge-from="preflight" data-edge-to="stop_repair" data-edge-label="red stops here" data-edge-key="7" data-edge-id="stop">
           <rect x="361.4" y="355" width="77.2" height="14" rx="3" class="c-mask"/>

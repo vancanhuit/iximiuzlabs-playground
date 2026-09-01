@@ -6,7 +6,7 @@
     "output": "docs/k0s/architecture/hubble-dns01.html",
     "quality_profile": "showcase",
     "column_fit": "spread",
-    "viewBox": [1080, 560],
+    "viewBox": [1080, 590],
     "views": [
       {
         "id": "secure-inputs",
@@ -64,18 +64,26 @@
       "variant": "security"
     },
     {
+      "id": "apply_resources",
+      "from": "operator",
+      "to": "kubernetes",
+      "y": 260,
+      "label": "apply rendered Issuer + Certificate + Ingress",
+      "variant": "emphasis"
+    },
+    {
       "id": "observe_certificate",
       "from": "cert_manager",
       "to": "kubernetes",
-      "y": 270,
-      "label": "observe Certificate request",
+      "y": 290,
+      "label": "watch Certificate request",
       "variant": "default"
     },
     {
       "id": "create_order",
       "from": "cert_manager",
       "to": "letsencrypt",
-      "y": 300,
+      "y": 320,
       "label": "create ACME order",
       "variant": "emphasis"
     },
@@ -83,7 +91,7 @@
       "id": "present_challenge",
       "from": "cert_manager",
       "to": "cloudflare",
-      "y": 330,
+      "y": 350,
       "label": "create _acme-challenge TXT",
       "variant": "security"
     },
@@ -91,7 +99,7 @@
       "id": "validate_txt",
       "from": "letsencrypt",
       "to": "cloudflare",
-      "y": 360,
+      "y": 380,
       "label": "query public TXT proof",
       "variant": "dashed"
     },
@@ -99,7 +107,7 @@
       "id": "issue_certificate",
       "from": "letsencrypt",
       "to": "cert_manager",
-      "y": 390,
+      "y": 410,
       "label": "return signed ECDSA certificate",
       "variant": "return"
     },
@@ -107,7 +115,7 @@
       "id": "write_tls_secret",
       "from": "cert_manager",
       "to": "kubernetes",
-      "y": 420,
+      "y": 440,
       "label": "write hubble-ui-tls Secret",
       "variant": "security"
     },
@@ -115,7 +123,7 @@
       "id": "cleanup_challenge",
       "from": "cert_manager",
       "to": "cloudflare",
-      "y": 445,
+      "y": 465,
       "label": "remove challenge TXT",
       "variant": "dashed"
     },
@@ -123,14 +131,14 @@
       "id": "reload_tls",
       "from": "kubernetes",
       "to": "ingress",
-      "y": 477,
+      "y": 500,
       "label": "reload renewed TLS Secret",
       "variant": "emphasis"
     }
   ],
   "activations": [
-    {"participant": "cert_manager", "from": 260, "to": 460, "type": "security"},
-    {"participant": "cloudflare", "from": 320, "to": 460, "type": "cloud"},
-    {"participant": "letsencrypt", "from": 290, "to": 400, "type": "external"}
+    {"participant": "cert_manager", "from": 280, "to": 480, "type": "security"},
+    {"participant": "cloudflare", "from": 340, "to": 480, "type": "cloud"},
+    {"participant": "letsencrypt", "from": 310, "to": 420, "type": "external"}
   ]
 }

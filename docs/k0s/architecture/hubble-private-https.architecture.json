@@ -62,8 +62,8 @@
       "id": "tailscale_proxy",
       "type": "security",
       "label": "Tailscale Proxy Pod",
-      "sublabel": "operator-managed StatefulSet",
-      "tag": "100.71.15.115",
+      "sublabel": "StatefulSet + tailnet identity",
+      "tag": "stable 100.x Service IP",
       "pos": [440, 450],
       "size": [185, 72]
     },
@@ -178,7 +178,7 @@
       "id": "service_forward",
       "from": "tailscale_proxy",
       "to": "lb_service",
-      "label": "DNAT to ClusterIP",
+      "label": "forward TCP to Service ClusterIP",
       "variant": "emphasis",
       "labelAt": [635, 540]
     },
@@ -249,7 +249,7 @@
       "items": [
         "Cloudflare answers DNS but does not proxy application traffic",
         "Tailscale forwards TCP to the Service selecting ingress-nginx",
-        "The proxy Pod is the TCP peer; tailnet grants remain the boundary"
+        "ingress-nginx sees the proxy Pod IP; tailnet grants authorize clients"
       ]
     },
     {

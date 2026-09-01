@@ -69,7 +69,7 @@
       "type": "backend",
       "label": "Gateway API Resources",
       "sublabel": "GatewayClass + Gateway + HTTPRoute",
-      "tag": "echo namespace",
+      "tag": "mixed cluster/namespace scope",
       "pos": [600, 210],
       "size": [250, 78],
       "sources": [
@@ -101,7 +101,7 @@
       "type": "security",
       "label": "gateway-envoy Proxy",
       "sublabel": "operator-managed StatefulSet",
-      "tag": "100.70.228.74 :443",
+      "tag": "stable 100.x Service IP :443",
       "pos": [435, 560],
       "size": [185, 76],
       "sources": [{"path": "docs/k0s/envoy-gateway-tailscale.yaml", "line": 1, "end_line": 14, "label": "Envoy Service provider"}]
@@ -207,7 +207,7 @@
       "id": "proxy_to_envoy",
       "from": "tailscale_proxy",
       "to": "envoy_service",
-      "label": "DNAT to ClusterIP",
+      "label": "forward TCP to Service ClusterIP",
       "variant": "emphasis",
       "labelAt": [635, 655]
     },

@@ -28,7 +28,7 @@
         "id": "service-backend",
         "label": "Service to backend",
         "focus": ["service_vip", "source_cilium", "local_pod", "vxlan_encap", "tailnet", "vxlan_decap", "destination_cilium", "remote_pod"],
-        "note": "The Service IP is virtual: eBPF selects a backend, then forwarding uses the same-node or cross-node Pod path."
+        "note": "The virtual ClusterIP selects a backend in eBPF. The result follows the same-node or cross-node Pod path."
       },
       {
         "id": "internet-egress",
@@ -42,8 +42,8 @@
     {
       "id": "service_vip",
       "type": "cloud",
-      "label": "Optional ClusterIP",
-      "sublabel": "virtual 10.96.x.y Service IP",
+      "label": "ClusterIP Service Lookup",
+      "sublabel": "virtual 10.96.x.y destination",
       "tag": "not routed",
       "pos": [25, 65],
       "size": [170, 76],
@@ -163,7 +163,7 @@
       "id": "service_lookup",
       "from": "service_vip",
       "to": "source_cilium",
-      "label": "eBPF selects Pod backend",
+      "label": "optional eBPF backend lookup",
       "variant": "dashed",
       "fromSide": "bottom",
       "toSide": "top"

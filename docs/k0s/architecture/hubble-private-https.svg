@@ -318,7 +318,7 @@ rect.c-bg-rect { fill: var(--bg); }
         <path data-edge-from="browser" data-edge-to="cloudflare_dns" data-edge-label="resolve DNS-only A record" data-edge-key="0" data-edge-id="resolve_private_ip" data-composition-points="112.5,450;112.5,313;140,313;140,176" d="M 112.5 450 L 112.5 321 Q 112.5 313 120.5 313 L 132 313 Q 140 313 140 305 L 140 176" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
         <path data-edge-from="browser" data-edge-to="tailnet" data-edge-label="authenticated device" data-edge-key="1" data-edge-id="join_tailnet" data-composition-points="200,486;230,486" d="M 200 486 L 230 486" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
         <path data-edge-from="tailnet" data-edge-to="tailscale_proxy" data-edge-label="WireGuard-encrypted HTTPS :443" data-edge-key="2" data-edge-id="private_https" data-composition-points="410,486;440,486" d="M 410 486 L 440 486" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
-        <path data-edge-from="tailscale_proxy" data-edge-to="lb_service" data-edge-label="DNAT to ClusterIP" data-edge-key="3" data-edge-id="service_forward" data-composition-points="625,486;655,486" d="M 625 486 L 655 486" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="tailscale_proxy" data-edge-to="lb_service" data-edge-label="forward TCP to Service ClusterIP" data-edge-key="3" data-edge-id="service_forward" data-composition-points="625,486;655,486" d="M 625 486 L 655 486" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
         <path data-edge-from="lb_service" data-edge-to="ingress_nginx" data-edge-label="select controller Pod" data-edge-key="4" data-edge-id="service_to_ingress" data-composition-points="840,486;870,486" d="M 840 486 L 870 486" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
         <path data-edge-from="ingress_nginx" data-edge-to="hubble_ui" data-edge-label="decrypted HTTP to ClusterIP" data-edge-key="5" data-edge-id="hubble_route" data-composition-points="1055,486;1085,486" d="M 1055 486 L 1085 486" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
         <path data-edge-from="cert_manager" data-edge-to="tls_secret" data-edge-label="write renewed keypair" data-edge-key="6" data-edge-id="store_certificate" data-composition-points="1050,628;1080,628" d="M 1050 628 L 1080 628" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
@@ -365,8 +365,8 @@ rect.c-bg-rect { fill: var(--bg); }
         <text x="320" y="514" class="t-security" font-size="7" text-anchor="middle">private 100.64.0.0/10</text>
         </g>
 
-        <g id="node-tailscale_proxy" data-node-id="tailscale_proxy" data-node-label="Tailscale Proxy Pod" tabindex="0" role="button" aria-label="Focus Tailscale Proxy Pod, operator-managed StatefulSet, Kubernetes cluster › Tailnet-only application path" aria-pressed="false" data-node-kind="security" data-node-sublabel="operator-managed StatefulSet" data-node-tag="100.71.15.115" data-node-context="Kubernetes cluster › Tailnet-only application path">
-          <title>Tailscale Proxy Pod · operator-managed StatefulSet · Kubernetes cluster › Tailnet-only application path · 100.71.15.115</title>
+        <g id="node-tailscale_proxy" data-node-id="tailscale_proxy" data-node-label="Tailscale Proxy Pod" tabindex="0" role="button" aria-label="Focus Tailscale Proxy Pod, StatefulSet + tailnet identity, Kubernetes cluster › Tailnet-only application path" aria-pressed="false" data-node-kind="security" data-node-sublabel="StatefulSet + tailnet identity" data-node-tag="stable 100.x Service IP" data-node-context="Kubernetes cluster › Tailnet-only application path">
+          <title>Tailscale Proxy Pod · StatefulSet + tailnet identity · Kubernetes cluster › Tailnet-only application path · stable 100.x Service IP</title>
           <rect x="440" y="450" width="185" height="72" rx="6" class="c-mask"/>
           <rect x="440" y="450" width="185" height="72" rx="6" class="c-security" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(446 456) scale(0.6875)">
@@ -374,8 +374,8 @@ rect.c-bg-rect { fill: var(--bg); }
             <path d="m5.8 8 1.5 1.5 3-3"/>
           </g>
           <text data-node-label="" x="532.5" y="484" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Tailscale Proxy Pod</text>
-        <text x="532.5" y="500" class="t-muted" font-size="9" text-anchor="middle">operator-managed StatefulSet</text>
-        <text x="532.5" y="514" class="t-security" font-size="7" text-anchor="middle">100.71.15.115</text>
+        <text x="532.5" y="500" class="t-muted" font-size="9" text-anchor="middle">StatefulSet + tailnet identity</text>
+        <text x="532.5" y="514" class="t-security" font-size="7" text-anchor="middle">stable 100.x Service IP</text>
         </g>
 
         <g id="node-lb_service" data-node-id="lb_service" data-node-label="hubble-ui-tailscale" tabindex="0" role="button" aria-label="Focus hubble-ui-tailscale, LoadBalancer Service, Kubernetes cluster › Tailnet-only application path" aria-pressed="false" data-node-kind="backend" data-node-sublabel="LoadBalancer Service" data-node-tag="class: tailscale" data-node-context="Kubernetes cluster › Tailnet-only application path">
@@ -480,9 +480,9 @@ rect.c-bg-rect { fill: var(--bg); }
           <rect x="338" y="530" width="154" height="14" rx="3" class="c-mask"/>
           <text x="415" y="540" class="t-security" font-size="8" text-anchor="middle">WireGuard-encrypted HTTPS :443</text>
         </g>
-        <g data-edge-from="tailscale_proxy" data-edge-to="lb_service" data-edge-label="DNAT to ClusterIP" data-edge-key="3" data-edge-id="service_forward">
-          <rect x="589.2" y="530" width="91.6" height="14" rx="3" class="c-mask"/>
-          <text x="635" y="540" class="t-backend" font-size="8" text-anchor="middle">DNAT to ClusterIP</text>
+        <g data-edge-from="tailscale_proxy" data-edge-to="lb_service" data-edge-label="forward TCP to Service ClusterIP" data-edge-key="3" data-edge-id="service_forward">
+          <rect x="553.2" y="530" width="163.6" height="14" rx="3" class="c-mask"/>
+          <text x="635" y="540" class="t-backend" font-size="8" text-anchor="middle">forward TCP to Service ClusterIP</text>
         </g>
         <g data-edge-from="lb_service" data-edge-to="ingress_nginx" data-edge-label="select controller Pod" data-edge-key="4" data-edge-id="service_to_ingress">
           <rect x="799.6" y="530" width="110.8" height="14" rx="3" class="c-mask"/>

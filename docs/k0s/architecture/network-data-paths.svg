@@ -317,7 +317,7 @@ rect.c-bg-rect { fill: var(--bg); }
         <rect data-graph-role="structural-frame" data-composition-frame-kind="region" data-composition-frame-id="2" data-composition-frame-label="Worker B: destination node" x="776" y="275" width="593" height="127" rx="12" class="c-region" stroke-width="1"/>
 
         <!-- Connection paths (before components for correct z-order) -->
-        <path data-edge-from="service_vip" data-edge-to="source_cilium" data-edge-label="eBPF selects Pod backend" data-edge-key="0" data-edge-id="service_lookup" data-composition-points="110,141;110,220.5;290,220.5;290,300" d="M 110 141 L 110 212.5 Q 110 220.5 118 220.5 L 282 220.5 Q 290 220.5 290 228.5 L 290 300" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
+        <path data-edge-from="service_vip" data-edge-to="source_cilium" data-edge-label="optional eBPF backend lookup" data-edge-key="0" data-edge-id="service_lookup" data-composition-points="110,141;110,220.5;290,220.5;290,300" d="M 110 141 L 110 212.5 Q 110 220.5 118 220.5 L 282 220.5 Q 290 220.5 290 228.5 L 290 300" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
         <path data-edge-from="source_pod" data-edge-to="source_cilium" data-edge-label="inner IP: 10.244.1.10 → 10.244.2.20" data-edge-key="1" data-edge-id="pod_veth" data-composition-points="175,341;205,341" d="M 175 341 L 205 341" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
         <path data-edge-from="source_cilium" data-edge-to="vxlan_encap" data-edge-label="remote Pod CIDR → tunnel" data-edge-key="2" data-edge-id="route_remote" data-composition-points="375,341;400,341" d="M 375 341 L 400 341" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
         <path data-edge-from="vxlan_encap" data-edge-to="tailnet" data-edge-label="outer IP: Worker A 100.x → Worker B 100.y, UDP :8472" data-edge-key="3" data-edge-id="vxlan_packet" data-composition-points="560,341;590,341" d="M 560 341 L 590 341" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
@@ -328,15 +328,15 @@ rect.c-bg-rect { fill: var(--bg); }
         <path data-edge-from="source_cilium" data-edge-to="internet" data-edge-label="SNAT Pod IP → Worker A eth0 IP" data-edge-key="8" data-edge-id="pod_egress" data-composition-points="290,382;290,443.5;750,443.5;750,505" d="M 290 382 L 290 435.5 Q 290 443.5 298 443.5 L 742 443.5 Q 750 443.5 750 451.5 L 750 505" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
 
         <!-- Components -->
-        <g id="node-service_vip" data-node-id="service_vip" data-node-label="Optional ClusterIP" tabindex="0" role="button" aria-label="Focus Optional ClusterIP, virtual 10.96.x.y Service IP, Architecture component" aria-pressed="false" data-node-kind="cloud" data-node-sublabel="virtual 10.96.x.y Service IP" data-node-tag="not routed" data-node-context="Architecture component">
-          <title>Optional ClusterIP · virtual 10.96.x.y Service IP · Architecture component · not routed</title>
+        <g id="node-service_vip" data-node-id="service_vip" data-node-label="ClusterIP Service Lookup" tabindex="0" role="button" aria-label="Focus ClusterIP Service Lookup, virtual 10.96.x.y destination, Architecture component" aria-pressed="false" data-node-kind="cloud" data-node-sublabel="virtual 10.96.x.y destination" data-node-tag="not routed" data-node-context="Architecture component">
+          <title>ClusterIP Service Lookup · virtual 10.96.x.y destination · Architecture component · not routed</title>
           <rect x="25" y="65" width="170" height="76" rx="6" class="c-mask"/>
           <rect x="25" y="65" width="170" height="76" rx="6" class="c-cloud" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="cloud" class="semantic-sigil s-cloud" transform="translate(31 71) scale(0.6875)">
             <path d="M4.3 12.5h7.3a2.4 2.4 0 0 0 .2-4.8 4 4 0 0 0-7.5-1.3A3.1 3.1 0 0 0 4.3 12.5Z"/>
           </g>
-          <text data-node-label="" x="110" y="101" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Optional ClusterIP</text>
-        <text x="110" y="117" class="t-muted" font-size="9" text-anchor="middle">virtual 10.96.x.y Service IP</text>
+          <text data-node-label="" x="110" y="101" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">ClusterIP Service Lookup</text>
+        <text x="110" y="117" class="t-muted" font-size="9" text-anchor="middle">virtual 10.96.x.y destination</text>
         <text x="110" y="133" class="t-cloud" font-size="7" text-anchor="middle">not routed</text>
         </g>
 
@@ -463,9 +463,9 @@ rect.c-bg-rect { fill: var(--bg); }
         </g>
 
         <!-- Connection labels -->
-        <g data-edge-from="service_vip" data-edge-to="source_cilium" data-edge-label="eBPF selects Pod backend" data-edge-key="0" data-edge-id="service_lookup">
-          <rect x="137.4" y="200.5" width="125.19999999999999" height="14" rx="3" class="c-mask"/>
-          <text x="200" y="210.5" class="t-messagebus" font-size="8" text-anchor="middle">eBPF selects Pod backend</text>
+        <g data-edge-from="service_vip" data-edge-to="source_cilium" data-edge-label="optional eBPF backend lookup" data-edge-key="0" data-edge-id="service_lookup">
+          <rect x="127.8" y="200.5" width="144.4" height="14" rx="3" class="c-mask"/>
+          <text x="200" y="210.5" class="t-messagebus" font-size="8" text-anchor="middle">optional eBPF backend lookup</text>
         </g>
         <g data-edge-from="source_pod" data-edge-to="source_cilium" data-edge-label="inner IP: 10.244.1.10 → 10.244.2.20" data-edge-key="1" data-edge-id="pod_veth">
           <rect x="101" y="388" width="178" height="14" rx="3" class="c-mask"/>

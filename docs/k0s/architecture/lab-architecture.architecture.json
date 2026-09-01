@@ -2,8 +2,8 @@
   "schema_version": 1,
   "diagram_type": "architecture",
   "meta": {
-    "title": "One Private Kubernetes Lab, Built Across Boundaries",
-    "subtitle": "Two disposable playgrounds become one resilient learning platform through identity-first networking.",
+    "title": "Private k0s Cluster over a Tailscale Underlay",
+    "subtitle": "Eight hosts in two playgrounds form one kube-proxy-free Kubernetes cluster.",
     "output": "docs/k0s/architecture/lab-architecture.html",
     "animation": "trace",
     "visual_preset": "editorial",
@@ -50,15 +50,15 @@
       "type": "security",
       "label": "Tailscale Tailnet",
       "sublabel": "identity + encrypted underlay",
-      "tag": "tag:lab",
+      "tag": "node identity: tag:lab",
       "pos": [250, 290],
       "size": [170, 72]
     },
     {
       "id": "api_service",
       "type": "security",
-      "label": "lab-k0s Service",
-      "sublabel": "HTTPS + Tailscale identity",
+      "label": "lab-k0s Tailscale Service",
+      "sublabel": "private HTTPS endpoint",
       "tag": "routine path",
       "pos": [490, 115],
       "size": [175, 72]
@@ -84,7 +84,7 @@
     {
       "id": "controllers",
       "type": "backend",
-      "label": "k0s Controllers",
+      "label": "k0s Controllers + API",
       "sublabel": "3 control-plane-only hosts",
       "tag": "API :6443",
       "pos": [745, 290],
@@ -176,7 +176,7 @@
       "id": "proxy-to-api",
       "from": "proxygroup",
       "to": "controllers",
-      "label": "impersonated identity",
+      "label": "workload credential + impersonation headers",
       "variant": "security",
       "labelAt": [835, 201]
     },
@@ -198,7 +198,7 @@
       "id": "controller-quorum",
       "from": "controllers",
       "to": "etcd",
-      "label": "etcd peers over Tailscale",
+      "label": "embedded etcd quorum over Tailscale",
       "variant": "security"
     },
     {

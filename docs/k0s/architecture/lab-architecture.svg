@@ -285,8 +285,8 @@ svg[data-theme="light"] { --bg: #f2eee5; --grid: #d8d0c2; --text: #242018; --tex
 svg[data-theme="dark"] { --bg: #181611; --grid: #39342a; --text: #f4eddf; --text-muted: #b9ae9b; --text-dim: #776e60; --text-faint: #9d917e; --panel: rgba(35, 31, 24, 0.96); --panel-border: #625a4a; --lane-fill: rgba(52, 46, 35, 0.46); --lane-stroke: #726957; --arrow: #948978; --arrow-emphasis: #dd6b3d; --mask: #231f18; --frontend-fill: rgba(43, 133, 142, 0.16); --frontend-stroke: #7fc6c7; --backend-fill: rgba(63, 132, 92, 0.16); --backend-stroke: #8fc29e; --database-fill: rgba(117, 91, 141, 0.17); --database-stroke: #c0a4d0; --cloud-fill: rgba(170, 119, 49, 0.16); --cloud-stroke: #d8ad68; --security-fill: rgba(157, 69, 65, 0.17); --security-stroke: #df9085; --messagebus-fill: rgba(174, 79, 42, 0.16); --messagebus-stroke: #df946f; --external-fill: rgba(126, 115, 96, 0.18); --external-stroke: #b8ad99; --toolbar-bg: rgba(35, 31, 24, 0.92); --toolbar-border: #625a4a; --toolbar-text: #eee5d5; --toolbar-hover: #302a20; --toolbar-menu-bg: #231f18; }
 rect.c-bg-rect { fill: var(--bg); }
 </style><rect width="100%" height="100%" class="c-bg-rect"/>
-        <title id="archify-diagram-title">One Private Kubernetes Lab, Built Across Boundaries</title>
-        <desc id="archify-diagram-description">Two disposable playgrounds become one resilient learning platform through identity-first networking.</desc>
+        <title id="archify-diagram-title">Private k0s Cluster over a Tailscale Underlay</title>
+        <desc id="archify-diagram-description">Eight hosts in two playgrounds form one kube-proxy-free Kubernetes cluster.</desc>
         <!-- Definitions -->
         <defs>
           <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
@@ -318,10 +318,10 @@ rect.c-bg-rect { fill: var(--bg); }
         <path data-edge-from="people" data-edge-to="tailnet" data-edge-label="authenticate" data-edge-key="0" data-edge-id="join-tailnet" data-composition-points="190,326;250,326" d="M 190 326 L 250 326" class="a-security" data-animate="edge" style="--step:0" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
         <path data-edge-from="tailnet" data-edge-to="api_service" data-edge-label="kubectl HTTPS :443" data-edge-key="1" data-edge-id="routine-api" data-composition-points="420,319;455,319;455,151;490,151" d="M 420 319 L 447 319 Q 455 319 455 311 L 455 159 Q 455 151 463 151 L 490 151" class="a-emphasis" data-animate="edge" style="--step:1" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
         <path data-edge-from="api_service" data-edge-to="proxygroup" data-edge-label="available replica" data-edge-key="2" data-edge-id="service-to-proxies" data-composition-points="665,151;745,151" d="M 665 151 L 745 151" class="a-emphasis" data-animate="edge" style="--step:2" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="proxygroup" data-edge-to="controllers" data-edge-label="impersonated identity" data-edge-key="3" data-edge-id="proxy-to-api" data-composition-points="835,187;835,290" d="M 835 187 L 835 290" class="a-security" data-animate="edge" style="--step:3" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
+        <path data-edge-from="proxygroup" data-edge-to="controllers" data-edge-label="workload credential + impersonation headers" data-edge-key="3" data-edge-id="proxy-to-api" data-composition-points="835,187;835,290" d="M 835 187 L 835 290" class="a-security" data-animate="edge" style="--step:3" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
         <path data-edge-from="tailnet" data-edge-to="break_glass" data-edge-label="recover" data-edge-key="4" data-edge-id="direct-recovery" data-composition-points="420,333;455,333;455,476;490,476" d="M 420 333 L 447 333 Q 455 333 455 341 L 455 468 Q 455 476 463 476 L 490 476" class="a-dashed" data-animate="edge" style="--step:4" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
         <path data-edge-from="break_glass" data-edge-to="controllers" data-edge-label="client certificate :6443" data-edge-key="5" data-edge-id="recovery-to-api" data-composition-points="665,476;705,476;705,326;745,326" d="M 665 476 L 697 476 Q 705 476 705 468 L 705 334 Q 705 326 713 326 L 745 326" class="a-dashed" data-animate="edge" style="--step:5" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
-        <path data-edge-from="controllers" data-edge-to="etcd" data-edge-label="etcd peers over Tailscale" data-edge-key="6" data-edge-id="controller-quorum" data-composition-points="925,326;967.5,326;967.5,151;1010,151" d="M 925 326 L 959.5 326 Q 967.5 326 967.5 318 L 967.5 159 Q 967.5 151 975.5 151 L 1010 151" class="a-security" data-animate="edge" style="--step:6" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
+        <path data-edge-from="controllers" data-edge-to="etcd" data-edge-label="embedded etcd quorum over Tailscale" data-edge-key="6" data-edge-id="controller-quorum" data-composition-points="925,326;967.5,326;967.5,151;1010,151" d="M 925 326 L 959.5 326 Q 967.5 326 967.5 318 L 967.5 159 Q 967.5 151 975.5 151 L 1010 151" class="a-security" data-animate="edge" style="--step:6" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
         <path data-edge-from="workers" data-edge-to="controllers" data-edge-label="node-local load balancer forwards API traffic" data-edge-key="7" data-edge-id="worker-control" data-composition-points="1010,326;925,326" d="M 1010 326 L 925 326" class="a-emphasis" data-animate="edge" style="--step:7" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
         <path data-edge-from="workers" data-edge-to="cilium" data-edge-label="node datapath" data-edge-key="8" data-edge-id="workers-to-cilium" data-composition-points="1010,326;967.5,326;967.5,606;925,606" d="M 1010 326 L 975.5 326 Q 967.5 326 967.5 334 L 967.5 598 Q 967.5 606 959.5 606 L 925 606" class="a-default" data-animate="edge" style="--step:8" stroke-width="1.5" marker-end="url(#arrowhead)"/>
         <path data-edge-from="cilium" data-edge-to="workloads" data-edge-label="Pod + Service networking" data-edge-key="9" data-edge-id="cilium-to-workloads" data-composition-points="925,606;1010,606" d="M 925 606 L 1010 606" class="a-emphasis" data-animate="edge" style="--step:9" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
@@ -341,8 +341,8 @@ rect.c-bg-rect { fill: var(--bg); }
         <text x="115" y="340" class="t-muted" font-size="9" text-anchor="middle">admin laptops</text>
         </g>
 
-        <g id="node-tailnet" data-node-id="tailnet" data-node-label="Tailscale Tailnet" tabindex="0" role="button" aria-label="Focus Tailscale Tailnet, identity + encrypted underlay, Tailnet identity boundary" aria-pressed="false" data-node-kind="security" data-node-sublabel="identity + encrypted underlay" data-node-tag="tag:lab" data-node-context="Tailnet identity boundary">
-          <title>Tailscale Tailnet · identity + encrypted underlay · Tailnet identity boundary · tag:lab</title>
+        <g id="node-tailnet" data-node-id="tailnet" data-node-label="Tailscale Tailnet" tabindex="0" role="button" aria-label="Focus Tailscale Tailnet, identity + encrypted underlay, Tailnet identity boundary" aria-pressed="false" data-node-kind="security" data-node-sublabel="identity + encrypted underlay" data-node-tag="node identity: tag:lab" data-node-context="Tailnet identity boundary">
+          <title>Tailscale Tailnet · identity + encrypted underlay · Tailnet identity boundary · node identity: tag:lab</title>
           <rect x="250" y="290" width="170" height="72" rx="6" class="c-mask"/>
           <rect x="250" y="290" width="170" height="72" rx="6" class="c-security" data-animate="node" style="--step:1" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(256 296) scale(0.6875)">
@@ -351,19 +351,19 @@ rect.c-bg-rect { fill: var(--bg); }
           </g>
           <text data-node-label="" x="335" y="324" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Tailscale Tailnet</text>
         <text x="335" y="340" class="t-muted" font-size="9" text-anchor="middle">identity + encrypted underlay</text>
-        <text x="335" y="354" class="t-security" font-size="7" text-anchor="middle">tag:lab</text>
+        <text x="335" y="354" class="t-security" font-size="7" text-anchor="middle">node identity: tag:lab</text>
         </g>
 
-        <g id="node-api_service" data-node-id="api_service" data-node-label="lab-k0s Service" tabindex="0" role="button" aria-label="Focus lab-k0s Service, HTTPS + Tailscale identity, Tailnet identity boundary" aria-pressed="false" data-node-kind="security" data-node-sublabel="HTTPS + Tailscale identity" data-node-tag="routine path" data-node-context="Tailnet identity boundary">
-          <title>lab-k0s Service · HTTPS + Tailscale identity · Tailnet identity boundary · routine path</title>
+        <g id="node-api_service" data-node-id="api_service" data-node-label="lab-k0s Tailscale Service" tabindex="0" role="button" aria-label="Focus lab-k0s Tailscale Service, private HTTPS endpoint, Tailnet identity boundary" aria-pressed="false" data-node-kind="security" data-node-sublabel="private HTTPS endpoint" data-node-tag="routine path" data-node-context="Tailnet identity boundary">
+          <title>lab-k0s Tailscale Service · private HTTPS endpoint · Tailnet identity boundary · routine path</title>
           <rect x="490" y="115" width="175" height="72" rx="6" class="c-mask"/>
           <rect x="490" y="115" width="175" height="72" rx="6" class="c-security" data-animate="node" style="--step:2" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(496 121) scale(0.6875)">
             <path d="M8 2.2 13 4v3.5c0 3.1-1.8 5.4-5 6.5-3.2-1.1-5-3.4-5-6.5V4Z"/>
             <path d="m5.8 8 1.5 1.5 3-3"/>
           </g>
-          <text data-node-label="" x="577.5" y="149" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">lab-k0s Service</text>
-        <text x="577.5" y="165" class="t-muted" font-size="9" text-anchor="middle">HTTPS + Tailscale identity</text>
+          <text data-node-label="" x="577.5" y="149" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">lab-k0s Tailscale Service</text>
+        <text x="577.5" y="165" class="t-muted" font-size="9" text-anchor="middle">private HTTPS endpoint</text>
         <text x="577.5" y="179" class="t-security" font-size="7" text-anchor="middle">routine path</text>
         </g>
 
@@ -392,14 +392,14 @@ rect.c-bg-rect { fill: var(--bg); }
         <text x="835" y="179" class="t-backend" font-size="7" text-anchor="middle">lab-k0s</text>
         </g>
 
-        <g id="node-controllers" data-node-id="controllers" data-node-label="k0s Controllers" tabindex="0" role="button" aria-label="Focus k0s Controllers, 3 control-plane-only hosts, iximiuz Labs: two playgrounds, one cluster" aria-pressed="false" data-node-kind="backend" data-node-sublabel="3 control-plane-only hosts" data-node-tag="API :6443" data-node-context="iximiuz Labs: two playgrounds, one cluster">
-          <title>k0s Controllers · 3 control-plane-only hosts · iximiuz Labs: two playgrounds, one cluster · API :6443</title>
+        <g id="node-controllers" data-node-id="controllers" data-node-label="k0s Controllers + API" tabindex="0" role="button" aria-label="Focus k0s Controllers + API, 3 control-plane-only hosts, iximiuz Labs: two playgrounds, one cluster" aria-pressed="false" data-node-kind="backend" data-node-sublabel="3 control-plane-only hosts" data-node-tag="API :6443" data-node-context="iximiuz Labs: two playgrounds, one cluster">
+          <title>k0s Controllers + API · 3 control-plane-only hosts · iximiuz Labs: two playgrounds, one cluster · API :6443</title>
           <rect x="745" y="290" width="180" height="72" rx="6" class="c-mask"/>
           <rect x="745" y="290" width="180" height="72" rx="6" class="c-backend" data-animate="node" style="--step:4" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(751 296) scale(0.6875)">
             <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
-          <text data-node-label="" x="835" y="324" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">k0s Controllers</text>
+          <text data-node-label="" x="835" y="324" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">k0s Controllers + API</text>
         <text x="835" y="340" class="t-muted" font-size="9" text-anchor="middle">3 control-plane-only hosts</text>
         <text x="835" y="354" class="t-backend" font-size="7" text-anchor="middle">API :6443</text>
         </g>
@@ -480,9 +480,9 @@ rect.c-bg-rect { fill: var(--bg); }
           <rect x="659.2" y="191" width="91.6" height="14" rx="3" class="c-mask"/>
           <text x="705" y="201" class="t-backend" font-size="8" text-anchor="middle">available replica</text>
         </g>
-        <g data-edge-from="proxygroup" data-edge-to="controllers" data-edge-label="impersonated identity" data-edge-key="3" data-edge-id="proxy-to-api">
-          <rect x="779.6" y="191" width="110.8" height="14" rx="3" class="c-mask"/>
-          <text x="835" y="201" class="t-security" font-size="8" text-anchor="middle">impersonated identity</text>
+        <g data-edge-from="proxygroup" data-edge-to="controllers" data-edge-label="workload credential + impersonation headers" data-edge-key="3" data-edge-id="proxy-to-api">
+          <rect x="726.8" y="191" width="216.4" height="14" rx="3" class="c-mask"/>
+          <text x="835" y="201" class="t-security" font-size="8" text-anchor="middle">workload credential + impersonation headers</text>
         </g>
         <g data-edge-from="tailnet" data-edge-to="break_glass" data-edge-label="recover" data-edge-key="4" data-edge-id="direct-recovery">
           <rect x="433.2" y="384.5" width="43.6" height="14" rx="3" class="c-mask"/>
@@ -492,9 +492,9 @@ rect.c-bg-rect { fill: var(--bg); }
           <rect x="642.4" y="381" width="125.19999999999999" height="14" rx="3" class="c-mask"/>
           <text x="705" y="391" class="t-messagebus" font-size="8" text-anchor="middle">client certificate :6443</text>
         </g>
-        <g data-edge-from="controllers" data-edge-to="etcd" data-edge-label="etcd peers over Tailscale" data-edge-key="6" data-edge-id="controller-quorum">
-          <rect x="902.5" y="218.5" width="130" height="14" rx="3" class="c-mask"/>
-          <text x="967.5" y="228.5" class="t-security" font-size="8" text-anchor="middle">etcd peers over Tailscale</text>
+        <g data-edge-from="controllers" data-edge-to="etcd" data-edge-label="embedded etcd quorum over Tailscale" data-edge-key="6" data-edge-id="controller-quorum">
+          <rect x="878.5" y="218.5" width="178" height="14" rx="3" class="c-mask"/>
+          <text x="967.5" y="228.5" class="t-security" font-size="8" text-anchor="middle">embedded etcd quorum over Tailscale</text>
         </g>
         <g data-edge-from="workers" data-edge-to="controllers" data-edge-label="node-local load balancer forwards API traffic" data-edge-key="7" data-edge-id="worker-control">
           <rect x="737" y="380" width="226" height="14" rx="3" class="c-mask"/>

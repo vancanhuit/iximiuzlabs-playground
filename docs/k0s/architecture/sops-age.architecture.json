@@ -2,7 +2,7 @@
   "schema_version": 1,
   "diagram_type": "architecture",
   "meta": {
-    "title": "How SOPS and age Protect Repository Secrets",
+    "title": "SOPS Envelope Encryption for Repository Secrets",
     "output": "docs/k0s/architecture/sops-age.html",
     "quality_profile": "showcase",
     "viewBox": [1340, 650],
@@ -11,7 +11,7 @@
     }
   },
   "components": [
-    { "id": "edit", "type": "frontend", "label": "Edit with SOPS", "sublabel": "plaintext in editor memory", "tag": "authorized host", "pos": [35, 235], "size": [145, 76] },
+    { "id": "edit", "type": "frontend", "label": "Edit with SOPS", "sublabel": "temporary plaintext", "tag": "authorized host", "pos": [35, 235], "size": [145, 76] },
     { "id": "data_key", "type": "security", "label": "Random data key", "sublabel": "generated per file", "tag": "never committed raw", "pos": [225, 235], "size": [145, 76] },
     { "id": "encrypted_values", "type": "security", "label": "Encrypted values", "sublabel": "AES-256-GCM", "tag": "MAC authenticates file", "pos": [425, 115], "size": [145, 76] },
     { "id": "wrapped_key", "type": "security", "label": "Wrapped data key", "sublabel": "age public recipient", "tag": "safe ciphertext", "pos": [425, 355], "size": [145, 76] },
@@ -19,7 +19,7 @@
     { "id": "git", "type": "cloud", "label": "Git repository", "sublabel": "versions ciphertext only", "pos": [835, 235], "size": [145, 76] },
     { "id": "decrypt", "type": "security", "label": "SOPS decrypt", "sublabel": "verify MAC + unwrap key", "tag": "extract one value", "pos": [1030, 235], "size": [145, 76] },
     { "id": "private_identity", "type": "security", "label": "age private identity", "sublabel": "stored outside Git", "tag": "grants decryption", "pos": [1030, 420], "size": [145, 76] },
-    { "id": "consumer", "type": "backend", "label": "Runtime consumer", "sublabel": "stdin or mode-600 file", "tag": "remove after use", "pos": [1190, 80], "size": [125, 76] }
+    { "id": "consumer", "type": "backend", "label": "Runtime consumer", "sublabel": "protected input", "tag": "mode 0600; remove after use", "pos": [1190, 80], "size": [125, 76] }
   ],
   "boundaries": [
     { "kind": "security-group", "label": "SOPS envelope encryption", "wraps": ["data_key", "encrypted_values", "wrapped_key", "encrypted_file"], "pad": 25 },

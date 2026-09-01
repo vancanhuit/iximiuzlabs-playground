@@ -6,8 +6,8 @@
   "visualReview": "pending",
   "artifact": {
     "path": "/home/canhdinh/workspace/iximiuzlabs-playground/docs/k0s/architecture/echo-gateway-api.html",
-    "sha256": "26fefa885f5b5313d540a119a2e64a48feb544b5a5795d108038f00dce3fa1ae",
-    "bytes": 729257
+    "sha256": "20d868a01a6750a839c4b837b3dc4c6be400bf716abd5804f862cc271ced8f53",
+    "bytes": 729378
   },
   "state": {
     "detail": "read",
