@@ -1,7 +1,7 @@
 # Build and operate a k0s cluster over Tailscale
 
 **Owner:** Lab operator | **Frequency:** As needed
-**Last updated:** 2026-09-01 | **Last run:** 2026-09-01
+**Last updated:** 2026-09-02 | **Last run:** 2026-09-02
 
 This runbook builds and operates an eight-node Kubernetes cluster across two iximiuz Labs playgrounds. Steps 1 through 10 form the core deployment. Later sections add optional access, ingress, applications, and monitoring or cover recurring operations and recovery.
 
@@ -170,34 +170,111 @@ Tailscale SSH policy and network grants are separate controls. The `check` actio
 
 ### Step 3: Enroll every playground machine
 
-Create a preapproved, reusable auth key for `tag:lab`. Store it at `tailscale.auth_key` in [`../../secrets/lab.sops.yaml`](../../secrets/lab.sops.yaml). Revoke the key immediately after enrolling all eight machines.
+Create a preapproved, reusable auth key for `tag:lab` with a 24-hour expiry and use it only for this enrollment run. The following block keeps the key in a protected temporary file, removes every remote copy, and revokes the key on success or failure.
+
+Set the two current playground run IDs before running it:
+
+```bash
+(
+  set -euo pipefail
+  kubernetes_01_run_id=playground_run_id_1
+  kubernetes_02_run_id=playground_run_id_2
+  api_token=$(sops decrypt --extract \
+    '["tailscale"]["access_token"]' secrets/lab.sops.yaml)
+  response=$(mktemp)
+  auth_key_file=$(mktemp)
+  key_id=
+
+  cleanup() {
+    for target in \
+      "$kubernetes_01_run_id:control-plane-01" \
+      "$kubernetes_01_run_id:node-01" \
+      "$kubernetes_01_run_id:node-02" \
+      "$kubernetes_01_run_id:node-03" \
+      "$kubernetes_02_run_id:control-plane-02" \
+      "$kubernetes_02_run_id:control-plane-03" \
+      "$kubernetes_02_run_id:node-04" \
+      "$kubernetes_02_run_id:node-05"; do
+      run_id=${target%%:*}
+      node_name=${target#*:}
+      labctl ssh "$run_id" --machine "$node_name" --user root -- \
+        rm -f /run/tailscale-auth-key >/dev/null 2>&1 || true
+    done
+    if [[ -n $key_id ]]; then
+      curl --fail-with-body --silent --show-error \
+        --request DELETE \
+        -H "Authorization: Bearer $api_token" \
+        "https://api.tailscale.com/api/v2/tailnet/-/keys/$key_id" \
+        >/dev/null || printf 'Revoke Tailscale key %s manually.\n' \
+          "$key_id" >&2
+    fi
+    unset api_token
+    rm -f "$response" "$auth_key_file"
+  }
+  trap cleanup EXIT
+  chmod 600 "$response" "$auth_key_file"
+
+  curl --fail-with-body --silent --show-error \
+    --request POST \
+    -H "Authorization: Bearer $api_token" \
+    -H 'Content-Type: application/json' \
+    --data '{
+      "capabilities": {
+        "devices": {
+          "create": {
+            "reusable": true,
+            "ephemeral": false,
+            "preauthorized": true,
+            "tags": ["tag:lab"]
+          }
+        }
+      },
+      "expirySeconds": 86400,
+      "description": "iximiuz k0s playground enrollment"
+    }' \
+    https://api.tailscale.com/api/v2/tailnet/-/keys >"$response"
+
+  key_id=$(jq -er '.id' <"$response")
+  jq -er '.key' <"$response" >"$auth_key_file"
+
+  enroll() {
+    run_id=$1
+    node_name=$2
+    labctl cp --machine "$node_name" --user root \
+      "$auth_key_file" "$run_id:/run/tailscale-auth-key"
+    labctl ssh "$run_id" --machine "$node_name" --user root -- \
+      chmod 600 /run/tailscale-auth-key
+    labctl ssh "$run_id" --machine "$node_name" --user root -- \
+      tailscale up \
+      --auth-key=file:/run/tailscale-auth-key \
+      --advertise-tags=tag:lab \
+      --ssh
+    labctl ssh "$run_id" --machine "$node_name" --user root -- \
+      rm -f /run/tailscale-auth-key
+  }
+
+  enroll "$kubernetes_01_run_id" control-plane-01
+  enroll "$kubernetes_01_run_id" node-01
+  enroll "$kubernetes_01_run_id" node-02
+  enroll "$kubernetes_01_run_id" node-03
+  enroll "$kubernetes_02_run_id" control-plane-02
+  enroll "$kubernetes_02_run_id" control-plane-03
+  enroll "$kubernetes_02_run_id" node-04
+  enroll "$kubernetes_02_run_id" node-05
+)
+```
+
+The API token must belong to a tailnet administrator. If automatic revocation fails, the block prints the non-secret key ID. Revoke that ID before continuing.
 
 If this tailnet previously contained machines with the same hostnames, remove those stale device records before enrollment. Duplicate names receive suffixed MagicDNS names such as `node-01-1`, and the address updater intentionally rejects duplicate hostnames. Delete only records confirmed offline and belonging to destroyed playground sessions; never remove a live or unrelated device to make validation pass. Allow MagicDNS to converge before reusing canonical names.
 
-From the control host, enroll one machine at a time. Replace `playground_id` with the playground run ID and `node_name` with the machine name:
-
-```bash
-sops decrypt --extract '["tailscale"]["auth_key"]' \
-  secrets/lab.sops.yaml | labctl ssh playground_id \
-  --machine node_name --user root -- \
-  install -m 600 /dev/stdin /run/tailscale-auth-key
-
-labctl ssh playground_id --machine node_name --user root -- \
-  tailscale up \
-  --auth-key=file:/run/tailscale-auth-key \
-  --advertise-tags=tag:lab \
-  --ssh
-labctl ssh playground_id --machine node_name --user root -- \
-  rm -f /run/tailscale-auth-key
-```
-
-Repeat enrollment for all eight nodes. A one-use key can enroll only one machine and is not suitable for this procedure.
+A one-use key can enroll only one machine and is not suitable for this procedure.
 
 Never place auth keys in shell history, manifests, plaintext Git files, or command arguments. Do not enable `--accept-routes` without an explicit routed-subnet requirement and a CIDR review.
 
 **Expected result:** `tailscale status` shows eight online devices with `tag:lab`.
 
-**If it fails:** Remove the temporary key file. Check key expiry, tag ownership, node time, and Tailscale connectivity before retrying.
+**If it fails:** Confirm the cleanup trap revoked the printed key ID. Check `labctl` access, tag ownership, node time, and Tailscale connectivity before retrying.
 
 ### Step 4: Verify the Tailscale underlay
 
@@ -508,7 +585,6 @@ Store the values in the encrypted secrets file:
 ```yaml
 tailscale:
   access_token: tailscale_api_access_token
-  auth_key: tagged_lab_auth_key
   oauth:
     client_id: tailscale_operator_oauth_client_id
     client_secret: tailscale_operator_oauth_client_secret
@@ -637,7 +713,7 @@ kubectl get proxygroup lab-k0s -o jsonpath='\
 {.message}{"\n"}{end}'
 ```
 
-Prefer the exact `svc:lab-k0s` auto-approver. If policy approval is unavailable, approve only the operator-created backends with the encrypted API token:
+The exact `svc:lab-k0s` auto-approver should approve both backends. Reconcile both exact backend approvals through the API as an idempotent check:
 
 ```bash
 (
@@ -649,14 +725,21 @@ Prefer the exact `svc:lab-k0s` auto-approver. If policy approval is unavailable,
   hosts=$(curl --fail-with-body --silent --show-error \
     -H "Authorization: Bearer $token" \
     "$api/svc%3Alab-k0s/devices")
+  node_ids_json=$(jq -cer '
+    if (.hosts | length) == 2 and
+       all(.hosts[]; .nodeId | type == "string" and length > 0)
+    then [.hosts[].nodeId]
+    else error("expected exactly two API proxy backends") end
+  ' <<<"$hosts")
+  mapfile -t node_ids < <(jq -r '.[]' <<<"$node_ids_json")
   while IFS= read -r node_id; do
     curl --fail-with-body --silent --show-error \
       --request POST \
       -H "Authorization: Bearer $token" \
       -H 'Content-Type: application/json' \
       --data '{"approved":true}' \
-      "$api/svc%3Alab-k0s/device/${node_id}/approved"
-  done < <(jq -r '.hosts[].nodeId' <<<"$hosts")
+      "$api/svc%3Alab-k0s/device/${node_id}/approved" >/dev/null
+  done < <(printf '%s\n' "${node_ids[@]}")
 )
 ```
 
@@ -793,7 +876,59 @@ kubectl --context tailscale-k0s -n ingress-nginx \
   --timeout=5m
 ```
 
-The Tailscale operator preserves the existing `hubble-ui` endpoint and stable `100.x` Service address while routing ports `80` and `443` to ingress-nginx. The Cloudflare `A` record for `hubble-ui.playground.canhdinh.com` must point to that address with **DNS only** proxy status. Cloudflare's public reverse proxy cannot reach a tailnet-only `100.64.0.0/10` origin. DNS-01 uses temporary `_acme-challenge` TXT records and does not make the application public.
+Create the DNS-only Cloudflare `A` record from the assigned Tailscale Service address. This record is managed manually because ExternalDNS is installed later for Gateway API routes:
+
+```bash
+(
+  set -euo pipefail
+  token=$(sops decrypt --extract \
+    '["cloudflare"]["cert_manager_api_token"]' \
+    secrets/lab.sops.yaml)
+  service_ip=$(kubectl --context tailscale-k0s \
+    -n ingress-nginx get service hubble-ui-tailscale \
+    -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+  trap 'unset token service_ip' EXIT
+  zone_id=2185aa72445518dc56956cc797c7786a
+  record_name=hubble-ui.playground.canhdinh.com
+  api="https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records"
+  record_id=$(curl --fail-with-body --silent --show-error \
+    -H "Authorization: Bearer $token" \
+    --get --data-urlencode "type=A" \
+    --data-urlencode "name=$record_name" "$api" | jq -er '
+      if (.result | length) <= 1 then .result[0].id // ""
+      else error("multiple Hubble A records exist") end
+    ')
+  body=$(jq -nc --arg name "$record_name" --arg content "$service_ip" '{
+    type: "A",
+    name: $name,
+    content: $content,
+    ttl: 1,
+    proxied: false,
+    comment: "Private Hubble UI via Tailscale"
+  }')
+  if [[ -n $record_id ]]; then
+    method=PUT
+    url="$api/$record_id"
+  else
+    method=POST
+    url=$api
+  fi
+  curl --fail-with-body --silent --show-error \
+    --request "$method" \
+    -H "Authorization: Bearer $token" \
+    -H 'Content-Type: application/json' \
+    --data "$body" "$url" >/dev/null
+
+  for attempt in {1..24}; do
+    [[ $(dig +short "$record_name" A) == "$service_ip" ]] && exit 0
+    sleep 5
+  done
+  printf 'DNS did not converge to %s within 120s.\n' "$service_ip" >&2
+  exit 1
+)
+```
+
+The Tailscale operator preserves the `hubble-ui` endpoint and stable `100.x` Service address while routing ports `80` and `443` to ingress-nginx. Cloudflare's public reverse proxy cannot reach a tailnet-only `100.64.0.0/10` origin. DNS-01 uses temporary `_acme-challenge` TXT records and does not make the application public.
 
 Verify certificate identity, redirect behavior, and private HTTPS access from a tailnet client:
 
@@ -961,6 +1096,14 @@ kubectl --context tailscale-k0s -n envoy-gateway-system \
   -l gateway.envoyproxy.io/owning-gateway-name=echo \
   --for=jsonpath='{.status.conditions[?(@.type=="TailscaleIngressSvcConfigured")].status}'=True \
   --timeout=5m
+
+echo_ip=$(kubectl --context tailscale-k0s -n echo \
+  get gateway echo -o jsonpath='{.status.addresses[0].value}')
+for attempt in {1..24}; do
+  [[ $(dig +short echo.playground.canhdinh.com A) == "$echo_ip" ]] && break
+  sleep 5
+done
+[[ $(dig +short echo.playground.canhdinh.com A) == "$echo_ip" ]]
 ```
 
 Verify from a policy-authorized tailnet client:
@@ -1047,9 +1190,20 @@ kubectl --context tailscale-k0s -n envoy-gateway-system \
   -l gateway.envoyproxy.io/owning-gateway-name=monitoring \
   --for=jsonpath='{.status.conditions[?(@.type=="TailscaleIngressSvcConfigured")].status}'=True \
   --timeout=5m
+
+monitoring_ip=$(kubectl --context tailscale-k0s -n monitoring \
+  get gateway monitoring -o jsonpath='{.status.addresses[0].value}')
+for attempt in {1..24}; do
+  records=$(for name in prometheus alertmanager grafana; do
+    dig +short "$name.playground.canhdinh.com" A
+  done | sort -u)
+  [[ $records == "$monitoring_ip" ]] && break
+  sleep 5
+done
+[[ $records == "$monitoring_ip" ]]
 ```
 
-The exact `svc:monitoring-gateway` auto-approver in [`tailnet-policy.hujson`](tailnet-policy.hujson) should approve both ProxyGroup backends. If that policy change has not reached the tailnet yet, approve only this Service with the encrypted API token:
+The exact `svc:monitoring-gateway` auto-approver in [`tailnet-policy.hujson`](tailnet-policy.hujson) should approve both ProxyGroup backends. Reconcile both exact backend approvals through the API because the admin console can retain a pending approval even after the Kubernetes Service reports Ready:
 
 ```bash
 (
@@ -1061,14 +1215,29 @@ The exact `svc:monitoring-gateway` auto-approver in [`tailnet-policy.hujson`](ta
   hosts=$(curl --fail-with-body --silent --show-error \
     -H "Authorization: Bearer $token" \
     "$api/svc%3Amonitoring-gateway/devices")
+  node_ids_json=$(jq -cer '
+    if (.hosts | length) == 2 and
+       all(.hosts[]; .nodeId | type == "string" and length > 0)
+    then [.hosts[].nodeId]
+    else error("expected exactly two monitoring backends") end
+  ' <<<"$hosts")
+  mapfile -t node_ids < <(jq -r '.[]' <<<"$node_ids_json")
   while IFS= read -r node_id; do
     curl --fail-with-body --silent --show-error \
       --request POST \
       -H "Authorization: Bearer $token" \
       -H 'Content-Type: application/json' \
       --data '{"approved":true}' \
-      "$api/svc%3Amonitoring-gateway/device/${node_id}/approved"
-  done < <(jq -r '.hosts[].nodeId' <<<"$hosts")
+      "$api/svc%3Amonitoring-gateway/device/${node_id}/approved" \
+      >/dev/null
+  done < <(printf '%s\n' "${node_ids[@]}")
+
+  refreshed=$(curl --fail-with-body --silent --show-error \
+    -H "Authorization: Bearer $token" \
+    "$api/svc%3Amonitoring-gateway/devices")
+  jq -e --argjson expected "$node_ids_json" '
+    [.hosts[].nodeId] | sort == ($expected | sort)
+  ' <<<"$refreshed" >/dev/null
 )
 ```
 
@@ -1612,9 +1781,12 @@ To remove Echo Server while preserving shared Gateway API, DNS, and certificate 
 kubectl --context tailscale-k0s -n echo \
   delete httproute echo gateway echo
 
-until [[ -z $(dig +short echo.playground.canhdinh.com A) ]]; do
-  sleep 5
-done
+timeout 130 bash -c '
+  until [[ -z $(dig +short echo.playground.canhdinh.com A) ]] &&
+        [[ -z $(dig +short a-echo.playground.canhdinh.com TXT) ]]; do
+    sleep 5
+  done
+'
 
 kubectl --context tailscale-k0s delete namespace echo
 ```
@@ -1627,11 +1799,17 @@ To remove monitoring while preserving the shared Gateway API, DNS, and certifica
 kubectl --context tailscale-k0s -n monitoring delete \
   httproute prometheus alertmanager grafana gateway monitoring
 
-until [[ -z $(dig +short prometheus.playground.canhdinh.com A) ]] && \
-      [[ -z $(dig +short alertmanager.playground.canhdinh.com A) ]] && \
-      [[ -z $(dig +short grafana.playground.canhdinh.com A) ]]; do
-  sleep 5
-done
+timeout 130 bash -c '
+  until
+    [[ -z $(dig +short prometheus.playground.canhdinh.com A) ]] &&
+    [[ -z $(dig +short alertmanager.playground.canhdinh.com A) ]] &&
+    [[ -z $(dig +short grafana.playground.canhdinh.com A) ]] &&
+    [[ -z $(dig +short a-prometheus.playground.canhdinh.com TXT) ]] &&
+    [[ -z $(dig +short a-alertmanager.playground.canhdinh.com TXT) ]] &&
+    [[ -z $(dig +short a-grafana.playground.canhdinh.com TXT) ]]; do
+    sleep 5
+  done
+'
 
 kubectl --context tailscale-k0s delete \
   gatewayclass monitoring-tailscale
@@ -1648,20 +1826,29 @@ Remove the shared components only when no other Gateways, routes, certificates, 
 ```bash
 kubectl --context tailscale-k0s delete \
   -f docs/k0s/envoy-gateway-tailscale.yaml
-kubectl --context tailscale-k0s delete \
-  -f docs/k0s/ingress-proxygroup.yaml
 helm --kube-context tailscale-k0s -n external-dns \
-  uninstall external-dns
-kubectl --context tailscale-k0s delete namespace external-dns
+  uninstall external-dns --ignore-not-found
+kubectl --context tailscale-k0s delete namespace external-dns \
+  --ignore-not-found
 kubectl --context tailscale-k0s delete \
   clusterissuer letsencrypt-cloudflare
 kubectl --context tailscale-k0s -n cert-manager \
   delete secret cloudflare-api-token
 helm --kube-context tailscale-k0s -n envoy-gateway-system \
-  uninstall envoy-gateway
+  uninstall envoy-gateway --ignore-not-found
+kubectl --context tailscale-k0s delete namespace envoy-gateway-system \
+  --ignore-not-found
+helm --kube-context tailscale-k0s -n ingress-nginx \
+  uninstall ingress-nginx --ignore-not-found
+kubectl --context tailscale-k0s delete namespace ingress-nginx \
+  --ignore-not-found
+helm --kube-context tailscale-k0s -n cert-manager \
+  uninstall cert-manager --ignore-not-found
+kubectl --context tailscale-k0s delete namespace cert-manager \
+  --ignore-not-found
 ```
 
-The Envoy Gateway Helm release owns Gateway API and Envoy CRDs. Helm does not remove CRDs during uninstall; delete them only after confirming no resources of those APIs remain and permanent removal is intended.
+The Envoy Gateway and cert-manager Helm releases retain custom resource definitions (CRDs). Remove retained CRDs only after confirming no resources or other installations depend on them.
 
 Before destroying playgrounds, export workload data and an etcd backup. Then complete these actions:
 
@@ -1671,6 +1858,93 @@ Before destroying playgrounds, export workload data and an etcd backup. Then com
 4. Remove stale machines from the Tailscale admin console.
 5. Revoke every remaining enrollment key and API token.
 6. Remove obsolete direct kubeconfig credentials from administrator machines.
+
+After deleting the application resources above, remove API access while the cluster and operator can still reconcile deletions:
+
+```bash
+kubectl --context tailscale-k0s delete proxygroup \
+  lab-ingress lab-k0s
+kubectl --context tailscale-k0s delete clusterrolebinding \
+  tailscale-lab-k0s-admin
+kubectl --context tailscale-k0s -n tailscale \
+  wait --for=delete pod \
+  -l tailscale.com/parent-resource=lab-ingress --timeout=5m
+kubectl --context tailscale-k0s -n tailscale \
+  wait --for=delete pod \
+  -l tailscale.com/parent-resource=lab-k0s --timeout=5m
+
+helm --kube-context tailscale-k0s -n tailscale \
+  uninstall tailscale-operator
+kubectl --context tailscale-k0s delete namespace tailscale
+```
+
+Confirm `tailscale status` no longer lists the proxy devices or Service addresses. Then identify the operator and playground devices by their exact hostname and tag set. The block stops unless it finds exactly these nine devices, prints their non-secret IDs for review, and requires explicit confirmation before deletion:
+
+```bash
+(
+  set -euo pipefail
+  token=$(sops decrypt --extract \
+    '["tailscale"]["access_token"]' secrets/lab.sops.yaml)
+  response=$(mktemp)
+  selected=$(mktemp)
+  trap 'unset token; rm -f "$response" "$selected"' EXIT
+  chmod 600 "$response" "$selected"
+  api=https://api.tailscale.com/api/v2
+
+  curl --fail-with-body --silent --show-error \
+    -H "Authorization: Bearer $token" \
+    "$api/tailnet/-/devices" >"$response"
+  jq -e '[.devices[] | select(
+    ((.hostname | test("^(control-plane-0[1-3]|node-0[1-5])$")) and
+     (.tags == ["tag:lab"])) or
+    (.hostname == "tailscale-operator" and
+     (.tags == ["tag:k8s-operator"]))
+  ) | {id, hostname, tags}] |
+  if length == 9 then . else error("expected exactly nine lab devices") end
+  ' <"$response" >"$selected"
+  jq . "$selected"
+  read -r -p 'Delete these nine Tailscale devices? [y/N] ' confirm
+  [[ $confirm == y ]]
+
+  while IFS= read -r device_id; do
+    curl --fail-with-body --silent --show-error \
+      --request DELETE \
+      -H "Authorization: Bearer $token" \
+      "$api/device/$device_id" >/dev/null
+  done < <(jq -r '.[].id' "$selected")
+)
+```
+
+Do not delete the control host or unrelated tailnet devices.
+
+Use each iximiuz Labs run ID to destroy its session. Stopping preserves the session and does not permit custom playground removal. Wait for destruction to finish before removing the generated custom playground names:
+
+```bash
+labctl playground destroy kubernetes_01_run_id
+labctl playground destroy kubernetes_02_run_id
+for attempt in {1..24}; do
+  sessions=$(labctl playground list --all --output json)
+  jq -e --arg first kubernetes_01_run_id \
+    --arg second kubernetes_02_run_id \
+    '[.[] | select(.id == $first or .id == $second) |
+      {id, state: .status.stateEvents[-1].state}] |
+     length == 2 and
+     all(.state == "DESTROYED" or .state == "TERMINATED")' \
+    <<<"$sessions" >/dev/null && break
+  sleep 5
+done
+jq -e --arg first kubernetes_01_run_id \
+  --arg second kubernetes_02_run_id \
+  '[.[] | select(.id == $first or .id == $second) |
+    {id, state: .status.stateEvents[-1].state}] |
+   length == 2 and
+   all(.state == "DESTROYED" or .state == "TERMINATED")' \
+  <<<"$sessions" >/dev/null
+labctl playground remove --force kubernetes_01_playground_name
+labctl playground remove --force kubernetes_02_playground_name
+```
+
+Verify that the custom playground catalog contains neither Kubernetes playground and that the application DNS records no longer exist before starting a clean rebuild.
 
 Destroying a playground removes its local k0s state. Restore from the etcd backup only into a compatible, isolated recovery cluster.
 
@@ -1697,6 +1971,7 @@ Update this table after every deployment, upgrade, recovery, or teardown:
 | 2026-08-30 | Repository owner and OpenCode | Deployed Echo Server through Envoy Gateway and a private Tailscale LoadBalancer; automated Cloudflare DNS with ExternalDNS and issued a Let's Encrypt ECDSA certificate with DNS-01 |
 | 2026-09-01 | Repository owner and OpenCode | Deployed kube-prometheus-stack and its Kubernetes command-center dashboard; exposed Prometheus, Alertmanager, and Grafana through one private Envoy Gateway with ExternalDNS and Let's Encrypt DNS-01 certificates |
 | 2026-09-01 | Repository owner and OpenCode | Upgraded all eight hosts to k0s `v1.36.4+k0s.0` and Cilium to `1.20.1`; verified API and etcd health, five Ready workers, 70 focused connectivity actions with Hubble Relay forwarded, ingress endpoints, and 32 healthy Prometheus targets |
+| 2026-09-02 | Repository owner and OpenCode | Removed all lab workloads, DNS records, Tailscale Services and devices, sessions, and playground definitions; rebuilt from clean state; verified five Ready workers, three-member etcd, 70 focused Cilium actions, Sonobuoy quick mode, both API paths, private Hubble and Echo endpoints, and the monitoring stack |
 
 ## Supporting references
 

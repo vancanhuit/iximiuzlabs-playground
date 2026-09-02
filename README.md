@@ -113,7 +113,7 @@ sops secrets/lab.sops.yaml
 Decrypt only the field needed by the next process and prefer a pipe:
 
 ```bash
-sops decrypt --extract '["tailscale"]["auth_key"]' \
+sops decrypt --extract '["tailscale"]["access_token"]' \
   secrets/lab.sops.yaml | consuming_command
 ```
 
