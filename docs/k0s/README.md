@@ -3,19 +3,23 @@
 **Owner:** Lab operator | **Frequency:** As needed
 **Last updated:** 2026-09-01 | **Last run:** 2026-09-01
 
-This runbook builds and operates an eight-node Kubernetes cluster across two iximiuz Labs playgrounds. Use it for initial deployment, validation, upgrades, recovery, and teardown.
+This runbook builds and operates an eight-node Kubernetes cluster across two iximiuz Labs playgrounds. Steps 1 through 10 form the core deployment. Later sections add optional access, ingress, applications, and monitoring or cover recurring operations and recovery.
 
-## Plan and scope
+## Choose a workflow
 
-This page serves an operator who controls the playgrounds, tailnet, and Kubernetes cluster.
+Start with the workflow that matches your task:
 
-- **Overview:** Build k0s on a private Tailscale underlay and install Cilium
-- **Goal:** Deploy and verify a recoverable, kube-proxy-free Kubernetes cluster
-- **Audience:** The lab operator responsible for Tailscale and Kubernetes administration
-- **Content plan:** Prepare, secure, bootstrap, verify, operate, and remove the cluster
-- **Open questions:** Record environment-specific contacts and the last successful run before sharing this runbook
+| Task | Follow |
+| --- | --- |
+| Build a new cluster | [Prerequisites](#prerequisites), then [core deployment](#core-deployment) |
+| Add identity-based Kubernetes API access | [Configure identity-based API access](#configure-identity-based-api-access) |
+| Expose Hubble UI | [Expose Hubble UI through Tailscale with HTTPS](#expose-hubble-ui-through-tailscale-with-https) |
+| Deploy the Echo Server example | [Deploy Echo Server through Gateway API](#deploy-echo-server-through-gateway-api) |
+| Deploy monitoring | [Deploy monitoring through Gateway API](#deploy-monitoring-through-gateway-api) |
+| Upgrade or diagnose the cluster | [Recurring operations](#recurring-operations) and [troubleshooting](#troubleshooting) |
+| Remove services or the cluster | [Rollback and safe teardown](#rollback-and-safe-teardown) |
 
-This page is an operational how-to. Open the [interactive architecture](architecture/lab-architecture.html) to explore the system, the [interactive network data paths](architecture/network-data-paths.html) to trace packet flows, the [private Hubble HTTPS architecture](architecture/hubble-private-https.html) to inspect service and certificate ownership, the [DNS-01 issuance sequence](architecture/hubble-dns01.html) to follow certificate provisioning, or the [interactive bootstrap journey](architecture/bootstrap-journey.html) to explore the deployment sequence.
+This page is for the lab operator who controls the playgrounds, tailnet, and Kubernetes cluster. Record environment-specific contacts and the last successful run before sharing it with another operator.
 
 ## Purpose
 
@@ -45,6 +49,14 @@ Keep these requirements true throughout the cluster lifecycle:
 - Workers retain Internet egress for registries, Tailscale coordination, and Designated Encrypted Relay for Packets (DERP)
 
 Controllers do not run workloads. `kubectl get nodes` lists five workers. Use `k0s status` and `k0s etcd member-list` to inspect controllers.
+
+Use these diagrams when you need more context than the deployment steps provide:
+
+- [Lab architecture](architecture/lab-architecture.html): hosts, cluster components, and network boundaries
+- [Bootstrap journey](architecture/bootstrap-journey.html): ordered deployment sequence
+- [Network data paths](architecture/network-data-paths.html): node, Pod, Service, and egress packet flows
+- [Private Hubble HTTPS architecture](architecture/hubble-private-https.html): service and certificate ownership
+- [DNS-01 issuance sequence](architecture/hubble-dns01.html): certificate provisioning
 
 [![k0s lab architecture](architecture/lab-architecture.svg)](architecture/lab-architecture.svg)
 
@@ -116,9 +128,9 @@ control-plane-01  control-plane-02  control-plane-03
 node-01           node-02           node-03  node-04  node-05
 ```
 
-## Procedure
+## Core deployment
 
-Follow the steps in order for a new deployment. For recurring operations, start at the relevant step and preserve all preceding requirements.
+Follow Steps 1 through 10 in order for a new deployment. For later changes, use the matching recurring operation and preserve the architecture requirements.
 
 ### Step 1: Prepare the control host
 
@@ -475,7 +487,11 @@ The tested set completed 453 e2e tests with zero failures. All five node-log plu
 
 **If it fails:** Preserve the archive and inspect every failure. A passing isolated rerun does not replace the failed full-run result.
 
-### Step 11: Configure identity-based API access when needed
+## Optional services
+
+Install only the services your environment needs. Complete the core deployment and verification first.
+
+### Configure identity-based API access
 
 Use the direct kubeconfig for bootstrap and recovery. Install the Tailscale Kubernetes Operator when shared access needs Tailscale identity and Kubernetes role-based access control (RBAC).
 
@@ -680,7 +696,7 @@ Keep the direct `tailscale-k0s` context. It remains the recovery path when clust
 
 **If it fails:** Check operator logs, Service approval, OAuth scopes, tailnet HTTPS, RBAC bindings, and Pod placement.
 
-### Step 12: Expose Hubble UI through Tailscale with HTTPS
+### Expose Hubble UI through Tailscale with HTTPS
 
 Hubble Relay and Hubble UI are enabled by [`cilium-values.yaml`](cilium-values.yaml). Install cert-manager and ingress-nginx to terminate browser-trusted TLS without changing Cilium's Helm-owned `hubble-ui` ClusterIP Service:
 
@@ -1124,7 +1140,7 @@ curl --fail --show-error --head \
 
 ## Verification
 
-Complete every check before recording a successful run:
+Complete every core check before recording a successful cluster deployment:
 
 - [ ] `kubectl get nodes -o wide` shows five `Ready` workers with Tailscale InternalIP values
 - [ ] `k0s etcd member-list` shows three controller Tailscale addresses
@@ -1133,6 +1149,9 @@ Complete every check before recording a successful run:
 - [ ] Focused Cilium connectivity tests pass and cleanup completes
 - [ ] `tailscale0` reports MTU `1280`, while Cilium routes report MTU `1230`
 - [ ] The selected Sonobuoy profile reports zero e2e failures
+
+Complete only the checks for optional services you installed:
+
 - [ ] Both API paths return `ok` when the ProxyGroup is installed
 - [ ] `hubble-ui.playground.canhdinh.com` presents a valid certificate and reaches Hubble UI only from the tailnet
 - [ ] The Echo Gateway and route are accepted, its Certificate is ready, and private HTTPS returns the expected body

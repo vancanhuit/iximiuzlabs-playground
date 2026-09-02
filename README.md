@@ -9,6 +9,20 @@ Use this runbook to publish the Debian Trixie images and deploy their custom [ix
 
 Use [`docs/k0s/README.md`](docs/k0s/README.md) after both Kubernetes playgrounds are running. That runbook owns tailnet policy, machine enrollment, k0s, Cilium, conformance testing, and private Kubernetes API access.
 
+## Choose a workflow
+
+You don't need to follow every section for every change. Use the shortest path that matches your task:
+
+| Task | Follow |
+| --- | --- |
+| Prepare a new control host | [Prerequisites](#prerequisites), [secret management](#secret-management-with-sops-and-age), then Step 1 |
+| Publish either root filesystem image | [Deployment procedure](#deployment-procedure), Steps 1 through 3 |
+| Create or update a Debian playground | [Deployment procedure](#deployment-procedure), Steps 1 through 4, then [recurring operations](#recurring-playground-operations) |
+| Create the Kubernetes lab | [Deployment procedure](#deployment-procedure), Steps 1, 5, and 6 |
+| Start, stop, inspect, or update a playground | [Recurring playground operations](#recurring-playground-operations) |
+
+For a new environment, follow Steps 1 through 6 in order. The recurring operations aren't additional deployment requirements.
+
 > **Reference environment**: This repository records one tested lab. It is not a drop-in configuration for another account or network. Before running commands, review these values:
 >
 > - The GitHub account, package URLs, and `ghcr.io/vancanhuit/debian-rootfs` image path in [`mise.toml`](mise.toml) and the four playground manifests
@@ -117,7 +131,7 @@ sops updatekeys secrets/lab.sops.yaml
 
 Review the encrypted diff before committing, verify that an intended replacement identity can decrypt it, and verify that a removed identity no longer can. Do not remove the old identity until the updated ciphertext is committed and recovery access is confirmed.
 
-## Procedure
+## Deployment procedure
 
 Follow the steps in order for a new deployment. For an image or manifest update, start at the relevant build or update step.
 
@@ -172,7 +186,7 @@ tailscale status
 
 **If it fails:** Resolve the missing tool, expired login, or tailnet connection before publishing an image or creating a playground.
 
-### Scan the repository for secrets
+#### Scan the repository for secrets
 
 Run both secret scanners against the complete local Git history before publishing changes:
 
@@ -346,7 +360,11 @@ Workers remain `NotReady` until you install Cilium. Complete the runbook before 
 
 **If it fails:** Follow the failure action in the corresponding k0s runbook step. Preserve the direct `tailscale-k0s` recovery context.
 
-### Step 7: Operate playground sessions
+## Recurring playground operations
+
+Use these procedures after creating a playground. They aren't required during every deployment.
+
+### Start, inspect, and stop sessions
 
 Use the generated playground name to start a session, then use its run ID for session operations.
 
@@ -375,7 +393,7 @@ labctl playground remove --force playground_name
 
 **If it fails:** List custom playgrounds to distinguish their generated names from session run IDs. Retry with the identifier required by the command.
 
-### Step 8: Inspect and update manifests
+### Inspect and update manifests
 
 Inspect a live base manifest before using an undocumented custom playground field.
 
