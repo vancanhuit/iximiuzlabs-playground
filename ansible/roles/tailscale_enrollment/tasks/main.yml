@@ -1,0 +1,216 @@
+---
+- name: Tailscale enrollment | Select target hosts
+  ansible.builtin.set_fact:
+    tailscale_enrollment__hosts: "{{ groups[tailscale_enrollment_group] | default([]) }}"
+
+- name: Tailscale enrollment | Require target hosts and playground run IDs
+  ansible.builtin.assert:
+    that:
+      - tailscale_enrollment__hosts | length > 0
+      - hostvars[item].lab_play_id | default('') | length > 0
+    fail_msg: >-
+      Inventory group {{ tailscale_enrollment_group }} must contain hosts with
+      a lab_play_id. Pass the inventory's required *_play_id variables.
+  loop: "{{ tailscale_enrollment__hosts }}"
+
+- name: Tailscale enrollment | Check status through labctl
+  ansible.builtin.command:
+    argv:
+      - labctl
+      - ssh
+      - "{{ hostvars[item].lab_play_id }}"
+      - --machine
+      - "{{ item }}"
+      - --user
+      - root
+      - --
+      - tailscale
+      - status
+      - --json
+  loop: "{{ tailscale_enrollment__hosts }}"
+  register: tailscale_enrollment__status
+  changed_when: false
+  failed_when: false
+
+- name: Tailscale enrollment | Select unenrolled hosts
+  ansible.builtin.set_fact:
+    tailscale_enrollment__unenrolled_hosts: >-
+      {{ tailscale_enrollment__status.results
+         | rejectattr('rc', 'equalto', 0)
+         | map(attribute='item')
+         | list }}
+
+- name: Tailscale enrollment | Record hosts with inactive backends
+  ansible.builtin.set_fact:
+    tailscale_enrollment__unenrolled_hosts: >-
+      {{ tailscale_enrollment__unenrolled_hosts + [item.item] }}
+  loop: "{{ tailscale_enrollment__status.results }}"
+  when:
+    - item.rc == 0
+    - (item.stdout | from_json).BackendState != 'Running'
+  no_log: true
+
+- name: Tailscale enrollment | Enroll hosts
+  when: tailscale_enrollment__unenrolled_hosts | length > 0
+  block:
+    - name: Tailscale enrollment | Decrypt API token
+      ansible.builtin.command:
+        argv:
+          - sops
+          - decrypt
+          - --extract
+          - '["tailscale"]["access_token"]'
+          - "{{ tailscale_enrollment_secret_file }}"
+      register: tailscale_enrollment__api_token
+      changed_when: false
+      no_log: true
+
+    - name: Tailscale enrollment | Create temporary auth key
+      ansible.builtin.uri:
+        url: https://api.tailscale.com/api/v2/tailnet/-/keys
+        method: POST
+        headers:
+          Authorization: "Bearer {{ tailscale_enrollment__api_token.stdout }}"
+        body_format: json
+        body:
+          capabilities:
+            devices:
+              create:
+                reusable: true
+                ephemeral: false
+                preauthorized: true
+                tags: "{{ tailscale_enrollment_tags }}"
+          expirySeconds: "{{ tailscale_enrollment_key_expiry_seconds }}"
+          description: "{{ tailscale_enrollment_description }}"
+        status_code: 200
+      register: tailscale_enrollment__auth_key
+      no_log: true
+
+    - name: Tailscale enrollment | Create protected local temporary file
+      ansible.builtin.tempfile:
+        state: file
+      register: tailscale_enrollment__auth_key_file
+
+    - name: Tailscale enrollment | Store temporary auth key
+      ansible.builtin.copy:
+        content: "{{ tailscale_enrollment__auth_key.json.key }}"
+        dest: "{{ tailscale_enrollment__auth_key_file.path }}"
+        mode: "0600"
+      no_log: true
+
+    - name: Tailscale enrollment | Copy auth key through labctl
+      ansible.builtin.command:
+        argv:
+          - labctl
+          - cp
+          - --machine
+          - "{{ item }}"
+          - --user
+          - root
+          - "{{ tailscale_enrollment__auth_key_file.path }}"
+          - "{{ hostvars[item].lab_play_id }}:/run/tailscale-auth-key"
+      loop: "{{ tailscale_enrollment__unenrolled_hosts }}"
+      changed_when: true
+      no_log: true
+
+    - name: Tailscale enrollment | Enroll hosts and enable SSH
+      ansible.builtin.command:
+        argv:
+          - labctl
+          - ssh
+          - "{{ hostvars[item].lab_play_id }}"
+          - --machine
+          - "{{ item }}"
+          - --user
+          - root
+          - --
+          - tailscale
+          - up
+          - --auth-key=file:/run/tailscale-auth-key
+          - "--advertise-tags={{ tailscale_enrollment_tags | join(',') }}"
+          - "--hostname={{ item }}"
+          - --ssh
+      loop: "{{ tailscale_enrollment__unenrolled_hosts }}"
+      changed_when: true
+      no_log: true
+
+    - name: Tailscale enrollment | Remove remote auth key files after enrollment
+      ansible.builtin.command:
+        argv:
+          - timeout
+          - "30"
+          - labctl
+          - ssh
+          - "{{ hostvars[item].lab_play_id }}"
+          - --machine
+          - "{{ item }}"
+          - --user
+          - root
+          - --
+          - rm
+          - -f
+          - /run/tailscale-auth-key
+      loop: "{{ tailscale_enrollment__unenrolled_hosts }}"
+      changed_when: false
+
+  always:
+    - name: Tailscale enrollment | Remove remote auth key files
+      ansible.builtin.command:
+        argv:
+          - timeout
+          - "30"
+          - labctl
+          - ssh
+          - "{{ hostvars[item].lab_play_id }}"
+          - --machine
+          - "{{ item }}"
+          - --user
+          - root
+          - --
+          - rm
+          - -f
+          - /run/tailscale-auth-key
+      loop: "{{ tailscale_enrollment__unenrolled_hosts }}"
+      changed_when: false
+      failed_when: false
+
+    - name: Tailscale enrollment | Remove local auth key file
+      ansible.builtin.file:
+        path: "{{ tailscale_enrollment__auth_key_file.path }}"
+        state: absent
+      when: tailscale_enrollment__auth_key_file is defined
+
+    - name: Tailscale enrollment | Revoke temporary auth key
+      ansible.builtin.uri:
+        url: >-
+          https://api.tailscale.com/api/v2/tailnet/-/keys/{{
+          tailscale_enrollment__auth_key.json.id }}
+        method: DELETE
+        headers:
+          Authorization: "Bearer {{ tailscale_enrollment__api_token.stdout }}"
+        status_code: 200
+      when:
+        - tailscale_enrollment__api_token is defined
+        - tailscale_enrollment__auth_key is defined
+      no_log: true
+
+- name: Tailscale enrollment | Verify connected backends through labctl
+  ansible.builtin.command:
+    argv:
+      - labctl
+      - ssh
+      - "{{ hostvars[item].lab_play_id }}"
+      - --machine
+      - "{{ item }}"
+      - --user
+      - root
+      - --
+      - tailscale
+      - status
+      - --json
+  loop: "{{ tailscale_enrollment__hosts }}"
+  register: tailscale_enrollment__verification
+  until: >-
+    tailscale_enrollment__verification.rc == 0 and
+    (tailscale_enrollment__verification.stdout | from_json).BackendState == 'Running'
+  changed_when: false

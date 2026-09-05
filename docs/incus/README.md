@@ -22,8 +22,10 @@ The Btrfs pool is local storage. Incus can move instances between members, but t
 | Path | Purpose |
 | --- | --- |
 | [`incus-cluster.manifest.yaml`](../../incus-cluster.manifest.yaml) | Three machines, two networks, dedicated data disks, and package installation |
-| [`ansible/inventory.ini`](../../ansible/inventory.ini) | Logical hostnames and Tailscale SSH transport |
-| [`ansible/tailscale.yml`](../../ansible/tailscale.yml) | Bootstrap enrollment through `labctl ssh` |
+| [`ansible/inventories/incus.ini`](../../ansible/inventories/incus.ini) | Incus topology and playground run mapping |
+| [`ansible/roles/tailscale_enrollment/`](../../ansible/roles/tailscale_enrollment/) | Reusable bootstrap enrollment through `labctl ssh` |
+| [`ansible/tailscale.yml`](../../ansible/tailscale.yml) | Shared enrollment role entry point |
+| [`ansible.cfg`](../../ansible.cfg) | Shared Python, user, and role-path settings |
 | [`ansible/incus_cluster.yml`](../../ansible/incus_cluster.yml) | Incus, Btrfs, OVN, uplink, and API configuration |
 | [`secrets/lab.sops.yaml`](../../secrets/lab.sops.yaml) | Encrypted Tailscale API token |
 
@@ -63,12 +65,13 @@ Incus cluster traffic uses `cluster.https_address` on `eth0`. Incus has one HTTP
 mise install
 mise exec -- ansible-lint \
   ansible/tailscale.yml \
+  ansible/roles/tailscale_enrollment \
   ansible/incus_cluster.yml
 mise exec -- ansible-playbook \
-  -i ansible/inventory.ini \
+  -i ansible/inventories/incus.ini \
   ansible/tailscale.yml --syntax-check
 mise exec -- ansible-playbook \
-  -i ansible/inventory.ini \
+  -i ansible/inventories/incus.ini \
   ansible/incus_cluster.yml --syntax-check
 git diff --check
 ```
@@ -117,7 +120,7 @@ Record the returned run ID and wait for `install_incus_01`, `install_incus_02`, 
 
 ```bash
 mise exec -- ansible-playbook \
-  -i ansible/inventory.ini \
+  -i ansible/inventories/incus.ini \
   ansible/tailscale.yml \
   -e incus_play_id=playground_run_id
 ```
@@ -130,7 +133,7 @@ The playbook:
 4. copies it through protected temporary files
 5. enrolls all three machines and enables Tailscale SSH
 6. removes every temporary key file and revokes the API-created key
-7. verifies SSH through `tailscale nc`
+7. verifies every host's Tailscale backend through `labctl`
 
 **Expected result:** The play recap has no failures and `tailscale status` lists exactly one online device for each Incus hostname.
 
@@ -141,9 +144,9 @@ The playbook:
 If the policy uses `action: "check"`, the final task might print an authentication URL. Open it and complete authentication once, then confirm access:
 
 ```bash
-ssh -o 'ProxyCommand=tailscale nc %h %p' root@incus-01 true
-ssh -o 'ProxyCommand=tailscale nc %h %p' root@incus-02 true
-ssh -o 'ProxyCommand=tailscale nc %h %p' root@incus-03 true
+ssh root@incus-01 true
+ssh root@incus-02 true
+ssh root@incus-03 true
 ```
 
 Do not set `checkPeriod` to `always` for these hosts because Ansible opens multiple SSH connections. A finite check period preserves reauthentication without blocking the run.
@@ -158,7 +161,7 @@ Warning: on a fresh run, this command permanently formats `/dev/vdb` on every me
 
 ```bash
 mise exec -- ansible-playbook \
-  -i ansible/inventory.ini \
+  -i ansible/inventories/incus.ini \
   ansible/incus_cluster.yml
 ```
 
@@ -173,7 +176,7 @@ The playbook validates the disks and interfaces, builds the three-member OVN dat
 Run control-plane checks through Tailscale SSH:
 
 ```bash
-ssh -o 'ProxyCommand=tailscale nc %h %p' root@incus-01 \
+ssh root@incus-01 \
   'incus cluster list; incus storage list; incus network list'
 ```
 
@@ -189,11 +192,11 @@ Confirm:
 Run a disposable workload test:
 
 ```bash
-ssh -o 'ProxyCommand=tailscale nc %h %p' root@incus-01 \
+ssh root@incus-01 \
   'incus launch images:debian/13 test-ovn --network ovn0'
-ssh -o 'ProxyCommand=tailscale nc %h %p' root@incus-01 \
+ssh root@incus-01 \
   'incus exec test-ovn -- ping -c 3 1.1.1.1'
-ssh -o 'ProxyCommand=tailscale nc %h %p' root@incus-01 \
+ssh root@incus-01 \
   'incus delete --force test-ovn'
 ```
 

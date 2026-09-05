@@ -1,7 +1,7 @@
 # Build and operate a k0s cluster over Tailscale
 
 **Owner:** Lab operator | **Frequency:** As needed
-**Last updated:** 2026-09-02 | **Last run:** 2026-09-02
+**Last updated:** 2026-09-05 | **Last run:** 2026-09-05
 
 This runbook builds and operates an eight-node Kubernetes cluster across two iximiuz Labs playgrounds. Steps 1 through 10 form the core deployment. Later sections add optional access, ingress, applications, and monitoring or cover recurring operations and recovery.
 
@@ -170,111 +170,25 @@ Tailscale SSH policy and network grants are separate controls. The `check` actio
 
 ### Step 3: Enroll every playground machine
 
-Create a preapproved, reusable auth key for `tag:lab` with a 24-hour expiry and use it only for this enrollment run. The following block keeps the key in a protected temporary file, removes every remote copy, and revokes the key on success or failure.
-
-Set the two current playground run IDs before running it:
+Use the Kubernetes inventory with both current playground run IDs:
 
 ```bash
-(
-  set -euo pipefail
-  kubernetes_01_run_id=playground_run_id_1
-  kubernetes_02_run_id=playground_run_id_2
-  api_token=$(sops decrypt --extract \
-    '["tailscale"]["access_token"]' secrets/lab.sops.yaml)
-  response=$(mktemp)
-  auth_key_file=$(mktemp)
-  key_id=
-
-  cleanup() {
-    for target in \
-      "$kubernetes_01_run_id:control-plane-01" \
-      "$kubernetes_01_run_id:node-01" \
-      "$kubernetes_01_run_id:node-02" \
-      "$kubernetes_01_run_id:node-03" \
-      "$kubernetes_02_run_id:control-plane-02" \
-      "$kubernetes_02_run_id:control-plane-03" \
-      "$kubernetes_02_run_id:node-04" \
-      "$kubernetes_02_run_id:node-05"; do
-      run_id=${target%%:*}
-      node_name=${target#*:}
-      labctl ssh "$run_id" --machine "$node_name" --user root -- \
-        rm -f /run/tailscale-auth-key >/dev/null 2>&1 || true
-    done
-    if [[ -n $key_id ]]; then
-      curl --fail-with-body --silent --show-error \
-        --request DELETE \
-        -H "Authorization: Bearer $api_token" \
-        "https://api.tailscale.com/api/v2/tailnet/-/keys/$key_id" \
-        >/dev/null || printf 'Revoke Tailscale key %s manually.\n' \
-          "$key_id" >&2
-    fi
-    unset api_token
-    rm -f "$response" "$auth_key_file"
-  }
-  trap cleanup EXIT
-  chmod 600 "$response" "$auth_key_file"
-
-  curl --fail-with-body --silent --show-error \
-    --request POST \
-    -H "Authorization: Bearer $api_token" \
-    -H 'Content-Type: application/json' \
-    --data '{
-      "capabilities": {
-        "devices": {
-          "create": {
-            "reusable": true,
-            "ephemeral": false,
-            "preauthorized": true,
-            "tags": ["tag:lab"]
-          }
-        }
-      },
-      "expirySeconds": 86400,
-      "description": "iximiuz k0s playground enrollment"
-    }' \
-    https://api.tailscale.com/api/v2/tailnet/-/keys >"$response"
-
-  key_id=$(jq -er '.id' <"$response")
-  jq -er '.key' <"$response" >"$auth_key_file"
-
-  enroll() {
-    run_id=$1
-    node_name=$2
-    labctl cp --machine "$node_name" --user root \
-      "$auth_key_file" "$run_id:/run/tailscale-auth-key"
-    labctl ssh "$run_id" --machine "$node_name" --user root -- \
-      chmod 600 /run/tailscale-auth-key
-    labctl ssh "$run_id" --machine "$node_name" --user root -- \
-      tailscale up \
-      --auth-key=file:/run/tailscale-auth-key \
-      --advertise-tags=tag:lab \
-      --ssh
-    labctl ssh "$run_id" --machine "$node_name" --user root -- \
-      rm -f /run/tailscale-auth-key
-  }
-
-  enroll "$kubernetes_01_run_id" control-plane-01
-  enroll "$kubernetes_01_run_id" node-01
-  enroll "$kubernetes_01_run_id" node-02
-  enroll "$kubernetes_01_run_id" node-03
-  enroll "$kubernetes_02_run_id" control-plane-02
-  enroll "$kubernetes_02_run_id" control-plane-03
-  enroll "$kubernetes_02_run_id" node-04
-  enroll "$kubernetes_02_run_id" node-05
-)
+mise exec -- ansible-playbook \
+  -i ansible/inventories/kubernetes.ini \
+  ansible/tailscale.yml \
+  -e kubernetes_01_play_id=playground_run_id_1 \
+  -e kubernetes_02_play_id=playground_run_id_2
 ```
 
-The API token must belong to a tailnet administrator. If automatic revocation fails, the block prints the non-secret key ID. Revoke that ID before continuing.
+The shared `tailscale_enrollment` role checks every inventory host through `labctl`, decrypts only `tailscale.access_token`, creates a reusable preauthorized one-hour key for `tag:lab`, enrolls only disconnected hosts, enables Tailscale SSH, removes local and remote key files, revokes the key, and verifies every host through MagicDNS. The API token must belong to a tailnet administrator.
 
 If this tailnet previously contained machines with the same hostnames, remove those stale device records before enrollment. Duplicate names receive suffixed MagicDNS names such as `node-01-1`, and the address updater intentionally rejects duplicate hostnames. Delete only records confirmed offline and belonging to destroyed playground sessions; never remove a live or unrelated device to make validation pass. Allow MagicDNS to converge before reusing canonical names.
 
-A one-use key can enroll only one machine and is not suitable for this procedure.
-
-Never place auth keys in shell history, manifests, plaintext Git files, or command arguments. Do not enable `--accept-routes` without an explicit routed-subnet requirement and a CIDR review.
+A one-use key can enroll only one machine and is not suitable for this procedure. Never place auth keys in shell history, manifests, plaintext Git files, or command arguments. Do not enable `--accept-routes` without an explicit routed-subnet requirement and a CIDR review.
 
 **Expected result:** `tailscale status` shows eight online devices with `tag:lab`.
 
-**If it fails:** Confirm the cleanup trap revoked the printed key ID. Check `labctl` access, tag ownership, node time, and Tailscale connectivity before retrying.
+**If it fails:** Check the Tailscale key list and revoke any remaining temporary key before retrying. Check `labctl` access, tag ownership, node time, and Tailscale connectivity.
 
 ### Step 4: Verify the Tailscale underlay
 
@@ -377,7 +291,9 @@ k0sctl apply --config docs/k0s/k0s.yaml
 
 ### Step 7: Configure recovery API access
 
-Create a protected admin kubeconfig without overwriting an existing file:
+Create a protected admin kubeconfig. Back up an existing file, then replace the
+old `tailscale-k0s` cluster, context, and shared `admin` user before merging so
+`kubectl` cannot retain stale credentials from an earlier playground:
 
 ```bash
 mkdir -p ~/.kube
@@ -387,10 +303,30 @@ if [[ -f ~/.kube/config ]]; then
 fi
 
 tmp_kubeconfig=$(mktemp)
+base_kubeconfig=$(mktemp)
+merged_kubeconfig=$(mktemp)
+trap 'rm -f "$tmp_kubeconfig" "$base_kubeconfig" \
+  "$merged_kubeconfig"' EXIT
+chmod 600 "$tmp_kubeconfig" "$base_kubeconfig" "$merged_kubeconfig"
 k0sctl kubeconfig --config docs/k0s/k0s.yaml >"$tmp_kubeconfig"
-install -m 600 "$tmp_kubeconfig" ~/.kube/config
-rm -f "$tmp_kubeconfig"
 
+if [[ -f ~/.kube/config ]]; then
+  cp ~/.kube/config "$base_kubeconfig"
+  KUBECONFIG="$base_kubeconfig" kubectl config delete-context \
+    tailscale-k0s >/dev/null 2>&1 || true
+  KUBECONFIG="$base_kubeconfig" kubectl config delete-cluster \
+    tailscale-k0s >/dev/null 2>&1 || true
+  KUBECONFIG="$base_kubeconfig" kubectl config delete-user \
+    admin >/dev/null 2>&1 || true
+  KUBECONFIG="$base_kubeconfig:$tmp_kubeconfig" \
+    kubectl config view --flatten >"$merged_kubeconfig"
+else
+  cp "$tmp_kubeconfig" "$merged_kubeconfig"
+fi
+
+install -m 600 "$merged_kubeconfig" ~/.kube/config
+
+kubectl config use-context tailscale-k0s
 kubectl config current-context
 kubectl get --raw=/readyz
 ```
@@ -452,21 +388,11 @@ Run focused connectivity tests after bootstrap, network changes, and Cilium upgr
 (
   set -euo pipefail
   context=tailscale-k0s
-  cilium hubble port-forward \
-    --context "$context" >/tmp/hubble-port-forward.log 2>&1 &
-  port_forward_pid=$!
-  trap 'kill "$port_forward_pid" 2>/dev/null || true; \
-    cilium connectivity test --context "$context" --cleanup' EXIT
-
-  until timeout 1 bash -c '</dev/tcp/127.0.0.1/4245' 2>/dev/null; do
-    kill -0 "$port_forward_pid"
-    sleep 1
-  done
-
-  hubble status --server localhost:4245
+  trap 'cilium connectivity test --context "$context" --cleanup' EXIT
 
   cilium connectivity test \
     --context "$context" \
+    --hubble=false \
     --ip-families ipv4 \
     --test '^no-policies/' \
     --test '^client-egress/' \
@@ -476,7 +402,7 @@ Run focused connectivity tests after bootstrap, network changes, and Cilium upgr
 )
 ```
 
-The selectors test Pod traffic, ClusterIP and NodePort Services, Domain Name System (DNS), and client egress. They omit the `dns-only` Layer 7 test because this cluster has no Envoy proxy. The explicit Hubble status check verifies Relay access. Per-action flow matching remains disabled because socket load balancing can translate a ClusterIP before Hubble observes the flow; traffic test failures remain fatal.
+The selectors test Pod traffic, ClusterIP and NodePort Services, Domain Name System (DNS), and client egress. They omit the `dns-only` Layer 7 test because this cluster has no Envoy proxy. `cilium status --wait` verifies Relay deployment health separately. The traffic suite disables Hubble because flow validation is disabled and transient DERP-backed Relay-to-agent connections must not prevent packet tests from running; traffic test failures remain fatal.
 
 Always run cleanup after a failed or interrupted test. The tested configuration executes 70 actions.
 
@@ -1739,6 +1665,7 @@ Use observed symptoms to select the narrowest corrective action:
 | Large requests stall | MTU exceeds the encapsulated path | Restore MTU `1230` and measure every node pair |
 | `ProxyGroupReady` remains false | Tailscale Service approval is missing | Add the exact auto-approver or approve only the two backends |
 | Tailscale paths use DERP | Direct UDP connectivity is unavailable | Check `tailscale netcheck`, firewall rules, and NAT behavior |
+| Cross-playground tests intermittently time out while same-playground tests pass | DERP is dropping or delaying packets because a direct path cannot be established between playground networks | Confirm with `tailscale ping --until-direct=true`; retry only after the underlay stabilizes rather than weakening Cilium checks |
 | Cluster routes use another VPN | Accepted subnet routes overlap cluster CIDR ranges | Remove the route or choose unused Pod and Service ranges |
 | Canonical hostnames resolve to stale addresses or fresh devices receive `-1` suffixes | Destroyed playground devices remain registered in the tailnet | Remove only the confirmed offline records, restore the fresh devices' canonical names, and wait for MagicDNS convergence |
 | `tailscale ping` prints `pong` but exits nonzero | DERP works but no direct peer path was established | Verify SSH succeeds, inspect `tailscale netcheck`, and troubleshoot UDP or NAT without blocking bootstrap on a functional DERP path |
@@ -1972,6 +1899,7 @@ Update this table after every deployment, upgrade, recovery, or teardown:
 | 2026-09-01 | Repository owner and OpenCode | Deployed kube-prometheus-stack and its Kubernetes command-center dashboard; exposed Prometheus, Alertmanager, and Grafana through one private Envoy Gateway with ExternalDNS and Let's Encrypt DNS-01 certificates |
 | 2026-09-01 | Repository owner and OpenCode | Upgraded all eight hosts to k0s `v1.36.4+k0s.0` and Cilium to `1.20.1`; verified API and etcd health, five Ready workers, 70 focused connectivity actions with Hubble Relay forwarded, ingress endpoints, and 32 healthy Prometheus targets |
 | 2026-09-02 | Repository owner and OpenCode | Removed all lab workloads, DNS records, Tailscale Services and devices, sessions, and playground definitions; rebuilt from clean state; verified five Ready workers, three-member etcd, 70 focused Cilium actions, Sonobuoy quick mode, both API paths, private Hubble and Echo endpoints, and the monitoring stack |
+| 2026-09-05 | Repository owner and OpenCode | Removed the prior operator Services, proxy devices, host devices, and playground runs; rebuilt the core cluster with the shared Ansible enrollment role; verified enrollment idempotence, three-member etcd, five Ready workers, Cilium health, MTU, DNS, and egress. Cross-playground DERP loss prevented the focused Cilium suite and Sonobuoy quick mode from completing. |
 
 ## Supporting references
 

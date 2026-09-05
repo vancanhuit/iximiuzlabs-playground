@@ -1,0 +1,7 @@
+---
+tailscale_enrollment_group: tailscale_enrollment
+tailscale_enrollment_description: iximiuz Labs machine enrollment
+tailscale_enrollment_secret_file: "{{ playbook_dir }}/../secrets/lab.sops.yaml"
+tailscale_enrollment_tags:
+  - tag:lab
+tailscale_enrollment_key_expiry_seconds: 3600
