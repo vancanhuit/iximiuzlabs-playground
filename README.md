@@ -51,6 +51,9 @@ Use this map to locate each image, manifest, and cluster configuration:
 | [`dev.manifest.yaml`](dev.manifest.yaml) | Single-node `trixie-dev` playground |
 | [`kubernetes-01.manifest.yaml`](kubernetes-01.manifest.yaml) | First Kubernetes playground: one controller and three workers |
 | [`kubernetes-02.manifest.yaml`](kubernetes-02.manifest.yaml) | Second Kubernetes playground: two controllers and two workers |
+| [`incus-cluster.manifest.yaml`](incus-cluster.manifest.yaml) | Three-node Incus playground with dedicated Btrfs disks and OVN networks |
+| [`ansible/`](ansible/) | Tailscale enrollment and Incus cluster automation |
+| [`docs/incus/README.md`](docs/incus/README.md) | Incus, OVN, Btrfs, and Tailscale deployment runbook |
 | [`docs/k0s/k0s.yaml`](docs/k0s/k0s.yaml) | Eight-node `k0sctl` cluster definition |
 | [`docs/k0s/cilium-values.yaml`](docs/k0s/cilium-values.yaml) | Cilium Helm values for the `k0s` cluster |
 | [`docs/k0s/README.md`](docs/k0s/README.md) | Full `k0s` and Cilium runbook |

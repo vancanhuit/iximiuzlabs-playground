@@ -1,0 +1,386 @@
+---
+- name: Validate Incus cluster hosts
+  hosts: incus
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Read Tailscale IPv4 address
+      ansible.builtin.command: tailscale ip -4
+      register: tailscale_ip_command
+      changed_when: false
+
+    - name: Check persisted uplink metadata
+      ansible.builtin.stat:
+        path: /etc/incus/uplink.json
+      register: uplink_metadata
+
+    - name: Read an existing Incus uplink gateway
+      ansible.builtin.command: incus network get UPLINK ipv4.gateway
+      register: existing_uplink_gateway
+      changed_when: false
+      failed_when: false
+      when:
+        - not uplink_metadata.stat.exists
+        - ansible_facts.eth1.ipv4 is not defined
+
+    - name: Require an address source before uplink configuration
+      ansible.builtin.assert:
+        that:
+          - >-
+            (ansible_facts.eth1.ipv4 is defined and
+             ansible_facts.eth1.ipv4.address is defined) or
+            (existing_uplink_gateway.rc | default(1)) == 0
+        fail_msg: eth1 has no address and /etc/incus/uplink.json does not exist.
+      when: not uplink_metadata.stat.exists
+
+    - name: Calculate uplink addresses
+      ansible.builtin.command:
+        argv:
+          - python3
+          - -c
+          - >-
+            import ipaddress, json, sys;
+            network = ipaddress.ip_interface(sys.argv[1]).network;
+            print(json.dumps({
+              "network": str(network),
+              "prefix": network.prefixlen,
+              "gateway": str(network.network_address + 1),
+              "range_start": str(network.network_address + 100),
+              "range_end": str(network.network_address + 199)
+            }))
+          - >-
+            {{ (ansible_facts.eth1.ipv4.address + '/' +
+                (ansible_facts.eth1.ipv4.prefix | string))
+               if ansible_facts.eth1.ipv4 is defined
+               else existing_uplink_gateway.stdout | trim }}
+      register: uplink_calculation
+      changed_when: false
+      when: not uplink_metadata.stat.exists
+
+    - name: Ensure Incus configuration directory exists
+      ansible.builtin.file:
+        path: /etc/incus
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Persist discovered uplink metadata
+      ansible.builtin.copy:
+        content: "{{ uplink_calculation.stdout }}\n"
+        dest: /etc/incus/uplink.json
+        owner: root
+        group: root
+        mode: "0644"
+      when: not uplink_metadata.stat.exists
+
+    - name: Read uplink metadata
+      ansible.builtin.slurp:
+        src: /etc/incus/uplink.json
+      register: uplink_metadata_content
+
+    - name: Record discovered network addresses
+      ansible.builtin.set_fact:
+        tailscale_ip: "{{ tailscale_ip_command.stdout | trim }}"
+        cluster_address: "{{ ansible_facts.eth0.ipv4.address }}"
+        uplink_prefix: "{{ (uplink_metadata_content.content | b64decode | from_json).prefix }}"
+        uplink_network: "{{ (uplink_metadata_content.content | b64decode | from_json).network }}"
+        uplink_gateway: "{{ (uplink_metadata_content.content | b64decode | from_json).gateway }}"
+        uplink_range_start: "{{ (uplink_metadata_content.content | b64decode | from_json).range_start }}"
+        uplink_range_end: "{{ (uplink_metadata_content.content | b64decode | from_json).range_end }}"
+
+    - name: Inspect dedicated storage disk
+      ansible.builtin.command: lsblk --json --output NAME,FSTYPE,MOUNTPOINTS /dev/vdb
+      register: storage_disk
+      changed_when: false
+
+    - name: Require the expected empty storage disk
+      ansible.builtin.assert:
+        that:
+          - (storage_disk.stdout | from_json).blockdevices[0].name == 'vdb'
+          - >-
+            ((storage_disk.stdout | from_json).blockdevices[0].fstype == none and
+             (storage_disk.stdout | from_json).blockdevices[0].mountpoints
+             in [[], [none]]) or
+            ((storage_disk.stdout | from_json).blockdevices[0].fstype == 'btrfs' and
+             '/var/lib/incus/storage-pools/local' in
+             (storage_disk.stdout | from_json).blockdevices[0].mountpoints)
+        fail_msg: >-
+          /dev/vdb must be empty or the mounted Incus local Btrfs pool.
+
+    - name: Require the expected network interfaces
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.eth0.ipv4.address is defined
+          - uplink_network | length > 0
+
+- name: Configure clustered OVN databases
+  hosts: incus
+  become: true
+  serial: 1
+  vars:
+    ovn_northbound_connection: >-
+      tcp:{{ hostvars['incus-01'].cluster_address }}:6641,
+      tcp:{{ hostvars['incus-02'].cluster_address }}:6641,
+      tcp:{{ hostvars['incus-03'].cluster_address }}:6641
+    ovn_southbound_connection: >-
+      tcp:{{ hostvars['incus-01'].cluster_address }}:6642,
+      tcp:{{ hostvars['incus-02'].cluster_address }}:6642,
+      tcp:{{ hostvars['incus-03'].cluster_address }}:6642
+  tasks:
+    - name: Start Open vSwitch
+      ansible.builtin.systemd_service:
+        name: openvswitch-switch
+        enabled: true
+        state: started
+
+    - name: Start the OVN host service
+      ansible.builtin.systemd_service:
+        name: ovn-host
+        enabled: true
+        state: started
+
+    - name: Configure OVN central
+      ansible.builtin.copy:
+        dest: /etc/default/ovn-central
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          OVN_CTL_OPTS=" \
+            --db-nb-addr={{ cluster_address }} \
+            {% if inventory_hostname != 'incus-01' %}--db-nb-cluster-remote-addr={{ hostvars['incus-01'].cluster_address }} \
+            {% endif %}--db-nb-create-insecure-remote=yes \
+            --db-sb-addr={{ cluster_address }} \
+            {% if inventory_hostname != 'incus-01' %}--db-sb-cluster-remote-addr={{ hostvars['incus-01'].cluster_address }} \
+            {% endif %}--db-sb-create-insecure-remote=yes \
+            --db-nb-cluster-local-addr={{ cluster_address }} \
+            --db-sb-cluster-local-addr={{ cluster_address }} \
+            --ovn-northd-nb-db={{ ovn_northbound_connection | replace(' ', '') }} \
+            --ovn-northd-sb-db={{ ovn_southbound_connection | replace(' ', '') }}"
+      register: ovn_central_config
+
+    - name: Restart OVN central
+      ansible.builtin.systemd_service:
+        name: ovn-central
+        enabled: true
+        state: restarted
+      when: ovn_central_config.changed
+      tags:
+        - skip_ansible_lint
+
+    - name: Start OVN central
+      ansible.builtin.systemd_service:
+        name: ovn-central
+        enabled: true
+        state: started
+
+    - name: Configure the OVN chassis
+      ansible.builtin.command:
+        argv:
+          - ovs-vsctl
+          - set
+          - open_vswitch
+          - .
+          - external_ids:ovn-remote={{ ovn_southbound_connection | replace(' ', '') }}
+          - external_ids:ovn-encap-type=geneve
+          - external_ids:ovn-encap-ip={{ cluster_address }}
+      changed_when: false
+
+- name: Bootstrap Incus
+  hosts: incus-01
+  become: true
+  vars:
+    ovn_northbound_connection: >-
+      tcp:{{ hostvars['incus-01'].cluster_address }}:6641,
+      tcp:{{ hostvars['incus-02'].cluster_address }}:6641,
+      tcp:{{ hostvars['incus-03'].cluster_address }}:6641
+  tasks:
+    - name: Check whether Incus is clustered
+      ansible.builtin.command: incus cluster list --format csv -c n
+      register: bootstrap_cluster
+      changed_when: false
+      failed_when: false
+
+    - name: Initialize the first Incus member
+      ansible.builtin.command: incus admin init --preseed
+      args:
+        stdin: |
+          config:
+            core.https_address: {{ cluster_address }}:8443
+            network.ovn.northbound_connection: {{ ovn_northbound_connection | replace(' ', '') }}
+          storage_pools:
+            - name: local
+              driver: btrfs
+              config:
+                source: /dev/vdb
+          profiles:
+            - name: default
+              devices:
+                root:
+                  path: /
+                  pool: local
+                  type: disk
+          cluster:
+            server_name: incus-01
+            enabled: true
+      when: bootstrap_cluster.rc != 0
+      changed_when: true
+
+- name: Join remaining Incus members
+  hosts: incus-02:incus-03
+  become: true
+  serial: 1
+  tasks:
+    - name: Check whether member has joined
+      ansible.builtin.command: incus cluster list --format csv -c n
+      register: member_cluster
+      changed_when: false
+      failed_when: false
+
+    - name: Create member join token
+      ansible.builtin.command: incus cluster add --quiet {{ inventory_hostname }}
+      delegate_to: incus-01
+      register: join_token
+      when: member_cluster.rc != 0
+      changed_when: true
+      no_log: true
+
+    - name: Join the Incus cluster
+      ansible.builtin.command: incus admin init --preseed
+      args:
+        stdin: |
+          cluster:
+            enabled: true
+            server_address: {{ cluster_address }}:8443
+            cluster_token: {{ join_token.stdout }}
+            member_config:
+              - entity: storage-pool
+                name: local
+                key: source
+                value: /dev/vdb
+              - entity: storage-pool
+                name: local
+                key: driver
+                value: btrfs
+      when: member_cluster.rc != 0
+      changed_when: true
+      no_log: true
+
+- name: Prepare OVN uplink interfaces
+  hosts: incus
+  become: true
+  tasks:
+    - name: Stop systemd-networkd from addressing the OVN uplink
+      ansible.builtin.copy:
+        dest: /etc/systemd/network/20-eth1.network
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          [Match]
+          Name=eth1
+
+          [Link]
+          RequiredForOnline=no
+
+          [Network]
+          LinkLocalAddressing=no
+      register: uplink_networkd_config
+
+    - name: Reload systemd-networkd configuration
+      ansible.builtin.command: networkctl reload
+      when: uplink_networkd_config.changed
+      changed_when: true
+      tags:
+        - skip_ansible_lint
+
+    - name: Remove host addresses from the OVN uplink
+      ansible.builtin.command: ip address flush dev eth1
+      when: ansible_facts.eth1.ipv4.address is defined
+      changed_when: true
+
+    - name: Keep the OVN uplink active
+      ansible.builtin.command: ip link set eth1 up
+      changed_when: false
+
+- name: Configure Incus networking
+  hosts: incus-01
+  become: true
+  vars:
+    members:
+      - incus-01
+      - incus-02
+      - incus-03
+  tasks:
+    - name: Check the OVN uplink
+      ansible.builtin.command: incus network show UPLINK
+      register: uplink_status
+      changed_when: false
+      failed_when: false
+
+    - name: Create the per-member OVN uplink definitions
+      ansible.builtin.command: >-
+        incus network create UPLINK --type=physical parent=eth1
+        --target={{ item }}
+      loop: "{{ members }}"
+      when: uplink_status.rc != 0
+      changed_when: true
+
+    - name: Create the clustered OVN uplink
+      ansible.builtin.command:
+        argv:
+          - incus
+          - network
+          - create
+          - UPLINK
+          - --type=physical
+          - ipv4.gateway={{ hostvars['incus-01'].uplink_gateway }}/{{ hostvars['incus-01'].uplink_prefix }}
+          - ipv4.ovn.ranges={{ hostvars['incus-01'].uplink_range_start }}-{{ hostvars['incus-01'].uplink_range_end }}
+      when: uplink_status.rc != 0
+      changed_when: true
+
+    - name: Check the OVN network
+      ansible.builtin.command: incus network show ovn0
+      register: ovn_network_status
+      changed_when: false
+      failed_when: false
+
+    - name: Create the OVN network
+      ansible.builtin.command: incus network create ovn0 --type=ovn network=UPLINK
+      when: ovn_network_status.rc != 0
+      changed_when: true
+
+    - name: Read the default profile
+      ansible.builtin.command: incus profile device get default eth0 network
+      register: default_profile_network
+      changed_when: false
+      failed_when: false
+
+    - name: Attach the OVN network to the default profile
+      ansible.builtin.command: incus profile device add default eth0 nic network=ovn0 name=eth0
+      when: default_profile_network.rc != 0
+      changed_when: true
+
+    - name: Listen for cluster and Tailscale API traffic on every member
+      ansible.builtin.command: incus config set core.https_address=0.0.0.0:8443
+      delegate_to: "{{ item }}"
+      loop: "{{ members }}"
+      changed_when: false
+
+    - name: Verify Incus members
+      ansible.builtin.command: incus cluster list --format csv -c n,s
+      register: incus_members
+      changed_when: false
+      failed_when: >-
+        incus_members.stdout_lines | length != 3 or
+        incus_members.stdout_lines |
+        reject('search', ',ONLINE$') | list | length > 0
+
+    - name: Verify Incus networks
+      ansible.builtin.command: incus network list --format csv -c n,t,s
+      register: incus_networks
+      changed_when: false
+      failed_when: >-
+        'UPLINK,physical,CREATED' not in incus_networks.stdout or
+        'ovn0,ovn,CREATED' not in incus_networks.stdout

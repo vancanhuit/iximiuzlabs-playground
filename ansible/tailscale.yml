@@ -1,0 +1,185 @@
+---
+- name: Enroll Incus hosts in Tailscale through labctl
+  hosts: localhost
+  gather_facts: false
+  vars:
+    incus_hosts:
+      - incus-01
+      - incus-02
+      - incus-03
+  tasks:
+    - name: Require the playground run ID
+      ansible.builtin.assert:
+        that: incus_play_id | default('') | length > 0
+        fail_msg: Pass the active run ID with -e incus_play_id=<run_id>.
+
+    - name: Check Tailscale status through labctl
+      ansible.builtin.command:
+        argv:
+          - labctl
+          - ssh
+          - "{{ incus_play_id }}"
+          - --machine
+          - "{{ item }}"
+          - --user
+          - root
+          - --
+          - tailscale
+          - status
+          - --json
+      loop: "{{ incus_hosts }}"
+      register: tailscale_status
+      changed_when: false
+      failed_when: false
+
+    - name: Select hosts that need enrollment
+      ansible.builtin.set_fact:
+        unenrolled_hosts: []
+
+    - name: Record hosts that need enrollment
+      ansible.builtin.set_fact:
+        unenrolled_hosts: "{{ unenrolled_hosts + [item.item] }}"
+      loop: "{{ tailscale_status.results }}"
+      when: >-
+        item.rc != 0 or
+        (item.stdout | from_json).BackendState != 'Running'
+      no_log: true
+
+    - name: Enroll hosts
+      when: unenrolled_hosts | length > 0
+      block:
+        - name: Decrypt the Tailscale API token
+          ansible.builtin.command:
+            argv:
+              - sops
+              - decrypt
+              - --extract
+              - '["tailscale"]["access_token"]'
+              - "{{ playbook_dir }}/../secrets/lab.sops.yaml"
+          register: tailscale_api_token
+          changed_when: false
+          no_log: true
+
+        - name: Create a temporary Tailscale auth key
+          ansible.builtin.uri:
+            url: https://api.tailscale.com/api/v2/tailnet/-/keys
+            method: POST
+            headers:
+              Authorization: "Bearer {{ tailscale_api_token.stdout }}"
+            body_format: json
+            body:
+              capabilities:
+                devices:
+                  create:
+                    reusable: true
+                    ephemeral: false
+                    preauthorized: true
+                    tags:
+                      - tag:lab
+              expirySeconds: 3600
+              description: iximiuz Incus cluster enrollment
+            status_code: 200
+          register: tailscale_auth_key
+          no_log: true
+
+        - name: Create a protected local temporary file
+          ansible.builtin.tempfile:
+            state: file
+          register: tailscale_auth_key_file
+
+        - name: Store the temporary auth key
+          ansible.builtin.copy:
+            content: "{{ tailscale_auth_key.json.key }}"
+            dest: "{{ tailscale_auth_key_file.path }}"
+            mode: "0600"
+          no_log: true
+
+        - name: Copy the auth key through labctl
+          ansible.builtin.command:
+            argv:
+              - labctl
+              - cp
+              - --machine
+              - "{{ item }}"
+              - --user
+              - root
+              - "{{ tailscale_auth_key_file.path }}"
+              - "{{ incus_play_id }}:/run/tailscale-auth-key"
+          loop: "{{ unenrolled_hosts }}"
+          changed_when: true
+          no_log: true
+
+        - name: Enroll hosts and enable Tailscale SSH through labctl
+          ansible.builtin.command:
+            argv:
+              - labctl
+              - ssh
+              - "{{ incus_play_id }}"
+              - --machine
+              - "{{ item }}"
+              - --user
+              - root
+              - --
+              - tailscale
+              - up
+              - --auth-key=file:/run/tailscale-auth-key
+              - --advertise-tags=tag:lab
+              - --hostname={{ item }}
+              - --ssh
+          loop: "{{ unenrolled_hosts }}"
+          changed_when: true
+          no_log: true
+
+      always:
+        - name: Remove remote auth key files
+          ansible.builtin.command:
+            argv:
+              - labctl
+              - ssh
+              - "{{ incus_play_id }}"
+              - --machine
+              - "{{ item }}"
+              - --user
+              - root
+              - --
+              - rm
+              - -f
+              - /run/tailscale-auth-key
+          loop: "{{ unenrolled_hosts }}"
+          changed_when: false
+          failed_when: false
+
+        - name: Remove the local auth key file
+          ansible.builtin.file:
+            path: "{{ tailscale_auth_key_file.path }}"
+            state: absent
+          when: tailscale_auth_key_file is defined
+
+        - name: Revoke the temporary Tailscale auth key
+          ansible.builtin.uri:
+            url: "https://api.tailscale.com/api/v2/tailnet/-/keys/{{ tailscale_auth_key.json.id }}"
+            method: DELETE
+            headers:
+              Authorization: "Bearer {{ tailscale_api_token.stdout }}"
+            status_code: 200
+          when:
+            - tailscale_api_token is defined
+            - tailscale_auth_key is defined
+          no_log: true
+
+    - name: Verify Tailscale SSH through MagicDNS
+      ansible.builtin.command:
+        argv:
+          - ssh
+          - -o
+          - BatchMode=yes
+          - -o
+          - StrictHostKeyChecking=accept-new
+          - -o
+          - ProxyCommand=tailscale nc %h %p
+          - "root@{{ item }}"
+          - tailscale
+          - ip
+          - -4
+      loop: "{{ incus_hosts }}"
+      changed_when: false

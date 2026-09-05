@@ -1,0 +1,197 @@
+kind: playground
+name: incus-cluster
+base: flexbox
+title: Incus cluster
+categories:
+  - linux
+  - networking
+playground:
+  networks:
+    - name: net-01
+      subnet: 172.16.0.0/24
+    - name: net-02
+      subnet: 172.17.0.0/24
+  machines:
+    - name: incus-01
+      users:
+        - name: root
+        - name: laborant
+          default: true
+      backend: firecracker
+      drives:
+        - source: oci://ghcr.io/vancanhuit/debian-rootfs:trixie-base
+          mount: /
+          size: 20GiB
+        - size: 60GiB
+      network:
+        interfaces:
+          - address: 172.16.0.2
+            network: net-01
+          - address: 172.17.0.2
+            network: net-02
+      resources:
+        cpuCount: 4
+        ramSize: 6GiB
+    - name: incus-02
+      users:
+        - name: root
+        - name: laborant
+          default: true
+      backend: firecracker
+      drives:
+        - source: oci://ghcr.io/vancanhuit/debian-rootfs:trixie-base
+          mount: /
+          size: 20GiB
+        - size: 60GiB
+      network:
+        interfaces:
+          - address: 172.16.0.3
+            network: net-01
+          - address: 172.17.0.3
+            network: net-02
+      resources:
+        cpuCount: 4
+        ramSize: 6GiB
+    - name: incus-03
+      users:
+        - name: root
+        - name: laborant
+          default: true
+      backend: firecracker
+      drives:
+        - source: oci://ghcr.io/vancanhuit/debian-rootfs:trixie-base
+          mount: /
+          size: 20GiB
+        - size: 60GiB
+      network:
+        interfaces:
+          - address: 172.16.0.4
+            network: net-01
+          - address: 172.17.0.4
+            network: net-02
+      resources:
+        cpuCount: 2
+        ramSize: 4GiB
+  tabs:
+    - id: terminal-incus-01
+      kind: terminal
+      name: incus-01
+      machine: incus-01
+      enabled: true
+    - id: terminal-incus-02
+      kind: terminal
+      name: incus-02
+      machine: incus-02
+      enabled: true
+    - id: terminal-incus-03
+      kind: terminal
+      name: incus-03
+      machine: incus-03
+      enabled: true
+  initTasks:
+    install_incus_01:
+      name: install_incus_01
+      machine: incus-01
+      init: true
+      user: root
+      timeout_seconds: 900
+      run: |-
+        #!/usr/bin/env bash
+        set -euxo pipefail
+
+        mkdir -p /etc/apt/keyrings
+        curl -fsSL https://pkgs.zabbly.com/key.asc -o /etc/apt/keyrings/zabbly.asc
+        test "$(gpg --show-keys --with-colons /etc/apt/keyrings/zabbly.asc | awk -F: '$1 == "fpr" { print $10; exit }')" = 4EFC590696CB15B87C73A3AD82CC8797C838DCFD
+        cat >/etc/apt/sources.list.d/zabbly-incus-lts-7.0.sources <<EOF
+        Enabled: yes
+        Types: deb
+        URIs: https://pkgs.zabbly.com/incus/lts-7.0
+        Suites: $(. /etc/os-release && echo "${VERSION_CODENAME}")
+        Components: main
+        Architectures: $(dpkg --print-architecture)
+        Signed-By: /etc/apt/keyrings/zabbly.asc
+        EOF
+        apt-get update
+        DEBIAN_FRONTEND=noninteractive apt-get install -y \
+          btrfs-progs \
+          incus-base \
+          ovn-central \
+          ovn-host
+        curl -fsSL https://tailscale.com/install.sh | sh
+        usermod -aG incus-admin laborant
+        systemctl enable incus openvswitch-switch ovn-central ovn-host tailscaled
+        systemctl start incus openvswitch-switch ovn-host tailscaled
+        systemctl stop ovn-central
+    install_incus_02:
+      name: install_incus_02
+      machine: incus-02
+      init: true
+      user: root
+      timeout_seconds: 900
+      run: |-
+        #!/usr/bin/env bash
+        set -euxo pipefail
+
+        mkdir -p /etc/apt/keyrings
+        curl -fsSL https://pkgs.zabbly.com/key.asc -o /etc/apt/keyrings/zabbly.asc
+        test "$(gpg --show-keys --with-colons /etc/apt/keyrings/zabbly.asc | awk -F: '$1 == "fpr" { print $10; exit }')" = 4EFC590696CB15B87C73A3AD82CC8797C838DCFD
+        cat >/etc/apt/sources.list.d/zabbly-incus-lts-7.0.sources <<EOF
+        Enabled: yes
+        Types: deb
+        URIs: https://pkgs.zabbly.com/incus/lts-7.0
+        Suites: $(. /etc/os-release && echo "${VERSION_CODENAME}")
+        Components: main
+        Architectures: $(dpkg --print-architecture)
+        Signed-By: /etc/apt/keyrings/zabbly.asc
+        EOF
+        apt-get update
+        DEBIAN_FRONTEND=noninteractive apt-get install -y \
+          btrfs-progs \
+          incus-base \
+          ovn-central \
+          ovn-host
+        curl -fsSL https://tailscale.com/install.sh | sh
+        usermod -aG incus-admin laborant
+        systemctl enable incus openvswitch-switch ovn-central ovn-host tailscaled
+        systemctl start incus openvswitch-switch ovn-host tailscaled
+        systemctl stop ovn-central
+    install_incus_03:
+      name: install_incus_03
+      machine: incus-03
+      init: true
+      user: root
+      timeout_seconds: 900
+      run: |-
+        #!/usr/bin/env bash
+        set -euxo pipefail
+
+        mkdir -p /etc/apt/keyrings
+        curl -fsSL https://pkgs.zabbly.com/key.asc -o /etc/apt/keyrings/zabbly.asc
+        test "$(gpg --show-keys --with-colons /etc/apt/keyrings/zabbly.asc | awk -F: '$1 == "fpr" { print $10; exit }')" = 4EFC590696CB15B87C73A3AD82CC8797C838DCFD
+        cat >/etc/apt/sources.list.d/zabbly-incus-lts-7.0.sources <<EOF
+        Enabled: yes
+        Types: deb
+        URIs: https://pkgs.zabbly.com/incus/lts-7.0
+        Suites: $(. /etc/os-release && echo "${VERSION_CODENAME}")
+        Components: main
+        Architectures: $(dpkg --print-architecture)
+        Signed-By: /etc/apt/keyrings/zabbly.asc
+        EOF
+        apt-get update
+        DEBIAN_FRONTEND=noninteractive apt-get install -y \
+          btrfs-progs \
+          incus-base \
+          ovn-central \
+          ovn-host
+        curl -fsSL https://tailscale.com/install.sh | sh
+        usermod -aG incus-admin laborant
+        systemctl enable incus openvswitch-switch ovn-central ovn-host tailscaled
+        systemctl start incus openvswitch-switch ovn-host tailscaled
+        systemctl stop ovn-central
+  accessControl:
+    canList:
+      - owner
+    canRead:
+      - owner
+    canStart:
+      - owner
