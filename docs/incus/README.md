@@ -285,10 +285,10 @@ The connectivity test left these Debian 13 cloud containers running:
 
 ```text
 NAME                     STATE    IPV4                  TYPE       LOCATION
-debian13-cloud-netcheck  RUNNING  10.131.73.7 (eth0)   CONTAINER  incus-01
-mesh-incus-01            RUNNING  10.131.73.8 (eth0)   CONTAINER  incus-01
-mesh-incus-02            RUNNING  10.131.73.9 (eth0)   CONTAINER  incus-02
-mesh-incus-03            RUNNING  10.131.73.10 (eth0)  CONTAINER  incus-03
+debian13-cloud-netcheck  RUNNING  10.131.73.7 (eth0)    CONTAINER  incus-01
+mesh-incus-01            RUNNING  10.131.73.8 (eth0)    CONTAINER  incus-01
+mesh-incus-02            RUNNING  10.131.73.9 (eth0)    CONTAINER  incus-02
+mesh-incus-03            RUNNING  10.131.73.10 (eth0)   CONTAINER  incus-03
 ```
 
 ## Troubleshooting
