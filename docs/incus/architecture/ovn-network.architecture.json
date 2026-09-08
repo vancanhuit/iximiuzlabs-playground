@@ -1,0 +1,221 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Incus OVN Network Data Paths",
+    "output": "docs/incus/architecture/ovn-network.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/vancanhuit/iximiuzlabs-playground",
+      "revision": "22c55491b72eb7386ff3708bd583c708680a8643"
+    },
+    "viewBox": [1380, 780],
+    "views": [
+      {
+        "id": "east-west",
+        "label": "Cross-member traffic",
+        "focus": ["source", "ovn0", "geneve", "destination"],
+        "note": "OVN carries container traffic between member chassis in Geneve tunnels over eth0."
+      },
+      {
+        "id": "north-south",
+        "label": "Internet egress",
+        "focus": ["source", "ovn0", "uplink", "net02", "gateway", "internet"],
+        "note": "North-south traffic leaves through the physical UPLINK and the playground gateway."
+      },
+      {
+        "id": "boot-recovery",
+        "label": "Uplink boot recovery",
+        "focus": ["recovery", "uplink", "net02"],
+        "note": "The boot unit removes host addresses from eth1 before Incus and ovn-host start."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "source",
+      "type": "cloud",
+      "label": "Source Container",
+      "sublabel": "ovn0 address on member A",
+      "tag": "10.131.73.0/24",
+      "pos": [40, 290],
+      "size": [180, 76],
+      "sources": [{"path": "docs/incus/README.md", "line": 227, "end_line": 261}]
+    },
+    {
+      "id": "ovn0",
+      "type": "messagebus",
+      "label": "ovn0 Logical Network",
+      "sublabel": "DHCP + logical switching/routing",
+      "tag": "DNS 1.1.1.1, 1.0.0.1",
+      "pos": [285, 290],
+      "size": [215, 76],
+      "sources": [{"path": "ansible/incus_cluster.yml", "line": 343, "end_line": 369}]
+    },
+    {
+      "id": "geneve",
+      "type": "security",
+      "label": "OVN Geneve Overlay",
+      "sublabel": "chassis-to-chassis tunnels",
+      "tag": "encap IP: eth0",
+      "pos": [570, 105],
+      "size": [210, 76],
+      "sources": [{"path": "ansible/incus_cluster.yml", "line": 178, "end_line": 188}]
+    },
+    {
+      "id": "destination",
+      "type": "cloud",
+      "label": "Destination Container",
+      "sublabel": "ovn0 address on member B",
+      "tag": "cross-member peer",
+      "pos": [850, 105],
+      "size": [205, 76],
+      "sources": [{"path": "docs/incus/README.md", "line": 243, "end_line": 261}]
+    },
+    {
+      "id": "uplink",
+      "type": "backend",
+      "label": "Incus UPLINK",
+      "sublabel": "clustered physical network",
+      "tag": "parent=eth1",
+      "pos": [570, 390],
+      "size": [210, 76],
+      "sources": [{"path": "ansible/incus_cluster.yml", "line": 316, "end_line": 341}]
+    },
+    {
+      "id": "recovery",
+      "type": "backend",
+      "label": "Uplink Boot Unit",
+      "sublabel": "flush address; keep link up",
+      "tag": "before Incus + ovn-host",
+      "pos": [285, 555],
+      "size": [215, 76],
+      "sources": [{"path": "incus-cluster.manifest.yaml", "line": 91, "end_line": 135}]
+    },
+    {
+      "id": "net02",
+      "type": "messagebus",
+      "label": "net-02 Shared Layer 2",
+      "sublabel": "unnumbered eth1 on every member",
+      "tag": "172.17.0.0/24",
+      "pos": [850, 390],
+      "size": [220, 76],
+      "sources": [{"path": "incus-cluster.manifest.yaml", "line": 9, "end_line": 13}]
+    },
+    {
+      "id": "gateway",
+      "type": "external",
+      "label": "Playground Gateway",
+      "sublabel": "required external dependency",
+      "tag": "172.17.0.1",
+      "pos": [1135, 390],
+      "size": [205, 76],
+      "sources": [{"path": "docs/incus/README.md", "line": 294, "end_line": 306}]
+    },
+    {
+      "id": "internet",
+      "type": "external",
+      "label": "Internet + DNS",
+      "sublabel": "repositories and resolvers",
+      "tag": "1.1.1.1 / 1.0.0.1",
+      "pos": [1135, 590],
+      "size": [205, 76],
+      "sources": [{"path": "docs/incus/README.md", "line": 14, "end_line": 17}]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Incus cluster: three OVN chassis",
+      "wraps": ["source", "ovn0", "geneve", "destination", "uplink", "recovery"],
+      "pad": 28
+    },
+    {
+      "kind": "region",
+      "label": "iximiuz Labs network",
+      "wraps": ["net02", "gateway"],
+      "pad": 24
+    }
+  ],
+  "connections": [
+    {
+      "id": "source-ovn",
+      "from": "source",
+      "to": "ovn0",
+      "label": "container eth0",
+      "variant": "emphasis",
+      "labelAt": [253, 380]
+    },
+    {
+      "id": "ovn-geneve",
+      "from": "ovn0",
+      "to": "geneve",
+      "label": "cross-member frame",
+      "variant": "security"
+    },
+    {
+      "id": "geneve-destination",
+      "from": "geneve",
+      "to": "destination",
+      "label": "decapsulate on peer chassis",
+      "variant": "security",
+      "labelAt": [815, 195]
+    },
+    {
+      "id": "ovn-uplink",
+      "from": "ovn0",
+      "to": "uplink",
+      "label": "north-south route",
+      "variant": "emphasis",
+      "labelAt": [535, 380]
+    },
+    {
+      "id": "recovery-uplink",
+      "from": "recovery",
+      "to": "uplink",
+      "label": "prepare eth1 at boot",
+      "variant": "dashed"
+    },
+    {
+      "id": "uplink-net02",
+      "from": "uplink",
+      "to": "net02",
+      "label": "untagged layer 2",
+      "variant": "emphasis",
+      "labelAt": [815, 480]
+    },
+    {
+      "id": "net02-gateway",
+      "from": "net02",
+      "to": "gateway",
+      "label": "ARP + IPv4 forwarding",
+      "variant": "emphasis",
+      "labelAt": [1103, 480]
+    },
+    {
+      "id": "gateway-internet",
+      "from": "gateway",
+      "to": "internet",
+      "label": "external egress",
+      "variant": "dashed",
+      "labelAt": [1238, 500]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "violet",
+      "title": "East-west",
+      "items": ["OVN switches container traffic logically", "Geneve uses member eth0 addresses as tunnel endpoints"]
+    },
+    {
+      "dot": "amber",
+      "title": "North-south",
+      "items": ["UPLINK binds OVN to unnumbered eth1", "The 172.17.0.1 gateway must provide working egress"]
+    },
+    {
+      "dot": "emerald",
+      "title": "Boot invariant",
+      "items": ["eth1 stays up without host IPv4 or IPv6", "incus-ovn-uplink.service runs before Incus and ovn-host"]
+    }
+  ]
+}

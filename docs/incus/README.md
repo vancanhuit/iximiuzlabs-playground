@@ -18,6 +18,15 @@ Use this runbook to deploy and verify the repository's three-node Incus cluster 
 
 The Btrfs pool is local storage. Incus can move instances between members, but their data is not synchronously replicated as it would be with shared storage such as Ceph.
 
+## Architecture Diagrams
+
+- [Incus cluster architecture](architecture/incus-cluster.html): management access, cluster control, database quorums, and member-local storage
+- [OVN network data paths](architecture/ovn-network.html): cross-member Geneve traffic, physical uplink egress, and boot recovery
+
+[![Three-node Incus cluster architecture](architecture/incus-cluster.svg)](architecture/incus-cluster.html)
+
+[![Incus OVN network data paths](architecture/ovn-network.svg)](architecture/ovn-network.html)
+
 ## Files
 
 | Path | Purpose |

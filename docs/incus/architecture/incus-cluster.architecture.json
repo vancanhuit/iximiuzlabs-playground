@@ -1,0 +1,220 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Three-Node Incus Cluster",
+    "output": "docs/incus/architecture/incus-cluster.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/vancanhuit/iximiuzlabs-playground",
+      "revision": "22c55491b72eb7386ff3708bd583c708680a8643"
+    },
+    "viewBox": [1320, 760],
+    "views": [
+      {
+        "id": "management",
+        "label": "Management path",
+        "focus": ["operator", "tailnet", "incus01", "incus02", "incus03"],
+        "note": "Ansible, SSH, and Incus client traffic enter through the private tailnet."
+      },
+      {
+        "id": "cluster-control",
+        "label": "Cluster control",
+        "focus": ["incus01", "incus02", "incus03", "incusdb", "ovndb", "net01"],
+        "note": "Incus and OVN each maintain a three-member database quorum over eth0."
+      },
+      {
+        "id": "local-storage",
+        "label": "Local storage",
+        "focus": ["incus01", "incus02", "incus03", "btrfs"],
+        "note": "Each member owns an independent Btrfs pool on its local /dev/vdb disk."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "operator",
+      "type": "external",
+      "label": "Control Host",
+      "sublabel": "Ansible + Incus client",
+      "pos": [40, 310],
+      "size": [160, 72],
+      "sources": [{"path": "docs/incus/README.md", "line": 128, "end_line": 205}]
+    },
+    {
+      "id": "tailnet",
+      "type": "security",
+      "label": "Tailscale Tailnet",
+      "sublabel": "SSH + private API access",
+      "tag": "tag:lab",
+      "pos": [250, 310],
+      "size": [170, 72],
+      "sources": [{"path": "docs/incus/README.md", "line": 54, "end_line": 59}]
+    },
+    {
+      "id": "incus01",
+      "type": "backend",
+      "label": "incus-01",
+      "sublabel": "database leader + OVN chassis",
+      "tag": "eth0 172.16.0.2",
+      "pos": [500, 105],
+      "size": [205, 78],
+      "sources": [{"path": "incus-cluster.manifest.yaml", "line": 15, "end_line": 34}]
+    },
+    {
+      "id": "incus02",
+      "type": "backend",
+      "label": "incus-02",
+      "sublabel": "database member + OVN chassis",
+      "tag": "eth0 172.16.0.3",
+      "pos": [500, 310],
+      "size": [205, 78],
+      "sources": [{"path": "incus-cluster.manifest.yaml", "line": 35, "end_line": 54}]
+    },
+    {
+      "id": "incus03",
+      "type": "backend",
+      "label": "incus-03",
+      "sublabel": "database member + OVN chassis",
+      "tag": "eth0 172.16.0.4",
+      "pos": [500, 515],
+      "size": [205, 78],
+      "sources": [{"path": "incus-cluster.manifest.yaml", "line": 55, "end_line": 74}]
+    },
+    {
+      "id": "net01",
+      "type": "messagebus",
+      "label": "net-01 / eth0 Fabric",
+      "sublabel": "cluster control + Geneve",
+      "tag": "172.16.0.0/24",
+      "pos": [770, 310],
+      "size": [190, 78],
+      "sources": [{"path": "docs/incus/README.md", "line": 46, "end_line": 59}]
+    },
+    {
+      "id": "incusdb",
+      "type": "database",
+      "label": "Incus Database Quorum",
+      "sublabel": "3 clustered members",
+      "tag": "HTTPS :8443",
+      "pos": [1030, 105],
+      "size": [205, 78],
+      "sources": [{"path": "ansible/incus_cluster.yml", "line": 190, "end_line": 268}]
+    },
+    {
+      "id": "ovndb",
+      "type": "database",
+      "label": "OVN Database Quorum",
+      "sublabel": "northbound + southbound",
+      "tag": "TCP 6641 / 6642",
+      "pos": [1030, 310],
+      "size": [205, 78],
+      "sources": [{"path": "ansible/incus_cluster.yml", "line": 117, "end_line": 188}]
+    },
+    {
+      "id": "btrfs",
+      "type": "database",
+      "label": "Member-Local Btrfs",
+      "sublabel": "one local pool per host",
+      "tag": "/dev/vdb",
+      "pos": [1030, 515],
+      "size": [205, 78],
+      "sources": [{"path": "ansible/incus_cluster.yml", "line": 92, "end_line": 109}]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "security-group",
+      "label": "Tailnet management boundary",
+      "wraps": ["tailnet"]
+    },
+    {
+      "kind": "region",
+      "label": "iximiuz Labs Incus playground",
+      "wraps": ["incus01", "incus02", "incus03", "net01", "incusdb", "ovndb", "btrfs"],
+      "pad": 28
+    }
+  ],
+  "connections": [
+    {
+      "id": "operator-tailnet",
+      "from": "operator",
+      "to": "tailnet",
+      "label": "authenticate",
+      "variant": "security",
+      "labelAt": [225, 396]
+    },
+    {
+      "id": "manage-01",
+      "from": "tailnet",
+      "to": "incus01",
+      "label": "SSH + Incus API :8443",
+      "variant": "security"
+    },
+    {
+      "id": "manage-02",
+      "from": "tailnet",
+      "to": "incus02",
+      "variant": "security"
+    },
+    {
+      "id": "manage-03",
+      "from": "tailnet",
+      "to": "incus03",
+      "variant": "security"
+    },
+    {
+      "id": "node01-fabric",
+      "from": "incus01",
+      "to": "net01"
+    },
+    {
+      "id": "node02-fabric",
+      "from": "incus02",
+      "to": "net01"
+    },
+    {
+      "id": "node03-fabric",
+      "from": "incus03",
+      "to": "net01"
+    },
+    {
+      "id": "fabric-incusdb",
+      "from": "net01",
+      "to": "incusdb",
+      "label": "cluster consensus",
+      "variant": "emphasis"
+    },
+    {
+      "id": "fabric-ovndb",
+      "from": "net01",
+      "to": "ovndb",
+      "label": "NB/SB replication",
+      "variant": "emphasis",
+      "labelAt": [1100, 402]
+    },
+    {
+      "id": "nodes-storage",
+      "from": "net01",
+      "to": "btrfs",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Control plane",
+      "items": ["Incus and OVN each use all three members", "eth0 carries control and Geneve traffic"]
+    },
+    {
+      "dot": "emerald",
+      "title": "Storage",
+      "items": ["Each /dev/vdb backs a local Btrfs pool", "Instance data is not synchronously replicated"]
+    },
+    {
+      "dot": "rose",
+      "title": "Management",
+      "items": ["Tailscale is the private management path", "Incus listens on 0.0.0.0:8443 for cluster and client traffic"]
+    }
+  ]
+}
