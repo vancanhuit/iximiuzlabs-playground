@@ -1,7 +1,7 @@
 # Build and operate a k0s cluster over Tailscale
 
 **Owner:** Lab operator | **Frequency:** As needed
-**Last updated:** 2026-09-05 | **Last run:** 2026-09-05
+**Last updated:** 2026-09-08 | **Last run:** 2026-09-08
 
 This runbook builds and operates an eight-node Kubernetes cluster across two iximiuz Labs playgrounds. Steps 1 through 10 form the core deployment. Later sections add optional access, ingress, applications, and monitoring or cover recurring operations and recovery.
 
@@ -40,13 +40,14 @@ Do not advertise the Pod or Service CIDR through a Tailscale subnet route. Tailn
 Keep these requirements true throughout the cluster lifecycle:
 
 - Every host has a unique, stable hostname and Tailscale IPv4 address
+- Every host listens on its manifest-assigned Tailscale UDP port `41641` through `41648`
 - Every host remains in one tailnet with policy-authorized peer connectivity
 - `privateAddress` and `privateInterface` select `tailscale0` for k0s traffic
 - `api.onlyBindToAddress: true` excludes iximiuz Labs `172.16.0.x` addresses
 - Every controller name and Tailscale Internet Protocol (IP) address appears in the certificate Subject Alternative Name (SAN) list
 - Pod, Service, playground local area network (LAN), and routed CIDR ranges do not overlap
 - Cilium uses VXLAN because Tailscale does not route the Pod CIDR
-- Workers retain Internet egress for registries, Tailscale coordination, and Designated Encrypted Relay for Packets (DERP)
+- Workers retain Internet egress for registries and Tailscale coordination
 
 Controllers do not run workloads. `kubectl get nodes` lists five workers. Use `k0s status` and `k0s etcd member-list` to inspect controllers.
 
@@ -72,7 +73,7 @@ Open the [interactive network data-path diagram](architecture/network-data-paths
 
 | Flow | Forward data path | Address and encapsulation behavior |
 | --- | --- | --- |
-| Node to node | Host process → Linux routing → `tailscale0` → peer `tailscale0` → destination host process | Uses `100.64.0.0/10` node addresses. Tailscale encrypts with WireGuard and prefers a direct peer path; DERP is an encrypted fallback. |
+| Node to node | Host process → Linux routing → `tailscale0` → peer `tailscale0` → destination host process | Uses `100.64.0.0/10` node addresses. Tailscale encrypts with WireGuard over a direct peer path. |
 | Controller to controller | Controller service → `tailscale0` → peer controller | Kubernetes control traffic uses TCP `6443`; etcd client traffic uses TCP `2379`, and etcd peer quorum uses TCP `2380`. |
 | Worker to controller | kubelet, Cilium, or another worker component → worker-local Envoy `127.0.0.1:7443` → selected controller `100.x:6443` over `tailscale0` | k0s node-local load balancing retries healthy controllers. It provides in-cluster API availability, not an external virtual IP. |
 | Pod to same node | Pod `eth0` → host-side veth → source Cilium eBPF policy and routing → destination endpoint eBPF policy → destination veth | The packet keeps Pod IP addresses and never enters `cilium_vxlan` or `tailscale0`. |
@@ -213,20 +214,48 @@ ssh root@node-01 \
   'tailscale status; tailscale netcheck; ip -br addr show tailscale0'
 ```
 
-Check cluster routes on the control host and nodes:
+Check cluster routes on the control host and every node:
 
 ```bash
-ip route get 10.244.0.1
-ip route get 10.96.0.1
+(
+  set -euo pipefail
+  hosts=(control-plane-01 control-plane-02 control-plane-03 \
+    node-01 node-02 node-03 node-04 node-05)
+  ip route get 10.244.0.1
+  ip route get 10.96.0.1
+  for host in "${hosts[@]}"; do
+    ssh root@"$host" \
+      'ip route get 10.244.0.1; ip route get 10.96.0.1'
+  done
+)
 ```
 
 Before Cilium installation, neither address may use another virtual private network (VPN) or subnet router.
 
-**Expected result:** Every peer responds, hostnames are unique, and `tailscale0` has a `100.x` address. Direct paths offer better latency, but DERP paths remain functional.
+Verify every host path between the two playgrounds is direct before
+bootstrapping k0s:
 
-`tailscale ping` exits nonzero when it receives DERP replies but cannot establish a direct path. In that case, confirm that the output contains successful `pong` replies, then use SSH and `tailscale netcheck` to distinguish functional DERP connectivity from a failed peer.
+```bash
+(
+  set -euo pipefail
+  left=(control-plane-01 node-01 node-02 node-03)
+  right=(control-plane-02 control-plane-03 node-04 node-05)
+  for source in "${left[@]}"; do
+    for target in "${right[@]}"; do
+      ssh root@"$source" \
+        tailscale ping --timeout=20s --until-direct=true "$target"
+    done
+  done
+)
+```
 
-**If it fails:** Stop the deployment. Resolve missing peers, duplicate hostnames, intermittent links, or route overlap first.
+The manifests assign unique Tailscale UDP listener ports `41641` through
+`41648`. This prevents endpoint collisions when multiple machines share one
+public NAT address.
+
+**Expected result:** Every peer responds, hostnames are unique, `tailscale0` has a `100.x` address, and every cross-playground probe reports a public `IP:port` endpoint rather than DERP.
+
+**If it fails:** Stop the deployment. Resolve missing peers, duplicate hostnames, relayed paths, or route overlap first.
 
 ### Step 5: Populate Tailscale addresses
 
@@ -271,6 +300,19 @@ k0sctl apply --config docs/k0s/k0s.yaml
 Validate the control plane and etcd membership:
 
 ```bash
+(
+  set -euo pipefail
+  for attempt in {1..24}; do
+    members=$(ssh root@control-plane-01 k0s etcd member-list)
+    nodes=$(ssh root@control-plane-01 \
+      'k0s kubectl get nodes --no-headers' 2>/dev/null || true)
+    [[ $(jq '.members | length' <<<"$members") -eq 3 ]] &&
+      [[ $(wc -l <<<"$nodes") -eq 5 ]] && break
+    sleep 5
+  done
+  [[ $(jq '.members | length' <<<"$members") -eq 3 ]]
+  [[ $(wc -l <<<"$nodes") -eq 5 ]]
+)
 ssh root@control-plane-01 k0s status
 ssh root@control-plane-02 k0s status
 ssh root@control-plane-03 k0s status
@@ -292,39 +334,45 @@ k0sctl apply --config docs/k0s/k0s.yaml
 ### Step 7: Configure recovery API access
 
 Create a protected admin kubeconfig. Back up an existing file, then replace the
-old `tailscale-k0s` cluster, context, and shared `admin` user before merging so
+old `tailscale-k0s` cluster, context, and dedicated user before merging so
 `kubectl` cannot retain stale credentials from an earlier playground:
 
 ```bash
-mkdir -p ~/.kube
-if [[ -f ~/.kube/config ]]; then
-  cp --backup=numbered --preserve=mode,timestamps \
-    ~/.kube/config ~/.kube/config.pre-k0s
-fi
+(
+  set -euo pipefail
+  mkdir -p ~/.kube
+  if [[ -f ~/.kube/config ]]; then
+    cp --backup=numbered --preserve=mode,timestamps \
+      ~/.kube/config ~/.kube/config.pre-k0s
+  fi
 
-tmp_kubeconfig=$(mktemp)
-base_kubeconfig=$(mktemp)
-merged_kubeconfig=$(mktemp)
-trap 'rm -f "$tmp_kubeconfig" "$base_kubeconfig" \
-  "$merged_kubeconfig"' EXIT
-chmod 600 "$tmp_kubeconfig" "$base_kubeconfig" "$merged_kubeconfig"
-k0sctl kubeconfig --config docs/k0s/k0s.yaml >"$tmp_kubeconfig"
+  tmp_kubeconfig=$(mktemp)
+  base_kubeconfig=$(mktemp)
+  merged_kubeconfig=$(mktemp)
+  trap 'rm -f "$tmp_kubeconfig" "$base_kubeconfig" \
+    "$merged_kubeconfig"' EXIT
+  chmod 600 "$tmp_kubeconfig" "$base_kubeconfig" "$merged_kubeconfig"
+  k0sctl kubeconfig --config docs/k0s/k0s.yaml \
+    --cluster tailscale-k0s --user tailscale-k0s-admin >"$tmp_kubeconfig"
 
-if [[ -f ~/.kube/config ]]; then
-  cp ~/.kube/config "$base_kubeconfig"
-  KUBECONFIG="$base_kubeconfig" kubectl config delete-context \
-    tailscale-k0s >/dev/null 2>&1 || true
-  KUBECONFIG="$base_kubeconfig" kubectl config delete-cluster \
-    tailscale-k0s >/dev/null 2>&1 || true
-  KUBECONFIG="$base_kubeconfig" kubectl config delete-user \
-    admin >/dev/null 2>&1 || true
-  KUBECONFIG="$base_kubeconfig:$tmp_kubeconfig" \
-    kubectl config view --flatten >"$merged_kubeconfig"
-else
-  cp "$tmp_kubeconfig" "$merged_kubeconfig"
-fi
+  if [[ -f ~/.kube/config ]]; then
+    cp ~/.kube/config "$base_kubeconfig"
+    KUBECONFIG="$base_kubeconfig" kubectl config delete-context \
+      tailscale-k0s >/dev/null 2>&1 || true
+    KUBECONFIG="$base_kubeconfig" kubectl config delete-cluster \
+      tailscale-k0s >/dev/null 2>&1 || true
+    KUBECONFIG="$base_kubeconfig" kubectl config delete-user \
+      tailscale-k0s-admin >/dev/null 2>&1 || true
+    KUBECONFIG="$base_kubeconfig:$tmp_kubeconfig" \
+      kubectl config view --flatten >"$merged_kubeconfig"
+  else
+    cp "$tmp_kubeconfig" "$merged_kubeconfig"
+  fi
 
-install -m 600 "$merged_kubeconfig" ~/.kube/config
+  KUBECONFIG="$merged_kubeconfig" kubectl config get-contexts \
+    tailscale-k0s >/dev/null
+  install -m 600 "$merged_kubeconfig" ~/.kube/config
+)
 
 kubectl config use-context tailscale-k0s
 kubectl config current-context
@@ -402,7 +450,7 @@ Run focused connectivity tests after bootstrap, network changes, and Cilium upgr
 )
 ```
 
-The selectors test Pod traffic, ClusterIP and NodePort Services, Domain Name System (DNS), and client egress. They omit the `dns-only` Layer 7 test because this cluster has no Envoy proxy. `cilium status --wait` verifies Relay deployment health separately. The traffic suite disables Hubble because flow validation is disabled and transient DERP-backed Relay-to-agent connections must not prevent packet tests from running; traffic test failures remain fatal.
+The selectors test Pod traffic, ClusterIP and NodePort Services, Domain Name System (DNS), and client egress. They omit the `dns-only` Layer 7 test because this cluster has no Envoy proxy. `cilium status --wait` verifies Relay deployment health separately. The traffic suite disables Hubble because flow validation is disabled; traffic test failures remain fatal.
 
 Always run cleanup after a failed or interrupted test. The tested configuration executes 70 actions.
 
@@ -415,6 +463,27 @@ kubectl -n kube-system exec daemonset/cilium -- \
   cilium-dbg status --verbose | grep -i mtu
 ssh root@node-01 tailscale ping node-02
 ```
+
+Confirm the cross-playground worker paths remain direct with repeated probes:
+
+```bash
+(
+  set -euo pipefail
+  left=(node-01 node-02 node-03)
+  right=(node-04 node-05)
+  for attempt in 1 2 3; do
+    for source in "${left[@]}"; do
+      for target in "${right[@]}"; do
+        ssh root@"$source" \
+          tailscale ping --timeout=10s --until-direct=true "$target"
+      done
+    done
+  done
+)
+```
+
+Every response must report a public `IP:port` endpoint. Treat any DERP response
+or failure to establish a direct connection as a failed underlay check.
 
 **Expected result:** Five workers are `Ready`. System Pods run, kube-proxy is absent, `tailscale0` reports MTU `1280`, and Cilium routes report MTU `1230`.
 
@@ -494,6 +563,12 @@ The tested set completed 453 e2e tests with zero failures. All five node-log plu
 
 Install only the services your environment needs. Complete the core deployment and verification first.
 
+The procedures are cumulative. Identity-based API access installs the Tailscale
+operator. Hubble HTTPS adds the shared ingress ProxyGroup, cert-manager, and
+ingress-nginx. Echo adds Envoy Gateway, Gateway API support, and ExternalDNS.
+Monitoring reuses all of those shared components. Follow that order, stopping
+after the last service you need.
+
 ### Configure identity-based API access
 
 Use the direct kubeconfig for bootstrap and recovery. Install the Tailscale Kubernetes Operator when shared access needs Tailscale identity and Kubernetes role-based access control (RBAC).
@@ -522,7 +597,9 @@ Edit secrets only with `sops secrets/lab.sops.yaml`. Disable shell tracing befor
 Create the namespace:
 
 ```bash
-kubectl create namespace tailscale
+kubectl --context tailscale-k0s create namespace tailscale \
+  --dry-run=client -o yaml | \
+  kubectl --context tailscale-k0s apply -f -
 ```
 
 Create the OAuth Secret without exposing credentials in command arguments:
@@ -545,10 +622,12 @@ Create the OAuth Secret without exposing credentials in command arguments:
     '["tailscale"]["oauth"]["client_secret"]' \
     secrets/lab.sops.yaml >"$oauth_dir/client_secret"
 
-  kubectl -n tailscale create secret generic operator-oauth \
+  kubectl --context tailscale-k0s -n tailscale \
+    create secret generic operator-oauth \
     --from-file=client_id="$oauth_dir/client_id" \
     --from-file=client_secret="$oauth_dir/client_secret" \
-    --dry-run=client -o yaml | kubectl apply -f -
+    --dry-run=client -o yaml | \
+    kubectl --context tailscale-k0s apply -f -
 )
 ```
 
@@ -564,13 +643,14 @@ helm upgrade --install tailscale-operator \
   --namespace tailscale \
   --set-string apiServerProxyConfig.allowImpersonation=true \
   --wait
-kubectl -n tailscale rollout status deployment/operator --timeout=5m
+kubectl --context tailscale-k0s -n tailscale \
+  rollout status deployment/operator --timeout=5m
 ```
 
 Create a two-replica API proxy:
 
 ```bash
-kubectl apply -f - <<'YAML'
+kubectl --context tailscale-k0s apply -f - <<'YAML'
 apiVersion: tailscale.com/v1alpha1
 kind: ProxyGroup
 metadata:
@@ -583,7 +663,7 @@ spec:
     hostname: lab-k0s
 YAML
 
-kubectl wait proxygroup/lab-k0s \
+kubectl --context tailscale-k0s wait proxygroup/lab-k0s \
   --for=condition=ProxyGroupReady=true \
   --timeout=5m
 ```
@@ -625,8 +705,10 @@ This lab currently binds the owner login directly as a Kubernetes user. The chec
 Verify the effective identity and authorization result through the proxy context:
 
 ```bash
-kubectl --context lab-k0s.tailnet_dns_name.ts.net auth whoami
-kubectl --context lab-k0s.tailnet_dns_name.ts.net auth can-i get pods --all-namespaces
+proxy_context=$(kubectl config get-contexts -o name | \
+  grep '^lab-k0s\..*\.ts\.net$')
+kubectl --context "$proxy_context" auth whoami
+kubectl --context "$proxy_context" auth can-i get pods --all-namespaces
 ```
 
 Keep the direct `tailscale-k0s` context separate. It uses a privileged Kubernetes client certificate rather than Tailscale impersonation and remains the recovery path.
@@ -634,7 +716,7 @@ Keep the direct `tailscale-k0s` context separate. It uses a privileged Kubernete
 If readiness stalls, inspect the advertised Service:
 
 ```bash
-kubectl get proxygroup lab-k0s -o jsonpath='\
+kubectl --context tailscale-k0s get proxygroup lab-k0s -o jsonpath='\
 {range .status.conditions[*]}{.type}{"="}{.status}{": "}\
 {.message}{"\n"}{end}'
 ```
@@ -657,7 +739,6 @@ The exact `svc:lab-k0s` auto-approver should approve both backends. Reconcile bo
     then [.hosts[].nodeId]
     else error("expected exactly two API proxy backends") end
   ' <<<"$hosts")
-  mapfile -t node_ids < <(jq -r '.[]' <<<"$node_ids_json")
   while IFS= read -r node_id; do
     curl --fail-with-body --silent --show-error \
       --request POST \
@@ -665,11 +746,13 @@ The exact `svc:lab-k0s` auto-approver should approve both backends. Reconcile bo
       -H 'Content-Type: application/json' \
       --data '{"approved":true}' \
       "$api/svc%3Alab-k0s/device/${node_id}/approved" >/dev/null
-  done < <(printf '%s\n' "${node_ids[@]}")
+  done < <(jq -r '.[]' <<<"$node_ids_json")
 )
 ```
 
-Rotate or revoke the owner-scoped API token after use. Tailscale API tokens expire within 90 days.
+Rotate or revoke the owner-scoped API token after all optional-service
+approvals and teardown operations that need it are complete. Tailscale API
+tokens expire within 90 days.
 
 Grant the owner administrator access without printing the identity:
 
@@ -680,10 +763,12 @@ Grant the owner administrator access without printing the identity:
     '["tailscale"]["kubernetes_user"]' secrets/lab.sops.yaml)
   trap 'unset kubernetes_user' EXIT
 
-  kubectl create clusterrolebinding tailscale-lab-k0s-admin \
+  kubectl --context tailscale-k0s create clusterrolebinding \
+    tailscale-lab-k0s-admin \
     --clusterrole=cluster-admin \
     --user="$kubernetes_user" \
-    --dry-run=client -o yaml | kubectl apply -f -
+    --dry-run=client -o yaml | \
+    kubectl --context tailscale-k0s apply -f -
 )
 ```
 
@@ -692,11 +777,13 @@ Create separate `view` or namespace-scoped bindings for guests. Never add a gues
 Configure the client and verify its identity:
 
 ```bash
-proxy_url=$(kubectl get proxygroup lab-k0s \
+proxy_url=$(kubectl --context tailscale-k0s get proxygroup lab-k0s \
   -o jsonpath='{.status.url}')
 tailscale configure kubeconfig "$proxy_url"
-kubectl auth whoami
-kubectl get nodes
+proxy_context=$(kubectl config get-contexts -o name | \
+  grep '^lab-k0s\..*\.ts\.net$')
+kubectl --context "$proxy_context" auth whoami
+kubectl --context "$proxy_context" get nodes
 ```
 
 Keep the direct `tailscale-k0s` context. It remains the recovery path when cluster DNS, Cilium, or ProxyGroup fails.
@@ -788,7 +875,7 @@ Render the ACME email from SOPS, apply the issuer, certificate, ingress, and Tai
 kubectl --context tailscale-k0s apply \
   -f docs/k0s/ingress-proxygroup.yaml
 kubectl --context tailscale-k0s wait proxygroup/lab-ingress \
-  --for=condition=ProxyGroupAvailable=true \
+  --for=condition=ProxyGroupReady=true \
   --timeout=5m
 
 kubectl --context tailscale-k0s apply \
@@ -932,8 +1019,11 @@ helm upgrade cert-manager \
   --kube-context tailscale-k0s \
   --wait
 
-kubectl --context tailscale-k0s create namespace echo
-kubectl --context tailscale-k0s create namespace external-dns
+for namespace in echo external-dns; do
+  kubectl --context tailscale-k0s create namespace "$namespace" \
+    --dry-run=client -o yaml | \
+    kubectl --context tailscale-k0s apply -f -
+done
 ```
 
 Create separate least-privilege Cloudflare Secrets for cert-manager and ExternalDNS. Both tokens need `Zone - DNS - Edit` and `Zone - Zone - Read` for `canhdinh.com`. Keep the ClusterIssuer token in cert-manager's cluster resource namespace so application workloads cannot mount it:
@@ -1147,7 +1237,6 @@ The exact `svc:monitoring-gateway` auto-approver in [`tailnet-policy.hujson`](ta
     then [.hosts[].nodeId]
     else error("expected exactly two monitoring backends") end
   ' <<<"$hosts")
-  mapfile -t node_ids < <(jq -r '.[]' <<<"$node_ids_json")
   while IFS= read -r node_id; do
     curl --fail-with-body --silent --show-error \
       --request POST \
@@ -1156,7 +1245,7 @@ The exact `svc:monitoring-gateway` auto-approver in [`tailnet-policy.hujson`](ta
       --data '{"approved":true}' \
       "$api/svc%3Amonitoring-gateway/device/${node_id}/approved" \
       >/dev/null
-  done < <(printf '%s\n' "${node_ids[@]}")
+  done < <(jq -r '.[]' <<<"$node_ids_json")
 
   refreshed=$(curl --fail-with-body --silent --show-error \
     -H "Authorization: Bearer $token" \
@@ -1253,27 +1342,51 @@ Complete only the checks for optional services you installed:
 - [ ] The monitoring Gateway and three routes are accepted, all Certificates are ready, and Prometheus, Alertmanager, and Grafana respond through private HTTPS
 - [ ] `ProxyGroup/lab-ingress` has two Ready replicas, and the Hubble UI, Echo, and monitoring Services report `2/2 proxy backends ready and advertising`
 
-Verify both API paths and ProxyGroup replicas:
+Run only the verification blocks for the optional services you installed.
+Verify identity-based API access:
 
 ```bash
 kubectl --context tailscale-k0s get --raw=/readyz
-kubectl --context lab-k0s.tailnet_dns_name.ts.net get --raw=/readyz
-kubectl --context lab-k0s.tailnet_dns_name.ts.net auth whoami
+proxy_context=$(kubectl config get-contexts -o name | \
+  grep '^lab-k0s\..*\.ts\.net$')
+kubectl --context "$proxy_context" get --raw=/readyz
+kubectl --context "$proxy_context" auth whoami
 kubectl --context tailscale-k0s wait proxygroup/lab-k0s \
   --for=condition=ProxyGroupReady=true --timeout=30s
 kubectl --context tailscale-k0s -n tailscale get pods \
   -l tailscale.com/parent-resource=lab-k0s -o wide
+```
+
+Verify the shared ingress ProxyGroup when Hubble, Echo, or monitoring is
+installed:
+
+```bash
 kubectl --context tailscale-k0s wait proxygroup/lab-ingress \
   --for=condition=ProxyGroupReady=true --timeout=30s
 kubectl --context tailscale-k0s -n tailscale get pods \
   -l tailscale.com/parent-resource=lab-ingress -o wide
+```
+
+Verify Hubble when installed:
+
+```bash
 kubectl --context tailscale-k0s get service \
   -n ingress-nginx hubble-ui-tailscale \
   -o jsonpath='{.status.conditions[?(@.type=="TailscaleIngressSvcConfigured")].message}{"\n"}'
+```
+
+Verify Echo when installed:
+
+```bash
 kubectl --context tailscale-k0s get service \
   -n envoy-gateway-system \
   -l gateway.envoyproxy.io/owning-gateway-name=echo \
   -o jsonpath='{.items[0].status.conditions[?(@.type=="TailscaleIngressSvcConfigured")].message}{"\n"}'
+```
+
+Verify monitoring when installed:
+
+```bash
 kubectl --context tailscale-k0s get service \
   -n envoy-gateway-system \
   -l gateway.envoyproxy.io/owning-gateway-name=monitoring \
@@ -1562,11 +1675,13 @@ Render and inspect the target chart with the complete checked-in values before c
 
 ```bash
 helm template cilium cilium/cilium \
+  --repo https://helm.cilium.io \
   --version 1.20.1 \
   --namespace kube-system \
   --values docs/k0s/cilium-values.yaml >/dev/null
 
 helm upgrade cilium cilium/cilium \
+  --repo https://helm.cilium.io \
   --version 1.20.1 \
   --namespace kube-system \
   --kube-context tailscale-k0s \
@@ -1578,6 +1693,7 @@ Apply the reviewed release and wait for the rollout:
 
 ```bash
 helm upgrade cilium cilium/cilium \
+  --repo https://helm.cilium.io \
   --version 1.20.1 \
   --namespace kube-system \
   --kube-context tailscale-k0s \
@@ -1588,33 +1704,48 @@ helm upgrade cilium cilium/cilium \
 cilium status --context tailscale-k0s --wait
 ```
 
-Keep `upgradeCompatibility: "1.20"` set to the cluster's initial Cilium release series. Run the focused connectivity tests from Step 9 after every upgrade. That procedure forwards Hubble Relay before enabling flow validation and removes generated resources even when the test fails or is interrupted.
+Keep `upgradeCompatibility: "1.20"` set to the cluster's initial Cilium release series. Run the focused connectivity tests from Step 9 after every upgrade. That procedure runs traffic checks without Hubble flow validation and removes generated resources even when the test fails or is interrupted.
 
 ### Reconcile a node address change
 
-Refresh addresses before applying k0s changes:
+Preview address changes before writing anything:
 
 ```bash
 uv run scripts/update_k0s_tailscale_ips.py --dry-run
-uv run scripts/update_k0s_tailscale_ips.py
-k0sctl apply --config docs/k0s/k0s.yaml --dry-run
 ```
 
-A controller address change affects etcd membership and certificates. Back up etcd and follow the k0s controller replacement procedure instead of treating it as a worker replacement.
+If any controller address changes, stop. Back up etcd and follow the k0s
+controller replacement procedure because controller addresses are part of etcd
+membership and API certificates. For worker-only changes, write and apply the
+reviewed configuration:
+
+```bash
+uv run scripts/update_k0s_tailscale_ips.py
+git diff -- docs/k0s/k0s.yaml
+k0sctl apply --config docs/k0s/k0s.yaml --dry-run
+k0sctl apply --config docs/k0s/k0s.yaml
+```
 
 ### Diagnose degraded connectivity
 
 Check the Tailscale path before changing Kubernetes:
 
 ```bash
-tailscale status
-tailscale netcheck
-tailscale ping control-plane-01
-ssh root@node-01 tailscale ping node-02
-ssh root@node-01 ip route
+(
+  set -euo pipefail
+  left=(control-plane-01 node-01 node-02 node-03)
+  right=(control-plane-02 control-plane-03 node-04 node-05)
+  for source in "${left[@]}"; do
+    ssh root@"$source" tailscale netcheck
+    for target in "${right[@]}"; do
+      ssh root@"$source" \
+        tailscale ping --timeout=20s --until-direct=true "$target"
+    done
+  done
+)
 ```
 
-DERP preserves encryption and connectivity but increases latency. Investigate firewall, Network Address Translation (NAT), and User Datagram Protocol (UDP) reachability when a direct path becomes relayed.
+This cluster does not accept relayed node paths. Investigate firewall, Network Address Translation (NAT), User Datagram Protocol (UDP) reachability, and duplicate public endpoint ports when a direct path cannot be established.
 
 ### Inspect Hubble UI certificate renewal
 
@@ -1665,10 +1796,9 @@ Use observed symptoms to select the narrowest corrective action:
 | Large requests stall | MTU exceeds the encapsulated path | Restore MTU `1230` and measure every node pair |
 | `ProxyGroupReady` remains false | Tailscale Service approval is missing | Add the exact auto-approver or approve only the two backends |
 | Tailscale paths use DERP | Direct UDP connectivity is unavailable | Check `tailscale netcheck`, firewall rules, and NAT behavior |
-| Cross-playground tests intermittently time out while same-playground tests pass | DERP is dropping or delaying packets because a direct path cannot be established between playground networks | Confirm with `tailscale ping --until-direct=true`; retry only after the underlay stabilizes rather than weakening Cilium checks |
 | Cluster routes use another VPN | Accepted subnet routes overlap cluster CIDR ranges | Remove the route or choose unused Pod and Service ranges |
 | Canonical hostnames resolve to stale addresses or fresh devices receive `-1` suffixes | Destroyed playground devices remain registered in the tailnet | Remove only the confirmed offline records, restore the fresh devices' canonical names, and wait for MagicDNS convergence |
-| `tailscale ping` prints `pong` but exits nonzero | DERP works but no direct peer path was established | Verify SSH succeeds, inspect `tailscale netcheck`, and troubleshoot UDP or NAT without blocking bootstrap on a functional DERP path |
+| `tailscale ping` prints `pong` but exits nonzero | No direct peer path was established | Inspect `tailscale netcheck` and the manifest-assigned UDP listener ports; do not bootstrap until `--until-direct=true` succeeds |
 | Sonobuoy reports failures | Cluster behavior or the test environment failed | Preserve the archive and inspect each failed test |
 | `Certificate/hubble-ui` remains `Ready=False` | Cloudflare token permissions, ACME account, or DNS propagation failed | Inspect the related `Order` and `Challenge`; confirm `Zone - DNS - Edit` and `Zone - Zone - Read` for `canhdinh.com` without printing the token |
 | HTTPS presents the ingress default certificate | `hubble-ui-tls` is missing, invalid, or not loaded by ingress-nginx | Check the Certificate condition, Secret type, Ingress TLS reference, and ingress-nginx events and logs |
@@ -1692,8 +1822,8 @@ To roll back only Hubble UI HTTPS while preserving Cilium and the cluster, remov
 kubectl --context tailscale-k0s -n ingress-nginx \
   delete service hubble-ui-tailscale
 kubectl --context tailscale-k0s -n kube-system \
-  delete ingress hubble-ui certificate hubble-ui \
-  issuer letsencrypt-cloudflare
+  delete ingress/hubble-ui certificate/hubble-ui \
+  issuer/letsencrypt-cloudflare
 kubectl --context tailscale-k0s -n kube-system \
   delete secret cloudflare-api-token
 helm --kube-context tailscale-k0s -n ingress-nginx \
@@ -1706,7 +1836,7 @@ To remove Echo Server while preserving shared Gateway API, DNS, and certificate 
 
 ```bash
 kubectl --context tailscale-k0s -n echo \
-  delete httproute echo gateway echo
+  delete httproute/echo gateway/echo
 
 timeout 130 bash -c '
   until [[ -z $(dig +short echo.playground.canhdinh.com A) ]] &&
@@ -1724,7 +1854,8 @@ To remove monitoring while preserving the shared Gateway API, DNS, and certifica
 
 ```bash
 kubectl --context tailscale-k0s -n monitoring delete \
-  httproute prometheus alertmanager grafana gateway monitoring
+  httproute/prometheus httproute/alertmanager httproute/grafana \
+  gateway/monitoring
 
 timeout 130 bash -c '
   until
@@ -1781,8 +1912,8 @@ Before destroying playgrounds, export workload data and an etcd backup. Then com
 
 1. Remove Kubernetes workloads and the ProxyGroup while the cluster can reconcile deletion.
 2. Remove operator-created Tailscale devices and Services.
-3. Destroy the playgrounds through iximiuz Labs.
-4. Remove stale machines from the Tailscale admin console.
+3. Destroy the two confirmed playground runs through iximiuz Labs.
+4. Remove only the now-offline host identities whose addresses match the recorded cluster configuration.
 5. Revoke every remaining enrollment key and API token.
 6. Remove obsolete direct kubeconfig credentials from administrator machines.
 
@@ -1805,7 +1936,12 @@ helm --kube-context tailscale-k0s -n tailscale \
 kubectl --context tailscale-k0s delete namespace tailscale
 ```
 
-Confirm `tailscale status` no longer lists the proxy devices or Service addresses. Then identify the operator and playground devices by their exact hostname and tag set. The block stops unless it finds exactly these nine devices, prints their non-secret IDs for review, and requires explicit confirmation before deletion:
+Confirm `tailscale status` no longer lists the proxy devices or Service
+addresses. Then destroy the two confirmed iximiuz Labs run IDs. After both runs
+report `DESTROYED` or `TERMINATED`, select the eight offline Tailscale host
+identities by canonical hostname, `tag:lab`, and the addresses currently
+recorded in `k0s.yaml`, plus the single offline operator identity. The block
+refuses to delete online, mismatched, or additional devices:
 
 ```bash
 (
@@ -1818,19 +1954,59 @@ Confirm `tailscale status` no longer lists the proxy devices or Service addresse
   chmod 600 "$response" "$selected"
   api=https://api.tailscale.com/api/v2
 
+  labctl playground destroy kubernetes_01_run_id
+  labctl playground destroy kubernetes_02_run_id
+  for attempt in {1..24}; do
+    sessions=$(labctl playground list --all --output json)
+    jq -e --arg first kubernetes_01_run_id \
+      --arg second kubernetes_02_run_id \
+      '[.[] | select(.id == $first or .id == $second) |
+        {id, state: .status.stateEvents[-1].state}] |
+       length == 2 and
+       all(.state == "DESTROYED" or .state == "TERMINATED")' \
+      <<<"$sessions" >/dev/null && break
+    sleep 5
+  done
+  jq -e --arg first kubernetes_01_run_id \
+    --arg second kubernetes_02_run_id \
+    '[.[] | select(.id == $first or .id == $second) |
+      {id, state: .status.stateEvents[-1].state}] |
+     length == 2 and
+     all(.state == "DESTROYED" or .state == "TERMINATED")' \
+    <<<"$sessions" >/dev/null
+
   curl --fail-with-body --silent --show-error \
     -H "Authorization: Bearer $token" \
     "$api/tailnet/-/devices" >"$response"
-  jq -e '[.devices[] | select(
-    ((.hostname | test("^(control-plane-0[1-3]|node-0[1-5])$")) and
-     (.tags == ["tag:lab"])) or
-    (.hostname == "tailscale-operator" and
-     (.tags == ["tag:k8s-operator"]))
-  ) | {id, hostname, tags}] |
-  if length == 9 then . else error("expected exactly nine lab devices") end
+  expected_addresses=$(uv run --locked python -c '
+import json
+from pathlib import Path
+from ruamel.yaml import YAML
+hosts = YAML(typ="safe").load(
+    Path("docs/k0s/k0s.yaml").read_text()
+)["spec"]["hosts"]
+print(json.dumps(sorted(host["privateAddress"] for host in hosts)))
+')
+  jq -e --argjson expected "$expected_addresses" '
+    [.devices[] | select(
+      (.hostname | test("^(control-plane-0[1-3]|node-0[1-5])$")) and
+      (.tags == ["tag:lab"]) and
+      (.connectedToControl == false)
+    ) | {id, hostname, addresses, tags}] as $hosts |
+    [.devices[] | select(
+      (.hostname == "tailscale-operator") and
+      (.tags == ["tag:k8s-operator"]) and
+      (.connectedToControl == false)
+    ) | {id, hostname, addresses, tags}] as $operators |
+    if ($hosts | length) == 8 and
+       ([$hosts[].addresses[0]] | sort) == $expected and
+       ($operators | length) == 1
+    then $hosts + $operators
+    else error("expected eight matching offline hosts and one offline operator") end
   ' <"$response" >"$selected"
   jq . "$selected"
-  read -r -p 'Delete these nine Tailscale devices? [y/N] ' confirm
+  printf 'Delete these nine offline Tailscale devices? [y/N] '
+  read -r confirm
   [[ $confirm == y ]]
 
   while IFS= read -r device_id; do
@@ -1839,37 +2015,13 @@ Confirm `tailscale status` no longer lists the proxy devices or Service addresse
       -H "Authorization: Bearer $token" \
       "$api/device/$device_id" >/dev/null
   done < <(jq -r '.[].id' "$selected")
+
+  labctl playground remove --force kubernetes_01_playground_name
+  labctl playground remove --force kubernetes_02_playground_name
 )
 ```
 
 Do not delete the control host or unrelated tailnet devices.
-
-Use each iximiuz Labs run ID to destroy its session. Stopping preserves the session and does not permit custom playground removal. Wait for destruction to finish before removing the generated custom playground names:
-
-```bash
-labctl playground destroy kubernetes_01_run_id
-labctl playground destroy kubernetes_02_run_id
-for attempt in {1..24}; do
-  sessions=$(labctl playground list --all --output json)
-  jq -e --arg first kubernetes_01_run_id \
-    --arg second kubernetes_02_run_id \
-    '[.[] | select(.id == $first or .id == $second) |
-      {id, state: .status.stateEvents[-1].state}] |
-     length == 2 and
-     all(.state == "DESTROYED" or .state == "TERMINATED")' \
-    <<<"$sessions" >/dev/null && break
-  sleep 5
-done
-jq -e --arg first kubernetes_01_run_id \
-  --arg second kubernetes_02_run_id \
-  '[.[] | select(.id == $first or .id == $second) |
-    {id, state: .status.stateEvents[-1].state}] |
-   length == 2 and
-   all(.state == "DESTROYED" or .state == "TERMINATED")' \
-  <<<"$sessions" >/dev/null
-labctl playground remove --force kubernetes_01_playground_name
-labctl playground remove --force kubernetes_02_playground_name
-```
 
 Verify that the custom playground catalog contains neither Kubernetes playground and that the application DNS records no longer exist before starting a clean rebuild.
 
@@ -1899,7 +2051,10 @@ Update this table after every deployment, upgrade, recovery, or teardown:
 | 2026-09-01 | Repository owner and OpenCode | Deployed kube-prometheus-stack and its Kubernetes command-center dashboard; exposed Prometheus, Alertmanager, and Grafana through one private Envoy Gateway with ExternalDNS and Let's Encrypt DNS-01 certificates |
 | 2026-09-01 | Repository owner and OpenCode | Upgraded all eight hosts to k0s `v1.36.4+k0s.0` and Cilium to `1.20.1`; verified API and etcd health, five Ready workers, 70 focused connectivity actions with Hubble Relay forwarded, ingress endpoints, and 32 healthy Prometheus targets |
 | 2026-09-02 | Repository owner and OpenCode | Removed all lab workloads, DNS records, Tailscale Services and devices, sessions, and playground definitions; rebuilt from clean state; verified five Ready workers, three-member etcd, 70 focused Cilium actions, Sonobuoy quick mode, both API paths, private Hubble and Echo endpoints, and the monitoring stack |
-| 2026-09-05 | Repository owner and OpenCode | Removed the prior operator Services, proxy devices, host devices, and playground runs; rebuilt the core cluster with the shared Ansible enrollment role; verified enrollment idempotence, three-member etcd, five Ready workers, Cilium health, MTU, DNS, and egress. Cross-playground DERP loss prevented the focused Cilium suite and Sonobuoy quick mode from completing. |
+| 2026-09-06 | Repository owner and OpenCode | Recreated both Kubernetes playgrounds, removed eight stale host devices, and rebuilt the core cluster from clean machines. Verified three-member etcd, five Ready workers, Cilium and Hubble health, MTUs `1280`/`1230`, all 70 focused Cilium actions, Sonobuoy quick mode with 8/8 e2e tests and 5/5 log plugins, and direct cross-playground Tailscale paths. |
+| 2026-09-08 | Repository owner and OpenCode | Deleted the previous runs and eight stale Tailscale nodes, assigned unique Tailscale UDP listener ports to all eight machines, and rebuilt playgrounds `kubernetes-01-d3e073f5` (`6a9ffbc504c48567540eed8d`) and `kubernetes-02-cd089d78` (`6a9ffbc504c48567540eed97`). Verified all 16 cross-playground host pairs and 18/18 repeated worker probes used direct endpoints, three-member etcd, five Ready workers, Cilium and Hubble health, all 70 focused Cilium actions, and Sonobuoy quick mode with 8/8 e2e tests and 5/5 log plugins. |
+| 2026-09-08 | Repository owner and OpenCode | Redeployed identity-based Kubernetes API access, private Hubble UI HTTPS, Echo Server through Gateway API, ExternalDNS, cert-manager, ingress-nginx, Envoy Gateway, and kube-prometheus-stack. Verified both API paths, five valid HTTPS endpoints, all routes and certificates, `2/2` Tailscale proxy backends for every exposed Service, 32/32 healthy Prometheus targets, and the reconciled Grafana command-center dashboard. |
+| 2026-09-08 | Repository owner and OpenCode | Made both Kubernetes playground runs persistent and reviewed the runbook end to end. Added fail-fast direct-path and bootstrap checks, safe kubeconfig replacement, explicit optional-service dependencies and contexts, rerunnable namespace creation, valid rollback commands, worker-only address reconciliation, and guarded post-destroy Tailscale cleanup. |
 
 ## Supporting references
 
