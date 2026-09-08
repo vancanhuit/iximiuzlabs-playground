@@ -27,6 +27,62 @@ The Btrfs pool is local storage. Incus can move instances between members, but t
 
 [![Incus OVN network data paths](architecture/ovn-network.svg)](architecture/ovn-network.html)
 
+### OVN Network Data Paths
+
+Open the [interactive OVN network diagram](architecture/ovn-network.html) and select **Cross-member traffic**, **Internet egress**, or **Uplink boot recovery** to isolate a path.
+
+OVN separates the logical container network from the networks that carry its traffic:
+
+| Layer | Network or interface | Responsibility |
+| --- | --- | --- |
+| Logical overlay | `ovn0`, currently `10.131.73.0/24` | Assigns container addresses with DHCP and performs logical switching and routing |
+| Tunnel underlay | `net-01` / member `eth0`, `172.16.0.0/24` | Carries Geneve packets between OVN chassis |
+| Physical uplink | `UPLINK` / member `eth1` / `net-02`, `172.17.0.0/24` | Connects the OVN logical router to the playground network and gateway |
+| Management | `tailscale0` | Carries Ansible, SSH, and Incus API traffic; it is not part of the container data path |
+
+#### Same-Member Container Traffic
+
+1. The source container sends a frame through its virtual `eth0` interface.
+2. The host-side Open vSwitch port receives the frame.
+3. The local OVN controller applies the logical switch, router, and policy flows derived from the OVN southbound database.
+4. Open vSwitch sends the frame to the destination container's local virtual port.
+
+The packet remains on one Incus member. It does not enter a Geneve tunnel, physical `eth0`, `UPLINK`, or `eth1`.
+
+#### Cross-Member Container Traffic
+
+1. The source container sends a frame through its virtual `eth0` interface to `ovn0`.
+2. Open vSwitch applies OVN's logical forwarding rules and selects the remote chassis hosting the destination logical port.
+3. OVN encapsulates the original frame in Geneve. The outer source and destination addresses are the Incus members' `eth0` addresses on `172.16.0.0/24`.
+4. The Geneve packet crosses `net-01` to the destination member.
+5. The destination chassis decapsulates the packet, applies its local OVN flows, and delivers the original frame to the destination container.
+
+The inner container addresses remain on `ovn0`; only the outer Geneve packet uses the `172.16.0.0/24` underlay. Return traffic follows the same stages in the opposite direction and may use a different active chassis path selected by OVN.
+
+#### Container Internet And DNS Traffic
+
+1. The container sends traffic for a non-local address to the `ovn0` logical router.
+2. OVN selects the clustered physical network named `UPLINK` for north-south traffic.
+3. `UPLINK` maps to unnumbered `eth1` on the active OVN chassis.
+4. The Ethernet frame enters the shared `net-02` layer 2 network and resolves the configured gateway, currently `172.17.0.1`, with ARP.
+5. The playground gateway must forward the packet and provide the external egress required to reach Internet services.
+6. Reply traffic returns through the gateway, `net-02`, `UPLINK`, and the OVN logical router to the originating container.
+
+DNS uses the same north-south path. OVN DHCP advertises `1.1.1.1` and `1.0.0.1`, but those addresses are usable only while the complete uplink and gateway path works. A successful DHCP lease or container-to-container ping does not prove Internet or DNS egress.
+
+#### Uplink Boot Invariant
+
+Every member's `eth1` must be up but have no host IPv4, IPv6, or link-local address. The `incus-ovn-uplink.service` unit runs after `systemd-networkd` and before Incus and `ovn-host`; it installs the unmanaged network definition, flushes addresses from `eth1`, and leaves the link active. This prevents host networking from competing with Open vSwitch for the OVN provider interface after a reboot.
+
+Use these boundaries when diagnosing a failure:
+
+| Observation | Working portion | Inspect next |
+| --- | --- | --- |
+| Same-member ping works, cross-member ping fails | Container ports and local OVN switching | `ovn-controller`, Geneve chassis addresses, `eth0`, and `net-01` |
+| Cross-member ping works, Internet IP fails | OVN overlay and Geneve underlay | `UPLINK`, unnumbered `eth1`, gateway ARP, and `172.17.0.1` forwarding |
+| Internet IP works, DNS fails | OVN egress and gateway forwarding | DHCP-advertised resolvers and container resolver state |
+| Networking fails only after reboot | Runtime OVN configuration may still be valid | `incus-ovn-uplink.service` ordering and addresses restored on `eth1` |
+
 ## Files
 
 | Path | Purpose |
