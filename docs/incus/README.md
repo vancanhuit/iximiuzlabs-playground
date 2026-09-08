@@ -1,7 +1,7 @@
 # Runbook: Deploy the Incus cluster playground
 
 **Owner:** Lab operator | **Frequency:** As needed
-**Last updated:** 2026-09-05 | **Last run:** 2026-09-05
+**Last updated:** 2026-09-08 | **Last run:** 2026-09-08
 
 ## Purpose
 
@@ -14,6 +14,7 @@ Use this runbook to deploy and verify the repository's three-node Incus cluster 
 - unnumbered `eth1` interfaces on a shared layer 2 network for the OVN uplink
 - one member-local Btrfs pool backed by `/dev/vdb` on each host
 - Tailscale SSH for Ansible and private Incus API access
+- OVN DHCP with `1.1.1.1` and `1.0.0.1` as the container DNS servers
 
 The Btrfs pool is local storage. Incus can move instances between members, but their data is not synchronously replicated as it would be with shared storage such as Ceph.
 
@@ -53,7 +54,7 @@ The playbook discovers addresses at runtime rather than storing them in inventor
 | `tailscale0` | Tailscale SSH and client access to the Incus API |
 | `/dev/vdb` | Dedicated Btrfs storage for the local Incus pool |
 
-The playbook persists the discovered `eth1` subnet metadata in `/etc/incus/uplink.json` before removing the interface address. This makes later runs idempotent. Do not delete that file unless `eth1` has its original playground address again.
+The playbook persists the discovered `eth1` subnet metadata in `/etc/incus/uplink.json` before removing the interface address. This makes later runs idempotent and allows the manifest-installed `incus-ovn-uplink.service` to run on subsequent boots. Init tasks run only when a playground instance is created, not after an in-session machine reboot, so the enabled systemd unit removes any address restored by playground networking before Incus and OVN start. Do not delete the metadata file unless `eth1` has its original playground address again.
 
 Incus cluster traffic uses `cluster.https_address` on `eth0`. Incus has one HTTPS listener for both cluster and client traffic, so `core.https_address` listens on `0.0.0.0:8443`; management clients must use a Tailscale address or MagicDNS name, and tailnet policy remains the management access boundary.
 
@@ -104,13 +105,21 @@ Do not remove a live or unrelated node merely to reclaim a hostname.
 
 **If it fails:** Stop and identify the old run before deleting records. If it is still needed, use different machine names consistently in the manifest and inventory instead.
 
-### Step 4: Start A Fresh Run
+### Step 4: Start Or Resume A Run
+
+Start a fresh run when no cluster state must be preserved:
 
 ```bash
 labctl playground start incus-cluster-e6fb1c6c
 ```
 
-Record the returned run ID and wait for `install_incus_01`, `install_incus_02`, and `install_incus_03` to complete. The init tasks install Zabbly Incus, Btrfs tools, OVN, Open vSwitch, and Tailscale, but do not enroll Tailscale or initialize Incus.
+Resume a stopped persistent run instead:
+
+```bash
+labctl playground restart playground_run_id
+```
+
+For a fresh run, record the returned run ID and wait for `install_incus_01`, `install_incus_02`, and `install_incus_03` to complete. The init tasks install Zabbly Incus, Btrfs tools, OVN, Open vSwitch, and Tailscale, but do not enroll Tailscale or initialize Incus. A resumed run retains its disks and does not rerun init tasks.
 
 **Expected result:** The run has three machines and all installation tasks complete successfully.
 
@@ -165,11 +174,35 @@ mise exec -- ansible-playbook \
   ansible/incus_cluster.yml
 ```
 
-The playbook validates the disks and interfaces, builds the three-member OVN database, forms the Incus cluster, initializes the local Btrfs pools, detaches host addresses from `eth1`, creates `UPLINK` and `ovn0`, updates the default profile, and verifies cluster and network state.
+The playbook validates the disks and interfaces, builds the three-member OVN database, forms the Incus cluster, initializes the local Btrfs pools, detaches host addresses from `eth1`, creates `UPLINK` and `ovn0`, configures the OVN DNS servers, updates the default profile, and verifies cluster and network state.
 
 **Expected result:** All plays complete without failures. The first run reports changes; later runs should be mostly `ok` or `skipped`.
 
 **If it fails:** Fix the reported stage and rerun the same playbook. It is designed to resume after successful cluster joins, Btrfs initialization, or network creation. Never manually format `/dev/vdb` to bypass the safety assertion.
+
+### Step 8: Configure The Control Host Client
+
+The client certificate is public material, but use a private temporary file on the cluster member and remove it immediately after adding trust:
+
+```bash
+ssh root@incus-01 'umask 077; cat >/tmp/control-host-incus-client.crt' \
+  < ~/.config/incus/client.crt
+ssh root@incus-01 \
+  "incus config trust add-certificate \
+    /tmp/control-host-incus-client.crt \
+    --name control-host-$(hostname) \
+    --description 'Incus client via Tailscale'; \
+   rm -f /tmp/control-host-incus-client.crt"
+incus remote add incus-lab https://incus-01:8443 --accept-certificate
+incus remote switch incus-lab
+incus cluster list
+```
+
+If `control-host-$(hostname)` or `incus-lab` already exists, inspect it instead of adding a duplicate.
+
+**Expected result:** `incus cluster list` succeeds from the control host and reports all three members as `ONLINE`.
+
+**If it fails:** Confirm `incus-01` resolves through MagicDNS, TCP port `8443` is allowed by the tailnet policy, and `core.https_address` is `0.0.0.0:8443`.
 
 ## Verification
 
@@ -186,21 +219,77 @@ Confirm:
 - [ ] `local` uses the `btrfs` driver and is `CREATED`.
 - [ ] `UPLINK` is a `physical` network in `CREATED` state.
 - [ ] `ovn0` is an `ovn` network in `CREATED` state.
+- [ ] `incus network get ovn0 dns.nameservers` returns `1.1.1.1,1.0.0.1`.
 - [ ] `eth1` is up but has no host IPv4 or IPv6 address on every member.
+- [ ] `incus-ovn-uplink.service` is enabled and active on every member.
 - [ ] `incus config get core.https_address` returns `0.0.0.0:8443`.
 
-Run a disposable workload test:
+Run one disposable workload on each member and wait for DHCP:
 
 ```bash
-ssh root@incus-01 \
-  'incus launch images:debian/13 test-ovn --network ovn0'
-ssh root@incus-01 \
-  'incus exec test-ovn -- ping -c 3 1.1.1.1'
-ssh root@incus-01 \
-  'incus delete --force test-ovn'
+for member in incus-01 incus-02 incus-03; do
+  incus launch images:debian/13/cloud "test-${member}" \
+    --profile default \
+    --target "${member}"
+done
+
+for instance in test-incus-01 test-incus-02 test-incus-03; do
+  until incus exec "${instance}" -- ip -4 route show default | grep -q default; do
+    sleep 1
+  done
+done
 ```
 
-**Expected result:** The container receives an address on `ovn0`, reaches the internet, and is removed afterward.
+Verify full-mesh name resolution and connectivity, plus external DNS and package repositories:
+
+```bash
+for source in test-incus-01 test-incus-02 test-incus-03; do
+  for destination in test-incus-01 test-incus-02 test-incus-03; do
+    [ "${source}" = "${destination}" ] || \
+      incus exec "${source}" -- ping -c 3 "${destination}"
+  done
+done
+
+incus exec test-incus-01 -- getent hosts deb.debian.org
+incus exec test-incus-01 -- apt-get update
+
+for instance in test-incus-01 test-incus-02 test-incus-03; do
+  incus delete --force "${instance}"
+done
+```
+
+**Expected result:** Each container receives an address on `ovn0`, resolves and reaches both peers by name, resolves `deb.debian.org` through the configured DNS servers, completes `apt-get update`, and is removed afterward.
+
+### Verified State On 2026-09-08
+
+The control host used `incus-lab` as its current remote:
+
+```text
+NAME                 URL                                   PROTOCOL       AUTH TYPE    PUBLIC  STATIC  GLOBAL
+homelab-server       https://debian-incus:8443             incus          tls          NO      NO      NO
+images               https://images.linuxcontainers.org    simplestreams  none         YES     NO      NO
+incus-lab (current)  https://incus-01:8443                 incus          tls          NO      NO      NO
+local                unix://                               incus          file access  NO      YES     NO
+```
+
+All three cluster members were fully operational:
+
+```text
+NAME      URL                        ROLES                     STATUS  MESSAGE
+incus-01  https://172.16.0.2:8443    database-leader,database  ONLINE  Fully operational
+incus-02  https://172.16.0.3:8443    database                  ONLINE  Fully operational
+incus-03  https://172.16.0.4:8443    database                  ONLINE  Fully operational
+```
+
+The connectivity test left these Debian 13 cloud containers running:
+
+```text
+NAME                     STATE    IPV4                  TYPE       LOCATION
+debian13-cloud-netcheck  RUNNING  10.131.73.7 (eth0)   CONTAINER  incus-01
+mesh-incus-01            RUNNING  10.131.73.8 (eth0)   CONTAINER  incus-01
+mesh-incus-02            RUNNING  10.131.73.9 (eth0)   CONTAINER  incus-02
+mesh-incus-03            RUNNING  10.131.73.10 (eth0)  CONTAINER  incus-03
+```
 
 ## Troubleshooting
 
@@ -212,6 +301,9 @@ ssh root@incus-01 \
 | `Network is not in pending state` | A prior run already finalized `UPLINK` | Inspect `incus network show UPLINK`; rerun the current idempotent playbook instead of recreating targets |
 | `ipv6.gateway` rejects `none` | Physical uplinks do not accept that value | Omit `ipv6.gateway`; this runbook configures only the IPv4 uplink |
 | OVN says `eth1` has addresses | systemd-networkd still owns the uplink address | Confirm `/etc/systemd/network/20-eth1.network` is unmanaged, flush `eth1`, and rerun the playbook |
+| `ovn0` is unavailable after a reboot | `eth1` regained its playground address before Incus started | Confirm `incus-ovn-uplink.service` is enabled, rerun `ansible/incus_cluster.yml`, and restart `incus.service` after `eth1` is unnumbered |
+| Containers reach `ovn0` but not `1.1.1.1` | The OVN uplink gateway is unreachable | From the active OVN chassis, verify that `172.17.0.1` answers ARP on `eth1`; restore playground network egress before changing container DNS |
+| Containers reach `1.1.1.1` but names do not resolve | OVN DHCP advertised missing or incorrect resolvers | Run `incus network set ovn0 dns.nameservers=1.1.1.1,1.0.0.1`, restart the test container, and rerun the playbook to persist the setting |
 | Members become `OFFLINE` after API configuration | `core.https_address` was bound only to Tailscale | Restore `incus config set core.https_address=0.0.0.0:8443` locally on every member |
 | MagicDNS resolves to a suffixed name | A stale Tailscale device owns the canonical hostname | Remove only the confirmed stale record, then reenroll the replacement node |
 | Ansible waits at SSH authentication | Tailscale SSH check mode requires reauthentication | Open the printed URL once; do not use `checkPeriod: always` with Ansible |
@@ -244,6 +336,7 @@ The custom playground definition is separate from a run. To roll back its config
 
 | Date | Run by | Notes |
 | --- | --- | --- |
+| 2026-09-08 | Repository owner and OpenCode | Resumed run `6a9bdbead17d324d6a33ce01`; configured control-host access, persistent OVN uplink recovery, explicit container DNS, and verified `apt-get update` |
 | 2026-09-05 | Repository owner and OpenCode | Deployed run `6a9bdbead17d324d6a33ce01`; verified three online Incus members, local Btrfs pools, OVN networking, Tailscale management, and container egress |
 
 ## References

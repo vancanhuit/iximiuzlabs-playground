@@ -347,9 +347,15 @@
       failed_when: false
 
     - name: Create the OVN network
-      ansible.builtin.command: incus network create ovn0 --type=ovn network=UPLINK
+      ansible.builtin.command: >-
+        incus network create ovn0 --type=ovn network=UPLINK
+        dns.nameservers=1.1.1.1,1.0.0.1
       when: ovn_network_status.rc != 0
       changed_when: true
+
+    - name: Configure OVN DNS servers
+      ansible.builtin.command: incus network set ovn0 dns.nameservers=1.1.1.1,1.0.0.1
+      changed_when: false
 
     - name: Read the default profile
       ansible.builtin.command: incus profile device get default eth0 network

@@ -88,6 +88,51 @@ playground:
       name: incus-03
       machine: incus-03
       enabled: true
+  startupFiles:
+    - path: /usr/local/sbin/prepare-incus-ovn-uplink
+      owner: root
+      mode: "755"
+      machines:
+        - incus-01
+        - incus-02
+        - incus-03
+      content: |
+        #!/bin/sh
+        set -eu
+        cat >/etc/systemd/network/20-eth1.network <<'EOF'
+        [Match]
+        Name=eth1
+
+        [Link]
+        RequiredForOnline=no
+
+        [Network]
+        LinkLocalAddressing=no
+        EOF
+        networkctl reload
+        ip address flush dev eth1
+        ip link set eth1 up
+    - path: /etc/systemd/system/incus-ovn-uplink.service
+      owner: root
+      mode: "644"
+      machines:
+        - incus-01
+        - incus-02
+        - incus-03
+      content: |
+        [Unit]
+        Description=Prepare the Incus OVN uplink
+        ConditionPathExists=/etc/incus/uplink.json
+        After=systemd-networkd.service
+        Before=incus.service ovn-host.service
+
+        [Service]
+        Type=oneshot
+        ExecStart=/usr/local/sbin/prepare-incus-ovn-uplink
+        RemainAfterExit=yes
+
+        [Install]
+        WantedBy=multi-user.target
   initTasks:
     install_incus_01:
       name: install_incus_01
@@ -120,6 +165,7 @@ playground:
         curl -fsSL https://tailscale.com/install.sh | sh
         usermod -aG incus-admin laborant
         systemctl enable incus openvswitch-switch ovn-central ovn-host tailscaled
+        systemctl enable incus-ovn-uplink.service
         systemctl start incus openvswitch-switch ovn-host tailscaled
         systemctl stop ovn-central
     install_incus_02:
@@ -153,6 +199,7 @@ playground:
         curl -fsSL https://tailscale.com/install.sh | sh
         usermod -aG incus-admin laborant
         systemctl enable incus openvswitch-switch ovn-central ovn-host tailscaled
+        systemctl enable incus-ovn-uplink.service
         systemctl start incus openvswitch-switch ovn-host tailscaled
         systemctl stop ovn-central
     install_incus_03:
@@ -186,6 +233,7 @@ playground:
         curl -fsSL https://tailscale.com/install.sh | sh
         usermod -aG incus-admin laborant
         systemctl enable incus openvswitch-switch ovn-central ovn-host tailscaled
+        systemctl enable incus-ovn-uplink.service
         systemctl start incus openvswitch-switch ovn-host tailscaled
         systemctl stop ovn-central
   accessControl:
