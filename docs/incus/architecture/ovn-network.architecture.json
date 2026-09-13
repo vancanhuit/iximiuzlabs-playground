@@ -37,7 +37,7 @@
       "type": "cloud",
       "label": "Source Container",
       "sublabel": "ovn0 address on member A",
-      "tag": "10.131.73.0/24",
+      "tag": "Incus-assigned subnet",
       "pos": [40, 290],
       "size": [180, 76],
       "sources": [{"path": "docs/incus/README.md", "line": 227, "end_line": 261}]

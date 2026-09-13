@@ -1,7 +1,7 @@
 # Runbook: Deploy the Incus cluster playground
 
 **Owner:** Lab operator | **Frequency:** As needed
-**Last updated:** 2026-09-08 | **Last run:** 2026-09-08
+**Last updated:** 2026-09-13 | **Last run:** 2026-09-13
 
 ## Purpose
 
@@ -35,7 +35,7 @@ OVN separates the logical container network from the networks that carry its tra
 
 | Layer | Network or interface | Responsibility |
 | --- | --- | --- |
-| Logical overlay | `ovn0`, currently `10.131.73.0/24` | Assigns container addresses with DHCP and performs logical switching and routing |
+| Logical overlay | `ovn0`, assigned by Incus | Assigns container addresses with DHCP and performs logical switching and routing |
 | Tunnel underlay | `net-01` / member `eth0`, `172.16.0.0/24` | Carries Geneve packets between OVN chassis |
 | Physical uplink | `UPLINK` / member `eth1` / `net-02`, `172.17.0.0/24` | Connects the OVN logical router to the playground network and gateway |
 | Management | `tailscale0` | Carries Ansible, SSH, and Incus API traffic; it is not part of the container data path |
@@ -119,7 +119,7 @@ The playbook discovers addresses at runtime rather than storing them in inventor
 | `tailscale0` | Tailscale SSH and client access to the Incus API |
 | `/dev/vdb` | Dedicated Btrfs storage for the local Incus pool |
 
-The playbook persists the discovered `eth1` subnet metadata in `/etc/incus/uplink.json` before removing the interface address. This makes later runs idempotent and allows the manifest-installed `incus-ovn-uplink.service` to run on subsequent boots. Init tasks run only when a playground instance is created, not after an in-session machine reboot, so the enabled systemd unit removes any address restored by playground networking before Incus and OVN start. Do not delete the metadata file unless `eth1` has its original playground address again.
+The playbook persists the discovered `eth1` subnet metadata in `/etc/incus/uplink.json`, then starts the manifest-installed `incus-ovn-uplink.service`. The service removes the interface address and stays active after preparing the link. Init tasks run only when a playground instance is created, not after an in-session machine reboot, so the enabled unit repeats this preparation before Incus and OVN start. Do not delete the metadata file unless `eth1` has its original playground address again.
 
 Incus cluster traffic uses `cluster.https_address` on `eth0`. Incus has one HTTPS listener for both cluster and client traffic, so `core.https_address` listens on `0.0.0.0:8443`; management clients must use a Tailscale address or MagicDNS name, and tailnet policy remains the management access boundary.
 
@@ -175,7 +175,9 @@ Do not remove a live or unrelated node merely to reclaim a hostname.
 Start a fresh run when no cluster state must be preserved:
 
 ```bash
-labctl playground start incus-cluster-e6fb1c6c
+run_id=$(labctl playground start incus-cluster-e6fb1c6c --quiet)
+labctl playground persist "${run_id}"
+printf 'Run ID: %s\n' "${run_id}"
 ```
 
 Resume a stopped persistent run instead:
@@ -184,9 +186,9 @@ Resume a stopped persistent run instead:
 labctl playground restart playground_run_id
 ```
 
-For a fresh run, record the returned run ID and wait for `install_incus_01`, `install_incus_02`, and `install_incus_03` to complete. The init tasks install Zabbly Incus, Btrfs tools, OVN, Open vSwitch, and Tailscale, but do not enroll Tailscale or initialize Incus. A resumed run retains its disks and does not rerun init tasks.
+For a fresh run, record the returned run ID and make the run persistent. Wait for `install_incus_01`, `install_incus_02`, and `install_incus_03` to complete. The init tasks install Zabbly Incus, Btrfs tools, OVN, Open vSwitch, and Tailscale, but do not enroll Tailscale or initialize Incus. A resumed run retains its disks and does not rerun init tasks.
 
-**Expected result:** The run has three machines and all installation tasks complete successfully.
+**Expected result:** The persistent run has three machines and all installation tasks complete successfully.
 
 **If it fails:** Inspect the run in the browser or use `labctl playground status run_id`. Do not run either playbook until all init tasks complete.
 
@@ -250,12 +252,14 @@ ssh root@incus-01 \
     --name control-host-$(hostname) \
     --description 'Incus client via Tailscale'; \
    rm -f /tmp/control-host-incus-client.crt"
+incus remote list --format csv --columns n | grep -qx incus-lab && \
+  incus remote remove incus-lab
 incus remote add incus-lab https://incus-01:8443 --accept-certificate
 incus remote switch incus-lab
 incus cluster list
 ```
 
-If `control-host-$(hostname)` or `incus-lab` already exists, inspect it instead of adding a duplicate.
+If `control-host-$(hostname)` already exists on the new cluster, inspect it instead of adding a duplicate. Replacing `incus-lab` makes the control host accept the new cluster's server certificate.
 
 **Expected result:** `incus cluster list` succeeds from the control host and reports all three members as `ONLINE`.
 
@@ -317,7 +321,9 @@ done
 
 **Expected result:** Each container receives an address on `ovn0`, resolves and reaches both peers by name, resolves `deb.debian.org` through the configured DNS servers, completes `apt-get update`, and is removed afterward.
 
-### Verified state on 2026-09-08
+### Verified state on 2026-09-13
+
+Fresh persistent run `6aa69e8bb4bf6f74dea37640` passed the complete procedure. All three replacement Tailscale devices were online. A second reconciliation after activating the persistent uplink service and a third reconciliation after rolling reboots completed without failures; the third run reported no changes.
 
 The control host used `incus-lab` as its current remote:
 
@@ -338,15 +344,9 @@ incus-02  https://172.16.0.3:8443    database                  ONLINE  Fully ope
 incus-03  https://172.16.0.4:8443    database                  ONLINE  Fully operational
 ```
 
-The connectivity test left these Debian 13 cloud containers running:
+The connectivity test created one Debian 13 cloud container on each member. They received `10.8.143.2` through `10.8.143.4`, passed full-mesh name resolution and connectivity, resolved `deb.debian.org`, completed `apt-get update`, survived rolling member reboots, and were removed afterward.
 
-```text
-NAME                     STATE    IPV4                  TYPE       LOCATION
-debian13-cloud-netcheck  RUNNING  10.131.73.7 (eth0)    CONTAINER  incus-01
-mesh-incus-01            RUNNING  10.131.73.8 (eth0)    CONTAINER  incus-01
-mesh-incus-02            RUNNING  10.131.73.9 (eth0)    CONTAINER  incus-02
-mesh-incus-03            RUNNING  10.131.73.10 (eth0)   CONTAINER  incus-03
-```
+After each reboot, `incus-ovn-uplink.service` was active, `eth1` had no global address, all Incus members were `ONLINE`, and both three-member OVN databases retained quorum.
 
 ## Troubleshooting
 
@@ -376,7 +376,7 @@ labctl playground stop playground_run_id
 Permanently destroy a disposable run only after confirming no Incus instance or volume data is required. Then remove its three stale Tailscale device records before starting another run:
 
 ```bash
-labctl playground destroy --force playground_run_id
+labctl playground destroy playground_run_id
 ```
 
 The custom playground definition is separate from a run. To roll back its configuration, restore the prior tracked manifest and update `incus-cluster-e6fb1c6c`; do not remove the custom playground unless it is no longer needed.
@@ -393,6 +393,7 @@ The custom playground definition is separate from a run. To roll back its config
 
 | Date | Run by | Notes |
 | --- | --- | --- |
+| 2026-09-13 | Repository owner and OpenCode | Deleted the three stale Incus Tailscale devices; deployed persistent run `6aa69e8bb4bf6f74dea37640` from scratch; verified Incus, Btrfs, OVN quorum, full-mesh workloads, DNS, package egress, idempotence, and rolling reboot recovery |
 | 2026-09-08 | Repository owner and OpenCode | Resumed run `6a9bdbead17d324d6a33ce01`; configured control-host access, persistent OVN uplink recovery, explicit container DNS, and verified `apt-get update` |
 | 2026-09-05 | Repository owner and OpenCode | Deployed run `6a9bdbead17d324d6a33ce01`; verified three online Incus members, local Btrfs pools, OVN networking, Tailscale management, and container egress |
 

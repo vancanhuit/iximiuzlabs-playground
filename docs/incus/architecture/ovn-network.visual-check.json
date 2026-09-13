@@ -6,8 +6,8 @@
   "visualReview": "pending",
   "artifact": {
     "path": "/home/canhdinh/workspace/iximiuzlabs-playground/docs/incus/architecture/ovn-network.html",
-    "sha256": "72d585e4d0f987913e39b05f573571916eb80e61daa5cd69fc04c2f8bc391549",
-    "bytes": 719622
+    "sha256": "6dd5bf880dd71dfd6c952b461cadcdf32e2549bd599be6a4d9f8cf77b3b357e2",
+    "bytes": 719643
   },
   "state": {
     "detail": "read",

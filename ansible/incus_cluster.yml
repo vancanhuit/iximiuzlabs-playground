@@ -271,38 +271,11 @@
   hosts: incus
   become: true
   tasks:
-    - name: Stop systemd-networkd from addressing the OVN uplink
-      ansible.builtin.copy:
-        dest: /etc/systemd/network/20-eth1.network
-        owner: root
-        group: root
-        mode: "0644"
-        content: |
-          [Match]
-          Name=eth1
-
-          [Link]
-          RequiredForOnline=no
-
-          [Network]
-          LinkLocalAddressing=no
-      register: uplink_networkd_config
-
-    - name: Reload systemd-networkd configuration
-      ansible.builtin.command: networkctl reload
-      when: uplink_networkd_config.changed
-      changed_when: true
-      tags:
-        - skip_ansible_lint
-
-    - name: Remove host addresses from the OVN uplink
-      ansible.builtin.command: ip address flush dev eth1
-      when: ansible_facts.eth1.ipv4.address is defined
-      changed_when: true
-
-    - name: Keep the OVN uplink active
-      ansible.builtin.command: ip link set eth1 up
-      changed_when: false
+    - name: Start the persistent OVN uplink preparation service
+      ansible.builtin.systemd_service:
+        name: incus-ovn-uplink.service
+        enabled: true
+        state: started
 
 - name: Configure Incus networking
   hosts: incus-01

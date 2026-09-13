@@ -325,8 +325,8 @@ rect.c-bg-rect { fill: var(--bg); }
         <path data-edge-from="gateway" data-edge-to="internet" data-edge-label="external egress" data-edge-key="7" data-edge-id="gateway-internet" data-composition-points="1237.5,466;1237.5,590" d="M 1237.5 466 L 1237.5 590" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
 
         <!-- Components -->
-        <g id="node-source" data-node-id="source" data-node-label="Source Container" tabindex="0" role="button" aria-label="Focus Source Container, ovn0 address on member A, Incus cluster: three OVN chassis" aria-pressed="false" data-node-kind="cloud" data-node-sublabel="ovn0 address on member A" data-node-tag="10.131.73.0/24" data-node-context="Incus cluster: three OVN chassis">
-          <title>Source Container · ovn0 address on member A · Incus cluster: three OVN chassis · 10.131.73.0/24</title>
+        <g id="node-source" data-node-id="source" data-node-label="Source Container" tabindex="0" role="button" aria-label="Focus Source Container, ovn0 address on member A, Incus cluster: three OVN chassis" aria-pressed="false" data-node-kind="cloud" data-node-sublabel="ovn0 address on member A" data-node-tag="Incus-assigned subnet" data-node-context="Incus cluster: three OVN chassis">
+          <title>Source Container · ovn0 address on member A · Incus cluster: three OVN chassis · Incus-assigned subnet</title>
           <rect x="40" y="290" width="180" height="76" rx="6" class="c-mask"/>
           <rect x="40" y="290" width="180" height="76" rx="6" class="c-cloud" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="cloud" class="semantic-sigil s-cloud" transform="translate(46 296) scale(0.6875)">
@@ -334,7 +334,7 @@ rect.c-bg-rect { fill: var(--bg); }
           </g>
           <text data-node-label="" x="130" y="326" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Source Container</text>
         <text x="130" y="342" class="t-muted" font-size="9" text-anchor="middle">ovn0 address on member A</text>
-        <text x="130" y="358" class="t-cloud" font-size="7" text-anchor="middle">10.131.73.0/24</text>
+        <text x="130" y="358" class="t-cloud" font-size="7" text-anchor="middle">Incus-assigned subnet</text>
         </g>
 
         <g id="node-ovn0" data-node-id="ovn0" data-node-label="ovn0 Logical Network" tabindex="0" role="button" aria-label="Focus ovn0 Logical Network, DHCP + logical switching/routing, Incus cluster: three OVN chassis" aria-pressed="false" data-node-kind="messagebus" data-node-sublabel="DHCP + logical switching/routing" data-node-tag="DNS 1.1.1.1, 1.0.0.1" data-node-context="Incus cluster: three OVN chassis">
