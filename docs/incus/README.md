@@ -18,7 +18,7 @@ Use this runbook to deploy and verify the repository's three-node Incus cluster 
 
 The Btrfs pool is local storage. Incus can move instances between members, but their data is not synchronously replicated as it would be with shared storage such as Ceph.
 
-## Architecture Diagrams
+## Architecture diagrams
 
 - [Incus cluster architecture](architecture/incus-cluster.html): management access, cluster control, database quorums, and member-local storage
 - [OVN network data paths](architecture/ovn-network.html): cross-member Geneve traffic, physical uplink egress, and boot recovery
@@ -27,7 +27,7 @@ The Btrfs pool is local storage. Incus can move instances between members, but t
 
 [![Incus OVN network data paths](architecture/ovn-network.svg)](architecture/ovn-network.html)
 
-### OVN Network Data Paths
+### OVN network data paths
 
 Open the [interactive OVN network diagram](architecture/ovn-network.html) and select **Cross-member traffic**, **Internet egress**, or **Uplink boot recovery** to isolate a path.
 
@@ -40,7 +40,7 @@ OVN separates the logical container network from the networks that carry its tra
 | Physical uplink | `UPLINK` / member `eth1` / `net-02`, `172.17.0.0/24` | Connects the OVN logical router to the playground network and gateway |
 | Management | `tailscale0` | Carries Ansible, SSH, and Incus API traffic; it is not part of the container data path |
 
-#### Same-Member Container Traffic
+#### Same-member container traffic
 
 1. The source container sends a frame through its virtual `eth0` interface.
 2. The host-side Open vSwitch port receives the frame.
@@ -49,7 +49,7 @@ OVN separates the logical container network from the networks that carry its tra
 
 The packet remains on one Incus member. It does not enter a Geneve tunnel, physical `eth0`, `UPLINK`, or `eth1`.
 
-#### Cross-Member Container Traffic
+#### Cross-member container traffic
 
 1. The source container sends a frame through its virtual `eth0` interface to `ovn0`.
 2. Open vSwitch applies OVN's logical forwarding rules and selects the remote chassis hosting the destination logical port.
@@ -59,7 +59,7 @@ The packet remains on one Incus member. It does not enter a Geneve tunnel, physi
 
 The inner container addresses remain on `ovn0`; only the outer Geneve packet uses the `172.16.0.0/24` underlay. Return traffic follows the same stages in the opposite direction and may use a different active chassis path selected by OVN.
 
-#### Container Internet And DNS Traffic
+#### Container Internet and DNS traffic
 
 1. The container sends traffic for a non-local address to the `ovn0` logical router.
 2. OVN selects the clustered physical network named `UPLINK` for north-south traffic.
@@ -70,7 +70,7 @@ The inner container addresses remain on `ovn0`; only the outer Geneve packet use
 
 DNS uses the same north-south path. OVN DHCP advertises `1.1.1.1` and `1.0.0.1`, but those addresses are usable only while the complete uplink and gateway path works. A successful DHCP lease or container-to-container ping does not prove Internet or DNS egress.
 
-#### Uplink Boot Invariant
+#### Uplink boot invariant
 
 Every member's `eth1` must be up but have no host IPv4, IPv6, or link-local address. The `incus-ovn-uplink.service` unit runs after `systemd-networkd` and before Incus and `ovn-host`; it installs the unmanaged network definition, flushes addresses from `eth1`, and leaves the link active. This prevents host networking from competing with Open vSwitch for the OVN provider interface after a reboot.
 
@@ -108,7 +108,7 @@ Use these boundaries when diagnosing a failure:
 
 The repository's example policy is [`docs/k0s/tailnet-policy.hujson`](../k0s/tailnet-policy.hujson). Replace its `tailscale_login` placeholder before applying it. Tailscale SSH `check` mode is supported, but an operator must complete its browser reauthentication before running the cluster playbook.
 
-## Network And Storage Invariants
+## Network and storage invariants
 
 The playbook discovers addresses at runtime rather than storing them in inventory:
 
@@ -125,7 +125,7 @@ Incus cluster traffic uses `cluster.https_address` on `eth0`. Incus has one HTTP
 
 ## Procedure
 
-### Step 1: Validate Local Configuration
+### Step 1: Validate local configuration
 
 ```bash
 mise install
@@ -146,7 +146,7 @@ git diff --check
 
 **If it fails:** Run `mise install` again, then fix the reported file before changing the live playground.
 
-### Step 2: Update The Custom Playground
+### Step 2: Update the custom playground
 
 The update changes future runs; it does not mutate an existing run.
 
@@ -160,7 +160,7 @@ labctl playground update incus-cluster-e6fb1c6c \
 
 **If it fails:** Inspect `labctl playground manifest flexbox` and compare unsupported fields with the base manifest. Task keys and task names must contain only alphanumeric characters or underscores.
 
-### Step 3: Remove Stale Tailscale Devices
+### Step 3: Remove stale Tailscale devices
 
 Before recreating a run, inspect the Tailscale admin console for offline devices named `incus-01`, `incus-02`, and `incus-03`. Remove only devices confirmed to belong to a destroyed run. Duplicate records cause suffixed MagicDNS names such as `incus-01-1` and make the static Ansible inventory ambiguous.
 
@@ -170,7 +170,7 @@ Do not remove a live or unrelated node merely to reclaim a hostname.
 
 **If it fails:** Stop and identify the old run before deleting records. If it is still needed, use different machine names consistently in the manifest and inventory instead.
 
-### Step 4: Start Or Resume A Run
+### Step 4: Start or resume a run
 
 Start a fresh run when no cluster state must be preserved:
 
@@ -190,7 +190,7 @@ For a fresh run, record the returned run ID and wait for `install_incus_01`, `in
 
 **If it fails:** Inspect the run in the browser or use `labctl playground status run_id`. Do not run either playbook until all init tasks complete.
 
-### Step 5: Enroll Tailscale Through Labctl
+### Step 5: Enroll Tailscale through labctl
 
 ```bash
 mise exec -- ansible-playbook \
@@ -199,21 +199,13 @@ mise exec -- ansible-playbook \
   -e incus_play_id=playground_run_id
 ```
 
-The playbook:
-
-1. reaches each new machine through `labctl ssh`
-2. decrypts only `tailscale.access_token` from the SOPS file
-3. creates a reusable, preauthorized one-hour key for `tag:lab`
-4. copies it through protected temporary files
-5. enrolls all three machines and enables Tailscale SSH
-6. removes every temporary key file and revokes the API-created key
-7. verifies every host's Tailscale backend through `labctl`
+The playbook reaches each machine through `labctl ssh`, decrypts only `tailscale.access_token`, and creates a reusable, preauthorized one-hour key for `tag:lab`. It transfers the key through protected temporary files, enrolls all three machines with Tailscale SSH, removes the temporary files, revokes the key, and verifies each host's Tailscale backend through `labctl`.
 
 **Expected result:** The play recap has no failures and `tailscale status` lists exactly one online device for each Incus hostname.
 
 **If it fails:** The `always` block still attempts to delete local and remote key files and revoke the key. Check the Tailscale key list and revoke any remaining key manually before retrying. Remove partial offline device records before starting a replacement run.
 
-### Step 6: Authorize Tailscale SSH Check Mode
+### Step 6: Authorize Tailscale SSH check mode
 
 If the policy uses `action: "check"`, the final task might print an authentication URL. Open it and complete authentication once, then confirm access:
 
@@ -229,7 +221,7 @@ Do not set `checkPeriod` to `always` for these hosts because Ansible opens multi
 
 **If it fails:** Confirm both a network grant and an SSH rule permit the operator to reach `tag:lab`, and confirm each host was enrolled with `tailscale up --ssh`.
 
-### Step 7: Build The Incus Cluster
+### Step 7: Build the Incus cluster
 
 Warning: on a fresh run, this command permanently formats `/dev/vdb` on every member.
 
@@ -245,7 +237,7 @@ The playbook validates the disks and interfaces, builds the three-member OVN dat
 
 **If it fails:** Fix the reported stage and rerun the same playbook. It is designed to resume after successful cluster joins, Btrfs initialization, or network creation. Never manually format `/dev/vdb` to bypass the safety assertion.
 
-### Step 8: Configure The Control Host Client
+### Step 8: Configure the control host client
 
 The client certificate is public material, but use a private temporary file on the cluster member and remove it immediately after adding trust:
 
@@ -325,7 +317,7 @@ done
 
 **Expected result:** Each container receives an address on `ovn0`, resolves and reaches both peers by name, resolves `deb.debian.org` through the configured DNS servers, completes `apt-get update`, and is removed afterward.
 
-### Verified State On 2026-09-08
+### Verified state on 2026-09-08
 
 The control host used `incus-lab` as its current remote:
 
@@ -373,7 +365,7 @@ mesh-incus-03            RUNNING  10.131.73.10 (eth0)   CONTAINER  incus-03
 | MagicDNS resolves to a suffixed name | A stale Tailscale device owns the canonical hostname | Remove only the confirmed stale record, then reenroll the replacement node |
 | Ansible waits at SSH authentication | Tailscale SSH check mode requires reauthentication | Open the printed URL once; do not use `checkPeriod: always` with Ansible |
 
-## Rollback And Teardown
+## Rollback and teardown
 
 Stop a run when its state might still be needed:
 

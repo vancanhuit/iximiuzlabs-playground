@@ -798,19 +798,22 @@ Hubble Relay and Hubble UI are enabled by [`cilium-values.yaml`](cilium-values.y
 
 [![Private Hubble UI HTTPS architecture](architecture/hubble-private-https.svg)](architecture/hubble-private-https.html)
 
-The request and certificate paths are deliberately separate. Cloudflare is authoritative for the public DNS records used by the custom hostname and ACME validation, but it does not proxy Hubble UI traffic. The DNS-only `A` record returns a private Tailscale address; a policy-authorized tailnet client then connects through the Tailscale Service to ingress-nginx, which terminates TLS and forwards HTTP to Cilium's `hubble-ui` Service.
+The request and certificate paths are separate. Cloudflare hosts the public DNS records for the custom hostname and ACME validation but does not proxy Hubble UI traffic. The DNS-only `A` record returns a private Tailscale address. A policy-authorized tailnet client connects through the Tailscale Service to ingress-nginx, which terminates TLS and forwards HTTP to Cilium's `hubble-ui` Service.
 
 #### How ingress-nginx and its load balancer are provisioned
 
 This deployment separates the ingress controller from its external entry point:
 
-1. Helm installs the `IngressClass/nginx`, the ingress-nginx controller `Deployment`, its admission webhook, RBAC, and controller `ConfigMap`. `controller.service.enabled=false` deliberately prevents the chart from creating its usual public-facing controller Service.
-2. The hand-authored `Ingress/hubble-ui` declares host and path routing. The ingress-nginx controller watches resources whose `ingressClassName` is `nginx`, resolves the referenced `hubble-ui` Service endpoints, reads `Secret/hubble-ui-tls`, and renders those objects into its running NGINX configuration.
-3. `ProxyGroup/lab-ingress` maintains two shared ingress proxy Pods. The separate `Service/ingress-nginx/hubble-ui-tailscale` selects the ingress-nginx controller Pod, declares `type: LoadBalancer` with `loadBalancerClass: tailscale`, and attaches to that ProxyGroup.
-4. The Tailscale operator creates `svc:hubble-ui`, configures both ProxyGroup replicas to advertise its stable `100.x` virtual IP, and writes that address and `*.ts.net` name into the Service status.
-5. Either ProxyGroup replica forwards ports 80 and 443 to the Service ClusterIP. Kubernetes service routing selects the ingress-nginx Pod; ingress-nginx terminates TLS, matches the host and path from the Ingress, and connects directly to a Hubble UI endpoint.
+| Resource | Owner and effect |
+| --- | --- |
+| ingress-nginx Helm release | Installs `IngressClass/nginx`, the controller `Deployment`, admission webhook, RBAC, and controller `ConfigMap`. `controller.service.enabled=false` prevents the chart from creating its usual public-facing Service. |
+| `Ingress/hubble-ui` | Declares host and path routing. The controller resolves the `hubble-ui` endpoints, reads `Secret/hubble-ui-tls`, and renders the NGINX configuration. |
+| `ProxyGroup/lab-ingress` | Maintains two shared ingress proxy Pods. |
+| `Service/ingress-nginx/hubble-ui-tailscale` | Selects the ingress-nginx controller, uses `type: LoadBalancer` and `loadBalancerClass: tailscale`, and attaches to the ProxyGroup. The Tailscale operator creates `svc:hubble-ui`; both proxy replicas advertise its stable `100.x` virtual IP. |
 
-The `LoadBalancer` Service therefore represents desired state, not an external appliance. Its Tailscale Service virtual IP is advertised by both shared ProxyGroup replicas. Removing the Service removes its routing and advertisement without removing the shared proxies; changing the Ingress only changes NGINX routing.
+A request reaches either ProxyGroup replica on port 80 or 443. Kubernetes routes it through the Service ClusterIP to ingress-nginx, which terminates TLS, matches the Ingress host and path, and connects to a Hubble UI endpoint.
+
+The `LoadBalancer` Service represents desired state rather than an external appliance. Both shared ProxyGroup replicas advertise its Tailscale Service virtual IP. Removing the Service removes its routing and advertisement without removing the shared proxies. Changing the Ingress changes only NGINX routing.
 
 ```bash
 helm upgrade --install cert-manager \
@@ -941,7 +944,7 @@ Create the DNS-only Cloudflare `A` record from the assigned Tailscale Service ad
 )
 ```
 
-The Tailscale operator preserves the `hubble-ui` endpoint and stable `100.x` Service address while routing ports `80` and `443` to ingress-nginx. Cloudflare's public reverse proxy cannot reach a tailnet-only `100.64.0.0/10` origin. DNS-01 uses temporary `_acme-challenge` TXT records and does not make the application public.
+The Tailscale operator preserves the `hubble-ui` endpoint and stable `100.x` Service address while routing ports `80` and `443` to ingress-nginx. Cloudflare's public reverse proxy cannot reach a tailnet-only `100.64.0.0/10` origin. DNS-01 creates temporary `_acme-challenge` TXT records without making the application public.
 
 Verify certificate identity, redirect behavior, and private HTTPS access from a tailnet client:
 
@@ -964,7 +967,7 @@ openssl s_client \
 
 Track upstream support in [tailscale/tailscale#11024](https://github.com/tailscale/tailscale/issues/11024), with the related Tailscale Serve proxy work in [tailscale/tailscale#14531](https://github.com/tailscale/tailscale/issues/14531). The forwarded-header trust boundary is also documented by [kubernetes/ingress-nginx#9163](https://github.com/kubernetes/ingress-nginx/issues/9163).
 
-Native Tailscale Layer 7 Ingress (`ingressClassName: tailscale`) uses Tailscale Serve and can provide sanitized Tailscale identity headers, but it terminates TLS at Tailscale and uses a tailnet `*.ts.net` hostname and certificate. It is not a drop-in replacement for this custom-domain, cert-manager, ingress-nginx design. Preserving a trustworthy client IP while retaining this design requires a deliberate topology change, such as co-locating Tailscale with ingress-nginx and using required PROXY protocol v2.
+Native Tailscale Layer 7 Ingress (`ingressClassName: tailscale`) uses Tailscale Serve and can provide sanitized Tailscale identity headers. It terminates TLS at Tailscale and uses a tailnet `*.ts.net` hostname and certificate, so it cannot directly replace this custom-domain, cert-manager, ingress-nginx design. Preserving a trustworthy client IP with the current design requires a topology change, such as co-locating Tailscale with ingress-nginx and requiring PROXY protocol v2.
 
 Track custom-domain support for the native Layer 7 alternative in [tailscale/tailscale#12709](https://github.com/tailscale/tailscale/issues/12709) and identity metadata for Layer 3 Services in [tailscale/tailscale#15657](https://github.com/tailscale/tailscale/issues/15657).
 
@@ -980,13 +983,16 @@ Deploy Envoy Gateway as the Gateway API implementation, expose its managed Envoy
 
 Gateway API separates infrastructure selection, listener configuration, and application routing:
 
-1. Helm installs the Gateway API and Envoy Gateway CRDs plus the Envoy Gateway controller. `GatewayClass/tailscale` selects that controller and references `EnvoyProxy/envoy-gateway-system/tailscale-proxy` as its infrastructure parameters.
-2. The `EnvoyProxy` resource tells Envoy Gateway to create its managed data-plane Service as `type: LoadBalancer` with `loadBalancerClass: tailscale` and the requested Tailscale hostname `gateway-envoy`.
-3. `Gateway/echo` requests an HTTPS listener for `echo.playground.canhdinh.com`, references its TLS Secret, and allows routes only from the same namespace. `HTTPRoute/echo` attaches to that listener and maps `/` to `Service/echo-server:80`.
-4. The Envoy Gateway controller validates those references, creates and owns an Envoy proxy `Deployment` and its `Service` in `envoy-gateway-system`, and continuously translates the Gateway and HTTPRoute into xDS listener, TLS, route, cluster, and endpoint configuration for Envoy.
-5. The generated Service has `loadBalancerClass: tailscale` and attaches to `ProxyGroup/lab-ingress`. The Tailscale operator creates `svc:gateway-envoy`, configures both shared replicas to advertise its `100.x` virtual IP, and publishes the address and `*.ts.net` name to the Service status.
-6. Envoy Gateway copies that Service address into `Gateway.status.addresses`. ExternalDNS reads the accepted Gateway and HTTPRoute and synchronizes the custom DNS-only Cloudflare record. cert-manager reads the Gateway annotations and listener certificate reference, completes DNS-01, and maintains the TLS Secret consumed by Envoy.
-7. At request time, the client resolves the custom hostname to the private `100.x` address, reaches either advertising ProxyGroup replica, crosses the generated Envoy Service to an Envoy Pod, terminates TLS at Envoy, and follows the HTTPRoute to an Echo Server endpoint.
+| Resource | Owner and effect |
+| --- | --- |
+| Envoy Gateway Helm release | Installs the Gateway API and Envoy Gateway CRDs and controller. |
+| `GatewayClass/tailscale` and `EnvoyProxy/tailscale-proxy` | Select Envoy Gateway and require a managed `LoadBalancer` Service with `loadBalancerClass: tailscale` and hostname `gateway-envoy`. |
+| `Gateway/echo` and `HTTPRoute/echo` | Define the HTTPS listener, TLS Secret, same-namespace route policy, and `/` backend at `Service/echo-server:80`. |
+| Envoy Gateway controller | Creates the Envoy `Deployment` and Service in `envoy-gateway-system`, then translates the Gateway and route into xDS configuration. It also copies the Service address into `Gateway.status.addresses`. |
+| Tailscale operator | Attaches the generated Service to `ProxyGroup/lab-ingress`, creates `svc:gateway-envoy`, and configures both shared replicas to advertise its `100.x` virtual IP. |
+| cert-manager and ExternalDNS | Maintain the listener's TLS Secret and DNS-only Cloudflare record. |
+
+A client resolves the custom hostname to the private `100.x` address and reaches either ProxyGroup replica. The request crosses the generated Service to an Envoy Pod, which terminates TLS and follows the `HTTPRoute` to Echo Server.
 
 Unlike the ingress-nginx deployment, the Envoy data-plane Deployment and LoadBalancer Service are generated resources. Change the `Gateway`, `HTTPRoute`, or referenced `EnvoyProxy`; do not hand-edit the generated `envoy-echo-*` resources because the Envoy Gateway controller will reconcile them back to declared state.
 
@@ -1026,7 +1032,7 @@ for namespace in echo external-dns; do
 done
 ```
 
-Create separate least-privilege Cloudflare Secrets for cert-manager and ExternalDNS. Both tokens need `Zone - DNS - Edit` and `Zone - Zone - Read` for `canhdinh.com`. Keep the ClusterIssuer token in cert-manager's cluster resource namespace so application workloads cannot mount it:
+Create separate least-privilege Cloudflare Secrets for cert-manager and ExternalDNS. Both tokens need `Zone - DNS - Edit` and `Zone - Zone - Read` for `canhdinh.com`. Store the ClusterIssuer token in cert-manager's cluster resource namespace so application workloads cannot mount it:
 
 ```bash
 (
@@ -1141,7 +1147,7 @@ openssl s_client \
 
 Track the missing source-address handoff in [tailscale/tailscale#11024](https://github.com/tailscale/tailscale/issues/11024), with the related proxy implementation work in [tailscale/tailscale#14531](https://github.com/tailscale/tailscale/issues/14531).
 
-Keep the current configuration unless the topology is deliberately changed. Do not trust an incoming `X-Forwarded-For` header with `ClientTrafficPolicy.clientIPDetection`; clients can supply that header themselves. Do not enable required PROXY protocol on Envoy because the Tailscale LoadBalancer proxy does not emit a PROXY header and connections will be reset. Optional PROXY protocol neither restores the client address nor provides a safe trust boundary. A trustworthy client IP requires a different ingress design, such as placing Tailscale in Envoy's network namespace or introducing a trusted frontend that emits PROXY protocol.
+Keep the current configuration unless you change the topology. Do not trust an incoming `X-Forwarded-For` header with `ClientTrafficPolicy.clientIPDetection` because clients can supply that header. Do not require PROXY protocol on Envoy: the Tailscale LoadBalancer proxy does not emit a PROXY header, so Envoy would reset the connections. Optional PROXY protocol does not restore the client address or provide a safe trust boundary. To preserve a trustworthy client IP, place Tailscale in Envoy's network namespace or add a trusted frontend that emits PROXY protocol.
 
 For the downstream trust model, follow [envoyproxy/gateway#8542](https://github.com/envoyproxy/gateway/issues/8542) and [envoyproxy/gateway#7825](https://github.com/envoyproxy/gateway/issues/7825). Envoy Gateway's separate transparent-source forwarding proposal is tracked in [envoyproxy/gateway#3359](https://github.com/envoyproxy/gateway/issues/3359), but it cannot reconstruct an address already replaced by the Tailscale proxy.
 
@@ -1149,7 +1155,11 @@ For the downstream trust model, follow [envoyproxy/gateway#8542](https://github.
 
 ### Deploy monitoring through Gateway API
 
-Install kube-prometheus-stack to collect cluster and node metrics and run Prometheus, Alertmanager, Grafana, Prometheus Operator, kube-state-metrics, and node-exporter. One Gateway owns three HTTPS listeners and one private Tailscale Service address. Its dedicated `GatewayClass` and `EnvoyProxy` give the generated LoadBalancer Service the unique Tailscale hostname `monitoring-gateway`; one ProxyGroup cannot attach two Services with the same Tailscale hostname. The tailnet policy must auto-approve the exact `svc:monitoring-gateway` identity for `tag:k8s`. Separate routes send each application hostname to its chart-managed ClusterIP Service. cert-manager issues one certificate per listener, and ExternalDNS creates the three DNS-only Cloudflare records from the accepted routes.
+Install kube-prometheus-stack to collect cluster and node metrics. It runs Prometheus, Alertmanager, Grafana, Prometheus Operator, kube-state-metrics, and node-exporter.
+
+One Gateway owns three HTTPS listeners and one private Tailscale Service address. Its dedicated `GatewayClass` and `EnvoyProxy` give the generated LoadBalancer Service the unique Tailscale hostname `monitoring-gateway`, because one ProxyGroup cannot attach two Services with the same Tailscale hostname. The tailnet policy must auto-approve the exact `svc:monitoring-gateway` identity for `tag:k8s`.
+
+Separate routes send each application hostname to its chart-managed ClusterIP Service. cert-manager issues one certificate per listener. ExternalDNS creates the three DNS-only Cloudflare records from the accepted routes.
 
 Open the [interactive monitoring Gateway API architecture](architecture/monitoring-gateway-api.html) to trace private HTTPS requests, DNS and certificate automation, or controller ownership.
 
@@ -1299,7 +1309,7 @@ Create or reconcile the API-managed Kubernetes command-center dashboard from the
 )
 ```
 
-Open `https://grafana.playground.canhdinh.com/d/kubernetes-command-center/kubernetes-cluster-command-center`. The dashboard combines node readiness, Pod health, CPU and memory capacity, restarts, actionable alerts, namespace resource usage, network throughput, API request rate, and unavailable workloads. Use its namespace and node variables for focused investigation, then follow the dashboard links to the chart-provisioned drill-down dashboards.
+Open `https://grafana.playground.canhdinh.com/d/kubernetes-command-center/kubernetes-cluster-command-center`. The dashboard shows node readiness, Pod health, CPU and memory capacity, restarts, alerts, namespace resource usage, network throughput, API request rate, and unavailable workloads. Use its namespace and node variables to narrow an investigation. The dashboard links to the chart-provisioned drill-down dashboards.
 
 The API-created dashboard is stored in Grafana's local database and is therefore ephemeral in this cluster. Re-run the reconciliation command after a Grafana Pod replacement until persistent storage or file provisioning is configured.
 
@@ -1586,8 +1596,6 @@ $ curl --fail --show-error \
 "gateway-api"
 ```
 
-This snapshot demonstrates the completed lab: Hubble UI and Echo each have a private Tailscale Service VIP, both VIPs are advertised by two shared proxies, both TLS certificates are Ready, and both HTTPS endpoints respond successfully.
-
 #### Monitoring stack status
 
 The following output was captured after installing kube-prometheus-stack, exposing its three interfaces through Gateway API, enabling read-only Prometheus rule visibility in Grafana, and reconciling the API-managed Kubernetes command-center dashboard on 2026-09-01. Ages, Pod IPs, generated names, and Tailscale Service addresses change across rebuilds.
@@ -1661,9 +1669,9 @@ $ curl --fail --silent --show-error \
 }
 ```
 
-Grafana's provisioned Prometheus data source has `manageAlerts: true`, so **Alerting > Alert rules** displays these 134 rules as read-only data-source-managed rules. The expected always-firing `Watchdog` is the only active rule in this snapshot. The reconciled `Kubernetes / Cluster Command Center` dashboard has UID `kubernetes-command-center`, version `1`, and 17 panels. Because Grafana uses ephemeral storage, a Helm upgrade that recreates its Pod removes this API-managed dashboard; rerun the dashboard reconciliation command before recording the deployment as complete.
+Grafana's provisioned Prometheus data source has `manageAlerts: true`, so **Alerting > Alert rules** displays these 134 rules as read-only data-source-managed rules. The expected always-firing `Watchdog` is the only active rule in this snapshot. The reconciled `Kubernetes / Cluster Command Center` dashboard has UID `kubernetes-command-center`, version `1`, and 17 panels.
 
-This snapshot demonstrates the completed monitoring deployment: all scrape targets are healthy, the three interfaces share one private Gateway VIP and valid certificates, both ingress proxies advertise the Service, Grafana displays the Prometheus rule set, and no external notification receiver is configured for this lab.
+Grafana uses ephemeral storage. A Helm upgrade that recreates its Pod removes this API-managed dashboard, so rerun the dashboard reconciliation command before recording the deployment as complete. No external notification receiver is configured for this lab.
 
 ## Recurring operations
 

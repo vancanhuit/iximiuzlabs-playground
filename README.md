@@ -32,13 +32,6 @@ For a new environment, follow Steps 1 through 6 in order. The recurring operatio
 >
 > The examples retain the repository owner’s values to reproduce the tested setup. Keep replacements consistent across tasks, manifests, and cluster configuration. Publish images under an accessible registry path.
 
-Use these repository components to build the environment:
-
-- custom `trixie-base` and `trixie-dev` root filesystem images
-- single-machine Debian playgrounds for testing those images
-- two multi-machine playgrounds that form an eight-node Kubernetes lab over Tailscale
-- a `k0s` cluster definition with Cilium, Hubble, and private Tailscale application programming interface (API) access
-
 ## Repository map
 
 Use this map to locate each image, manifest, and cluster configuration:
