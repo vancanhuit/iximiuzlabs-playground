@@ -1,7 +1,7 @@
 # Build and operate a k0s cluster over Tailscale
 
 **Owner:** Lab operator | **Frequency:** As needed
-**Last updated:** 2026-09-08 | **Last run:** 2026-09-08
+**Last updated:** 2026-09-13 | **Last run:** 2026-09-13
 
 This runbook builds and operates an eight-node Kubernetes cluster across two iximiuz Labs playgrounds. Steps 1 through 10 form the core deployment. Later sections add optional access, ingress, applications, and monitoring or cover recurring operations and recovery.
 
@@ -95,16 +95,17 @@ Treat these versions as one tested set. Validate upgrades in a fresh playground 
 
 | Component | Version |
 | --- | --- |
-| k0sctl | `v0.32.2` |
+| k0sctl | `v0.33.0` |
 | k0s and Kubernetes | `v1.36.4+k0s.0` |
 | Cilium | `v1.20.1` |
-| Tailscale Kubernetes Operator | `1.102.3` |
-| cert-manager | `v1.21.1` |
+| Tailscale clients | `1.102.4` |
+| Tailscale Kubernetes Operator | chart and operator `1.102.3` |
+| cert-manager | `v1.21.2` |
 | ingress-nginx | chart `4.15.1`, controller `v1.15.1` |
 | Envoy Gateway | `v1.9.1` |
-| ExternalDNS | chart `1.21.1`, controller `v0.21.0` |
+| ExternalDNS | chart `1.22.0`, controller `v0.22.0` |
 | Echo Server | `0.9.2` |
-| kube-prometheus-stack | chart `88.6.2`, Prometheus Operator `v0.93.1` |
+| kube-prometheus-stack | chart `91.0.0`, Prometheus Operator `v0.94.0` |
 | Sonobuoy | `v0.57.5` |
 
 The repository pins client tools in [`../../mise.toml`](../../mise.toml).
@@ -249,9 +250,13 @@ bootstrapping k0s:
 )
 ```
 
-The manifests assign unique Tailscale UDP listener ports `41641` through
-`41648`. This prevents endpoint collisions when multiple machines share one
-public NAT address.
+Tailscale normally listens on UDP `41641` and discovers the external mapping
+through STUN and NAT traversal. In this lab, using that default on all four
+machines behind each playground NAT produced direct paths for only 8 of 16
+cross-playground host pairs even though every host reported UDP support and
+`MappingVariesByDestIP: false`. The manifests therefore assign unique listener
+ports `41641` through `41648`; keep them unless a complete 16-pair test proves a
+different NAT implementation handles the shared default correctly.
 
 **Expected result:** Every peer responds, hostnames are unique, `tailscale0` has a `100.x` address, and every cross-playground probe reports a public `IP:port` endpoint rather than DERP.
 
@@ -818,7 +823,7 @@ The `LoadBalancer` Service represents desired state rather than an external appl
 ```bash
 helm upgrade --install cert-manager \
   oci://quay.io/jetstack/charts/cert-manager \
-  --version v1.21.1 \
+  --version v1.21.2 \
   --namespace cert-manager \
   --create-namespace \
   --set crds.enabled=true \
@@ -888,7 +893,7 @@ kubectl --context tailscale-k0s -n kube-system \
   --timeout=5m
 kubectl --context tailscale-k0s -n ingress-nginx \
   wait service/hubble-ui-tailscale \
-  --for=jsonpath='{.status.conditions[?(@.type=="TailscaleIngressSvcConfigured")].status}'=True \
+  --for=jsonpath='{.status.conditions[?(@.type=="TailscaleIngressSvcConfigured")].message}'='2/2 proxy backends ready and advertising' \
   --timeout=5m
 ```
 
@@ -1018,7 +1023,7 @@ Enable cert-manager's Gateway API controller after the CRDs exist, then create t
 ```bash
 helm upgrade cert-manager \
   oci://quay.io/jetstack/charts/cert-manager \
-  --version v1.21.1 \
+  --version v1.21.2 \
   --namespace cert-manager \
   --set crds.enabled=true \
   --set config.gatewayAPI.enabled=true \
@@ -1083,13 +1088,13 @@ kubectl --context tailscale-k0s wait \
   --for=condition=Ready=True --timeout=2m
 ```
 
-Install ExternalDNS with a `sync` policy, a route and Gateway label filter, a unique TXT owner ID, and an exact Cloudflare zone ID filter. The controller deletes only records it owns when their source routes disappear:
+Install ExternalDNS with a `sync` policy, a route and Gateway label filter, a unique TXT owner ID, and an exact Cloudflare zone ID filter. The controller deletes only records it owns when their source routes disappear. On a clean rebuild, its first sync removes records left by the previous cluster. Recursive resolvers can cache that absence until the zone's negative TTL expires, even after the new routes recreate the records.
 
 ```bash
 helm upgrade --install external-dns \
   external-dns \
   --repo https://kubernetes-sigs.github.io/external-dns \
-  --version 1.21.1 \
+  --version 1.22.0 \
   --namespace external-dns \
   --values docs/k0s/external-dns-values.yaml \
   --kube-context tailscale-k0s \
@@ -1116,11 +1121,12 @@ kubectl --context tailscale-k0s -n echo \
 kubectl --context tailscale-k0s -n envoy-gateway-system \
   wait service \
   -l gateway.envoyproxy.io/owning-gateway-name=echo \
-  --for=jsonpath='{.status.conditions[?(@.type=="TailscaleIngressSvcConfigured")].status}'=True \
+  --for=jsonpath='{.status.conditions[?(@.type=="TailscaleIngressSvcConfigured")].message}'='2/2 proxy backends ready and advertising' \
   --timeout=5m
 
 echo_ip=$(kubectl --context tailscale-k0s -n echo \
   get gateway echo -o jsonpath='{.status.addresses[0].value}')
+[[ -n $echo_ip ]]
 for attempt in {1..24}; do
   [[ $(dig +short echo.playground.canhdinh.com A) == "$echo_ip" ]] && break
   sleep 5
@@ -1177,7 +1183,7 @@ Install the pinned chart and wait for its controllers and workloads:
 helm upgrade --install monitoring \
   kube-prometheus-stack \
   --repo https://prometheus-community.github.io/helm-charts \
-  --version 88.6.2 \
+  --version 91.0.0 \
   --namespace monitoring \
   --create-namespace \
   --values docs/k0s/kube-prometheus-stack-values.yaml \
@@ -1214,11 +1220,12 @@ kubectl --context tailscale-k0s -n monitoring \
 kubectl --context tailscale-k0s -n envoy-gateway-system \
   wait service \
   -l gateway.envoyproxy.io/owning-gateway-name=monitoring \
-  --for=jsonpath='{.status.conditions[?(@.type=="TailscaleIngressSvcConfigured")].status}'=True \
+  --for=jsonpath='{.status.conditions[?(@.type=="TailscaleIngressSvcConfigured")].message}'='2/2 proxy backends ready and advertising' \
   --timeout=5m
 
 monitoring_ip=$(kubectl --context tailscale-k0s -n monitoring \
   get gateway monitoring -o jsonpath='{.status.addresses[0].value}')
+[[ -n $monitoring_ip ]]
 for attempt in {1..24}; do
   records=$(for name in prometheus alertmanager grafana; do
     dig +short "$name.playground.canhdinh.com" A
@@ -1806,7 +1813,7 @@ Use observed symptoms to select the narrowest corrective action:
 | Tailscale paths use DERP | Direct UDP connectivity is unavailable | Check `tailscale netcheck`, firewall rules, and NAT behavior |
 | Cluster routes use another VPN | Accepted subnet routes overlap cluster CIDR ranges | Remove the route or choose unused Pod and Service ranges |
 | Canonical hostnames resolve to stale addresses or fresh devices receive `-1` suffixes | Destroyed playground devices remain registered in the tailnet | Remove only the confirmed offline records, restore the fresh devices' canonical names, and wait for MagicDNS convergence |
-| `tailscale ping` prints `pong` but exits nonzero | No direct peer path was established | Inspect `tailscale netcheck` and the manifest-assigned UDP listener ports; do not bootstrap until `--until-direct=true` succeeds |
+| `tailscale ping` prints `pong` but exits nonzero | No direct peer path was established | Inspect `tailscale netcheck`, UDP reachability, NAT mappings, and the manifest-assigned unique listener ports; do not bootstrap until `--until-direct=true` succeeds |
 | Sonobuoy reports failures | Cluster behavior or the test environment failed | Preserve the archive and inspect each failed test |
 | `Certificate/hubble-ui` remains `Ready=False` | Cloudflare token permissions, ACME account, or DNS propagation failed | Inspect the related `Order` and `Challenge`; confirm `Zone - DNS - Edit` and `Zone - Zone - Read` for `canhdinh.com` without printing the token |
 | HTTPS presents the ingress default certificate | `hubble-ui-tls` is missing, invalid, or not loaded by ingress-nginx | Check the Certificate condition, Secret type, Ingress TLS reference, and ingress-nginx events and logs |
@@ -1816,6 +1823,7 @@ Use observed symptoms to select the narrowest corrective action:
 | Echo Gateway remains unprogrammed | Envoy could not provision its data plane or the Tailscale LoadBalancer | Inspect Gateway conditions, Envoy Gateway Pods, the generated Service, and Tailscale operator logs |
 | Echo `HTTPRoute` is not accepted | Its hostname, parent reference, listener, or namespace policy does not match | Inspect `status.parents` and keep the route in the `echo` namespace unless the Gateway policy is intentionally broadened |
 | Echo DNS resolves to a stale address | ExternalDNS is unhealthy or cannot update the Cloudflare zone | Compare the Gateway address with the DNS-only `A` record; inspect ExternalDNS logs, token scope, zone filter, and TXT ownership record |
+| A rebuilt application works with `curl --resolve` but its hostname returns no address | A recursive resolver cached the record's temporary absence during ExternalDNS reconciliation | Query the authoritative nameservers and another recursive resolver, then wait for the negative TTL to expire or reconnect the affected DNS client |
 | Echo Certificate remains `Ready=False` | The ClusterIssuer, cert-manager namespace token, or DNS-01 propagation failed | Inspect the ClusterIssuer, Certificate, Order, and Challenge without printing the token |
 | Echo reports a Tailscale proxy Pod IP as the client | The selected ingress ProxyGroup replica is the TCP peer seen by Envoy | This is expected; do not trust client-supplied forwarding headers or enable PROXY protocol without a trusted sender |
 | `_acme-challenge` TXT remains after issuance | Challenge cleanup failed or another ACME flow owns the record | Inspect active Challenges before deleting anything; let cert-manager reconcile first |
@@ -2063,6 +2071,7 @@ Update this table after every deployment, upgrade, recovery, or teardown:
 | 2026-09-08 | Repository owner and OpenCode | Deleted the previous runs and eight stale Tailscale nodes, assigned unique Tailscale UDP listener ports to all eight machines, and rebuilt playgrounds `kubernetes-01-d3e073f5` (`6a9ffbc504c48567540eed8d`) and `kubernetes-02-cd089d78` (`6a9ffbc504c48567540eed97`). Verified all 16 cross-playground host pairs and 18/18 repeated worker probes used direct endpoints, three-member etcd, five Ready workers, Cilium and Hubble health, all 70 focused Cilium actions, and Sonobuoy quick mode with 8/8 e2e tests and 5/5 log plugins. |
 | 2026-09-08 | Repository owner and OpenCode | Redeployed identity-based Kubernetes API access, private Hubble UI HTTPS, Echo Server through Gateway API, ExternalDNS, cert-manager, ingress-nginx, Envoy Gateway, and kube-prometheus-stack. Verified both API paths, five valid HTTPS endpoints, all routes and certificates, `2/2` Tailscale proxy backends for every exposed Service, 32/32 healthy Prometheus targets, and the reconciled Grafana command-center dashboard. |
 | 2026-09-08 | Repository owner and OpenCode | Made both Kubernetes playground runs persistent and reviewed the runbook end to end. Added fail-fast direct-path and bootstrap checks, safe kubeconfig replacement, explicit optional-service dependencies and contexts, rerunnable namespace creation, valid rollback commands, worker-only address reconciliation, and guarded post-destroy Tailscale cleanup. |
+| 2026-09-13 | Repository owner and OpenCode | Destroyed runs `6a9ffbc504c48567540eed8d` and `6a9ffbc504c48567540eed97`, removed 13 matching offline Tailscale host, proxy, and operator identities plus the stale `svc:lab-k0s` Service, and rebuilt persistent playgrounds `kubernetes-01-c13b7245` (`6aa686d2e7eedf93f38cd9b8`) and `kubernetes-02-40d9c62b` (`6aa686d2e7eedf93f38cd9c6`). Tailscale defaults produced only 8/16 direct cross-playground pairs despite UDP support and stable mappings; restoring unique ports produced 16/16 direct pairs and 18/18 repeated worker probes. Verified three-member etcd, five Ready workers, all 70 focused Cilium actions, Sonobuoy quick mode with 8/8 e2e tests and 5/5 log plugins, both API paths, five private HTTPS endpoints, `2/2` backends for every exposed Service, 32/32 Prometheus targets, and the Grafana dashboard. Upgraded cert-manager to `v1.21.2`, ExternalDNS to chart `1.22.0`/controller `v0.22.0`, and kube-prometheus-stack to chart `91.0.0`/Prometheus Operator `v0.94.0`. |
 
 ## Supporting references
 

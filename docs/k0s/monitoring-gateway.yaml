@@ -38,7 +38,6 @@ metadata:
     cert-manager.io/cluster-issuer: letsencrypt-cloudflare
     cert-manager.io/private-key-algorithm: ECDSA
     cert-manager.io/private-key-size: "256"
-    external-dns.kubernetes.io/cloudflare-proxied: "false"
 spec:
   gatewayClassName: monitoring-tailscale
   listeners:
@@ -87,6 +86,8 @@ kind: HTTPRoute
 metadata:
   name: prometheus
   namespace: monitoring
+  annotations:
+    external-dns.kubernetes.io/cloudflare-proxied: "false"
 spec:
   parentRefs:
     - group: gateway.networking.k8s.io
@@ -107,6 +108,8 @@ kind: HTTPRoute
 metadata:
   name: alertmanager
   namespace: monitoring
+  annotations:
+    external-dns.kubernetes.io/cloudflare-proxied: "false"
 spec:
   parentRefs:
     - group: gateway.networking.k8s.io
@@ -127,6 +130,8 @@ kind: HTTPRoute
 metadata:
   name: grafana
   namespace: monitoring
+  annotations:
+    external-dns.kubernetes.io/cloudflare-proxied: "false"
 spec:
   parentRefs:
     - group: gateway.networking.k8s.io

@@ -5,67 +5,67 @@ metadata:
 spec:
   hosts:
   - hostname: control-plane-01
-    privateAddress: 100.69.203.14
+    privateAddress: 100.95.45.121
     privateInterface: tailscale0
     role: controller
     ssh:
-      address: 100.69.203.14
+      address: 100.95.45.121
       user: root
       port: 22
   - hostname: control-plane-02
-    privateAddress: 100.82.90.99
+    privateAddress: 100.70.208.100
     privateInterface: tailscale0
     role: controller
     ssh:
-      address: 100.82.90.99
+      address: 100.70.208.100
       user: root
       port: 22
   - hostname: control-plane-03
-    privateAddress: 100.88.105.40
+    privateAddress: 100.83.139.69
     privateInterface: tailscale0
     role: controller
     ssh:
-      address: 100.88.105.40
+      address: 100.83.139.69
       user: root
       port: 22
   - hostname: node-01
-    privateAddress: 100.82.128.100
+    privateAddress: 100.97.186.122
     privateInterface: tailscale0
     role: worker
     ssh:
-      address: 100.82.128.100
+      address: 100.97.186.122
       user: root
       port: 22
   - hostname: node-02
-    privateAddress: 100.65.23.32
+    privateAddress: 100.120.134.7
     privateInterface: tailscale0
     role: worker
     ssh:
-      address: 100.65.23.32
+      address: 100.120.134.7
       user: root
       port: 22
   - hostname: node-03
-    privateAddress: 100.70.236.20
+    privateAddress: 100.102.21.94
     privateInterface: tailscale0
     role: worker
     ssh:
-      address: 100.70.236.20
+      address: 100.102.21.94
       user: root
       port: 22
   - hostname: node-04
-    privateAddress: 100.105.236.107
+    privateAddress: 100.73.133.68
     privateInterface: tailscale0
     role: worker
     ssh:
-      address: 100.105.236.107
+      address: 100.73.133.68
       user: root
       port: 22
   - hostname: node-05
-    privateAddress: 100.70.196.57
+    privateAddress: 100.77.100.23
     privateInterface: tailscale0
     role: worker
     ssh:
-      address: 100.70.196.57
+      address: 100.77.100.23
       user: root
       port: 22
   k0s:
@@ -82,9 +82,9 @@ spec:
           - control-plane-01
           - control-plane-02
           - control-plane-03
-          - 100.69.203.14
-          - 100.82.90.99
-          - 100.88.105.40
+          - 100.95.45.121
+          - 100.70.208.100
+          - 100.83.139.69
         network:
           provider: custom
           podCIDR: 10.244.0.0/16
