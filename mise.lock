@@ -165,51 +165,9 @@ url = "https://github.com/cocogitto/cocogitto/releases/download/7.0.0/cocogitto-
 url_api = "https://api.github.com/repos/cocogitto/cocogitto/releases/assets/366659399"
 
 [[tools.gh]]
-version = "2.99.0"
+version = "2.100.0"
 backend = "aqua:cli/cli"
-specifiers = ["2.99.0"]
-
-[tools.gh."platforms.linux-arm64"]
-checksum = "sha256:564eff56a61e8caf193efde16937fba879eb62a3a479c9dd6be2001e7647680b"
-url = "https://github.com/cli/cli/releases/download/v2.99.0/gh_2.99.0_linux_arm64.tar.gz"
-url_api = "https://api.github.com/repos/cli/cli/releases/assets/540091449"
-provenance = "github-attestations"
-
-[tools.gh."platforms.linux-arm64-musl"]
-checksum = "sha256:564eff56a61e8caf193efde16937fba879eb62a3a479c9dd6be2001e7647680b"
-url = "https://github.com/cli/cli/releases/download/v2.99.0/gh_2.99.0_linux_arm64.tar.gz"
-url_api = "https://api.github.com/repos/cli/cli/releases/assets/540091449"
-provenance = "github-attestations"
-
-[tools.gh."platforms.linux-x64"]
-checksum = "sha256:ed4960225d2833e04a61590d9fa2b5773d147f3aa375459e5466a40c102f3832"
-url = "https://github.com/cli/cli/releases/download/v2.99.0/gh_2.99.0_linux_amd64.tar.gz"
-url_api = "https://api.github.com/repos/cli/cli/releases/assets/540091442"
-provenance = "github-attestations"
-
-[tools.gh."platforms.linux-x64-musl"]
-checksum = "sha256:ed4960225d2833e04a61590d9fa2b5773d147f3aa375459e5466a40c102f3832"
-url = "https://github.com/cli/cli/releases/download/v2.99.0/gh_2.99.0_linux_amd64.tar.gz"
-url_api = "https://api.github.com/repos/cli/cli/releases/assets/540091442"
-provenance = "github-attestations"
-
-[tools.gh."platforms.macos-arm64"]
-checksum = "sha256:94d4bd7e88563a9cb414e651e88acc4f1728a87476752460906d824230748d37"
-url = "https://github.com/cli/cli/releases/download/v2.99.0/gh_2.99.0_macOS_arm64.zip"
-url_api = "https://api.github.com/repos/cli/cli/releases/assets/540091462"
-provenance = "github-attestations"
-
-[tools.gh."platforms.macos-x64"]
-checksum = "sha256:70c05750c75df9465bc73b994e8bc379243bb494271f1b51f54ead2e19e45471"
-url = "https://github.com/cli/cli/releases/download/v2.99.0/gh_2.99.0_macOS_amd64.zip"
-url_api = "https://api.github.com/repos/cli/cli/releases/assets/540091461"
-provenance = "github-attestations"
-
-[tools.gh."platforms.windows-x64"]
-checksum = "sha256:ea040d0ba03176440d13481caf67f742236c3b38ce1d4442a9da37e9bb98d8f2"
-url = "https://github.com/cli/cli/releases/download/v2.99.0/gh_2.99.0_windows_amd64.zip"
-url_api = "https://api.github.com/repos/cli/cli/releases/assets/540091493"
-provenance = "github-attestations"
+specifiers = ["2.100.0"]
 
 [[tools.gitleaks]]
 version = "8.30.1"
@@ -252,77 +210,14 @@ url = "https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8
 url_api = "https://api.github.com/repos/gitleaks/gitleaks/releases/assets/378333178"
 
 [[tools.helm]]
-version = "4.2.4"
+version = "4.3.0"
 backend = "aqua:helm/helm"
-specifiers = ["4.2.4"]
-
-[tools.helm."platforms.linux-arm64"]
-checksum = "sha256:564de2191b881e9f71b5606b25345821ea1682f06ab90499d3ab22b530176da1"
-url = "https://get.helm.sh/helm-v4.2.4-linux-arm64.tar.gz"
-
-[tools.helm."platforms.linux-arm64-musl"]
-checksum = "sha256:564de2191b881e9f71b5606b25345821ea1682f06ab90499d3ab22b530176da1"
-url = "https://get.helm.sh/helm-v4.2.4-linux-arm64.tar.gz"
-
-[tools.helm."platforms.linux-x64"]
-checksum = "sha256:c306b46f719b0a4da32d0f78ee21bf90ce8d602f15b22ab753f0674d1670a7f3"
-url = "https://get.helm.sh/helm-v4.2.4-linux-amd64.tar.gz"
-
-[tools.helm."platforms.linux-x64-musl"]
-checksum = "sha256:c306b46f719b0a4da32d0f78ee21bf90ce8d602f15b22ab753f0674d1670a7f3"
-url = "https://get.helm.sh/helm-v4.2.4-linux-amd64.tar.gz"
-
-[tools.helm."platforms.macos-arm64"]
-checksum = "sha256:d747eb4e28bd2727173d15b759fa0a17822291ec09db7ced3d55af290a3661a2"
-url = "https://get.helm.sh/helm-v4.2.4-darwin-arm64.tar.gz"
-
-[tools.helm."platforms.macos-x64"]
-checksum = "sha256:6c163d687ca03c3b5c01928e53bbbcf9518278f47ce7a2f249a5a08e8bdaa2bc"
-url = "https://get.helm.sh/helm-v4.2.4-darwin-amd64.tar.gz"
-
-[tools.helm."platforms.windows-x64"]
-checksum = "sha256:38cbdab1c7d4f0412d571c3aeefc700bcdc7b663be481832a11dfed01ee67c36"
-url = "https://get.helm.sh/helm-v4.2.4-windows-amd64.tar.gz"
+specifiers = ["4.3.0"]
 
 [[tools.k0sctl]]
-version = "0.32.2"
+version = "0.33.0"
 backend = "aqua:k0sproject/k0sctl"
-specifiers = ["0.32.2"]
-
-[tools.k0sctl."platforms.linux-arm64"]
-checksum = "sha256:b8de441f03ba8b53dee590d675caba1c0508ba05c53d2c77a841d31959a12ca7"
-url = "https://github.com/k0sproject/k0sctl/releases/download/v0.32.2/k0sctl-linux-arm64"
-url_api = "https://api.github.com/repos/k0sproject/k0sctl/releases/assets/493325108"
-
-[tools.k0sctl."platforms.linux-arm64-musl"]
-checksum = "sha256:b8de441f03ba8b53dee590d675caba1c0508ba05c53d2c77a841d31959a12ca7"
-url = "https://github.com/k0sproject/k0sctl/releases/download/v0.32.2/k0sctl-linux-arm64"
-url_api = "https://api.github.com/repos/k0sproject/k0sctl/releases/assets/493325108"
-
-[tools.k0sctl."platforms.linux-x64"]
-checksum = "sha256:cb40948151451c68dfca16de000cf990ee112fb2ffb4f6a5d103e665cbb43d5e"
-url = "https://github.com/k0sproject/k0sctl/releases/download/v0.32.2/k0sctl-linux-amd64"
-url_api = "https://api.github.com/repos/k0sproject/k0sctl/releases/assets/493325112"
-
-[tools.k0sctl."platforms.linux-x64-musl"]
-checksum = "sha256:cb40948151451c68dfca16de000cf990ee112fb2ffb4f6a5d103e665cbb43d5e"
-url = "https://github.com/k0sproject/k0sctl/releases/download/v0.32.2/k0sctl-linux-amd64"
-url_api = "https://api.github.com/repos/k0sproject/k0sctl/releases/assets/493325112"
-
-[tools.k0sctl."platforms.macos-arm64"]
-checksum = "sha256:cee6db821bd255e67052e00fd054ed89e1a2421a05326686ed576210caf1ffdd"
-url = "https://github.com/k0sproject/k0sctl/releases/download/v0.32.2/k0sctl-darwin-arm64"
-url_api = "https://api.github.com/repos/k0sproject/k0sctl/releases/assets/493325110"
-
-[tools.k0sctl."platforms.macos-x64"]
-checksum = "sha256:1124a07e18831bcc6df442593dde15f3c2a149060a42c05001ba59c58120a2c9"
-url = "https://github.com/k0sproject/k0sctl/releases/download/v0.32.2/k0sctl-darwin-amd64"
-url_api = "https://api.github.com/repos/k0sproject/k0sctl/releases/assets/493325111"
-
-[tools.k0sctl."platforms.windows-x64"]
-checksum = "sha256:3d06cca961ba0bd2571836a19f6a67a9c2b44fe0d5684944028393265562b467"
-url = "https://github.com/k0sproject/k0sctl/releases/download/v0.32.2/k0sctl-win-amd64.exe"
-url_api = "https://api.github.com/repos/k0sproject/k0sctl/releases/assets/493325107"
+specifiers = ["0.33.0"]
 
 [[tools.kubectl]]
 version = "1.37.0"
@@ -358,9 +253,9 @@ checksum = "sha256:4721b614a67bb4932a0369e61f4a323d8c6ca00943d3a2ff14837c124da06
 url = "https://dl.k8s.io/v1.37.0/bin/windows/amd64/kubectl.exe"
 
 [[tools."pipx:ansible"]]
-version = "14.2.0"
+version = "14.4.0"
 backend = "pipx:ansible"
-specifiers = ["14.2.0"]
+specifiers = ["14.4.0"]
 
 [[tools."pipx:ansible-lint"]]
 version = "26.8.0"
@@ -469,88 +364,11 @@ url_api = "https://api.github.com/repos/getsops/sops/releases/assets/486808200"
 url = "https://github.com/getsops/sops/releases/download/v3.13.3/sops-v3.13.3.intoto.jsonl"
 
 [[tools.trufflehog]]
-version = "3.97.1"
+version = "3.97.4"
 backend = "aqua:trufflesecurity/trufflehog"
-specifiers = ["3.97.1"]
-
-[tools.trufflehog."platforms.linux-arm64"]
-checksum = "sha256:57bfcc0988aae3f2ef97e74abe1138cf37a8fbd84dd26299062c77a6a6b125dd"
-url = "https://github.com/trufflesecurity/trufflehog/releases/download/v3.97.1/trufflehog_3.97.1_linux_arm64.tar.gz"
-url_api = "https://api.github.com/repos/trufflesecurity/trufflehog/releases/assets/527918234"
-
-[tools.trufflehog."platforms.linux-arm64-musl"]
-checksum = "sha256:57bfcc0988aae3f2ef97e74abe1138cf37a8fbd84dd26299062c77a6a6b125dd"
-url = "https://github.com/trufflesecurity/trufflehog/releases/download/v3.97.1/trufflehog_3.97.1_linux_arm64.tar.gz"
-url_api = "https://api.github.com/repos/trufflesecurity/trufflehog/releases/assets/527918234"
-
-[tools.trufflehog."platforms.linux-x64"]
-checksum = "sha256:f863ea3a8d786f7d097870496c977944cce7372a2fe1e56707d965016e543ece"
-url = "https://github.com/trufflesecurity/trufflehog/releases/download/v3.97.1/trufflehog_3.97.1_linux_amd64.tar.gz"
-url_api = "https://api.github.com/repos/trufflesecurity/trufflehog/releases/assets/527918235"
-
-[tools.trufflehog."platforms.linux-x64-musl"]
-checksum = "sha256:f863ea3a8d786f7d097870496c977944cce7372a2fe1e56707d965016e543ece"
-url = "https://github.com/trufflesecurity/trufflehog/releases/download/v3.97.1/trufflehog_3.97.1_linux_amd64.tar.gz"
-url_api = "https://api.github.com/repos/trufflesecurity/trufflehog/releases/assets/527918235"
-
-[tools.trufflehog."platforms.macos-arm64"]
-checksum = "sha256:1af86cf30c1cc5c1735ec6af9292b399ec9bed3ff1b30be13fcbfd4a30ab449a"
-url = "https://github.com/trufflesecurity/trufflehog/releases/download/v3.97.1/trufflehog_3.97.1_darwin_arm64.tar.gz"
-url_api = "https://api.github.com/repos/trufflesecurity/trufflehog/releases/assets/527918239"
-
-[tools.trufflehog."platforms.macos-x64"]
-checksum = "sha256:1515710bb16be5653ca9986c27ecd1a0e7536fc6e53ad46f7100992692f6a05f"
-url = "https://github.com/trufflesecurity/trufflehog/releases/download/v3.97.1/trufflehog_3.97.1_darwin_amd64.tar.gz"
-url_api = "https://api.github.com/repos/trufflesecurity/trufflehog/releases/assets/527918281"
-
-[tools.trufflehog."platforms.windows-x64"]
-checksum = "sha256:dc1759892a41d64ee0d46cd5d4391dad7f916f54257154aa1b0732f9c50901b2"
-url = "https://github.com/trufflesecurity/trufflehog/releases/download/v3.97.1/trufflehog_3.97.1_windows_amd64.tar.gz"
-url_api = "https://api.github.com/repos/trufflesecurity/trufflehog/releases/assets/527918274"
+specifiers = ["3.97.4"]
 
 [[tools.uv]]
-version = "0.12.9"
+version = "0.12.13"
 backend = "aqua:astral-sh/uv"
-specifiers = ["0.12.9"]
-
-[tools.uv."platforms.linux-arm64"]
-checksum = "sha256:c36fe17937ff6bd16dc42fc13854b5465999fcab2efe0af559381e945e3c6001"
-url = "https://github.com/astral-sh/uv/releases/download/0.12.9/uv-aarch64-unknown-linux-gnu.tar.gz"
-url_api = "https://api.github.com/repos/astral-sh/uv/releases/assets/540200939"
-provenance = "github-attestations"
-
-[tools.uv."platforms.linux-arm64-musl"]
-checksum = "sha256:7eb9bf48516448c9db6a9e436d8e747ac9c8a9cac74717160a29918249b080a6"
-url = "https://github.com/astral-sh/uv/releases/download/0.12.9/uv-aarch64-unknown-linux-musl.tar.gz"
-url_api = "https://api.github.com/repos/astral-sh/uv/releases/assets/540200941"
-provenance = "github-attestations"
-
-[tools.uv."platforms.linux-x64"]
-checksum = "sha256:ec7a99cd05e0cd7f80243f135ce1361c76835cb0ee60055d14d20eba8eba1460"
-url = "https://github.com/astral-sh/uv/releases/download/0.12.9/uv-x86_64-unknown-linux-gnu.tar.gz"
-url_api = "https://api.github.com/repos/astral-sh/uv/releases/assets/540201041"
-provenance = "github-attestations"
-
-[tools.uv."platforms.linux-x64-musl"]
-checksum = "sha256:aa4b1f8770910f7c7c543c7acc980e4270e52e70750c996acef813ea1c7c2912"
-url = "https://github.com/astral-sh/uv/releases/download/0.12.9/uv-x86_64-unknown-linux-musl.tar.gz"
-url_api = "https://api.github.com/repos/astral-sh/uv/releases/assets/540201044"
-provenance = "github-attestations"
-
-[tools.uv."platforms.macos-arm64"]
-checksum = "sha256:301f72afaf54060f92da7016cb0115bd077f43a9c8e39c1d8170a0bac80fd398"
-url = "https://github.com/astral-sh/uv/releases/download/0.12.9/uv-aarch64-apple-darwin.tar.gz"
-url_api = "https://api.github.com/repos/astral-sh/uv/releases/assets/540200930"
-provenance = "github-attestations"
-
-[tools.uv."platforms.macos-x64"]
-checksum = "sha256:e1ca175824f1056589ce9908f7631879ebc3c36535b5e63dc06510beb370b4c1"
-url = "https://github.com/astral-sh/uv/releases/download/0.12.9/uv-x86_64-apple-darwin.tar.gz"
-url_api = "https://api.github.com/repos/astral-sh/uv/releases/assets/540201016"
-provenance = "github-attestations"
-
-[tools.uv."platforms.windows-x64"]
-checksum = "sha256:ddbfcee1ac615a0499f6aa97b5ec8ebdf3ee4a7714a48055ec2ba0030e3cf810"
-url = "https://github.com/astral-sh/uv/releases/download/0.12.9/uv-x86_64-pc-windows-msvc.zip"
-url_api = "https://api.github.com/repos/astral-sh/uv/releases/assets/540201024"
-provenance = "github-attestations"
+specifiers = ["0.12.13"]
