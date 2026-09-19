@@ -79,7 +79,7 @@
                 reusable: true
                 ephemeral: false
                 preauthorized: true
-                tags: "{{ tailscale_enrollment_tags }}"
+                tags: "{{ omit if tailscale_enrollment_default_nodes else tailscale_enrollment_tags }}"
           expirySeconds: "{{ tailscale_enrollment_key_expiry_seconds }}"
           description: "{{ tailscale_enrollment_description }}"
         status_code: 200
@@ -113,23 +113,15 @@
       changed_when: true
       no_log: true
 
-    - name: Tailscale enrollment | Enroll hosts and enable SSH
+    - name: Tailscale enrollment | Enroll hosts
       ansible.builtin.command:
-        argv:
-          - labctl
-          - ssh
-          - "{{ hostvars[item].lab_play_id }}"
-          - --machine
-          - "{{ item }}"
-          - --user
-          - root
-          - --
-          - tailscale
-          - up
-          - --auth-key=file:/run/tailscale-auth-key
-          - "--advertise-tags={{ tailscale_enrollment_tags | join(',') }}"
-          - "--hostname={{ item }}"
-          - --ssh
+        argv: >-
+          {{ ['labctl', 'ssh', hostvars[item].lab_play_id,
+              '--machine', item, '--user', 'root', '--', 'tailscale', 'up',
+              '--auth-key=file:/run/tailscale-auth-key'] +
+             ([] if tailscale_enrollment_default_nodes else
+              ['--advertise-tags=' + (tailscale_enrollment_tags | join(',')),
+               '--hostname=' + item, '--ssh']) }}
       loop: "{{ tailscale_enrollment__unenrolled_hosts }}"
       changed_when: true
       no_log: true

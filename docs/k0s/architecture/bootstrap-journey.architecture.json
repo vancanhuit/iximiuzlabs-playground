@@ -38,7 +38,7 @@
   },
   "components": [
     {"id": "machines", "type": "cloud", "label": "Eight Machines", "sublabel": "two playgrounds", "pos": [30, 245], "size": [145, 72]},
-    {"id": "identity", "type": "security", "label": "Private Identity", "sublabel": "tag:lab + Tailscale SSH", "tag": "no public ingress", "pos": [200, 245], "size": [145, 72]},
+    {"id": "identity", "type": "security", "label": "Private Identity", "sublabel": "auth key + OpenSSH", "tag": "user-owned nodes", "pos": [200, 245], "size": [145, 72]},
     {"id": "preflight", "type": "security", "label": "Green Preflight", "sublabel": "online, unique, reachable", "tag": "blocking gate", "pos": [370, 245], "size": [145, 72]},
     {"id": "k0s", "type": "backend", "label": "Resilient Core", "sublabel": "3 controllers + 5 workers", "tag": "etcd quorum", "pos": [540, 245], "size": [145, 72]},
     {"id": "cilium", "type": "messagebus", "label": "Cilium Data Plane", "sublabel": "VXLAN + eBPF", "tag": "5 workers Ready", "pos": [710, 245], "size": [145, 72]},

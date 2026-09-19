@@ -341,8 +341,8 @@ rect.c-bg-rect { fill: var(--bg); }
         <text x="102.5" y="295" class="t-muted" font-size="9" text-anchor="middle">two playgrounds</text>
         </g>
 
-        <g id="node-identity" data-node-id="identity" data-node-label="Private Identity" tabindex="0" role="button" aria-label="Focus Private Identity, tag:lab + Tailscale SSH, Create + identify" aria-pressed="false" data-node-kind="security" data-node-sublabel="tag:lab + Tailscale SSH" data-node-tag="no public ingress" data-node-context="Create + identify">
-          <title>Private Identity · tag:lab + Tailscale SSH · Create + identify · no public ingress</title>
+        <g id="node-identity" data-node-id="identity" data-node-label="Private Identity" tabindex="0" role="button" aria-label="Focus Private Identity, auth key + OpenSSH, Create + identify" aria-pressed="false" data-node-kind="security" data-node-sublabel="auth key + OpenSSH" data-node-tag="user-owned nodes" data-node-context="Create + identify">
+          <title>Private Identity · auth key + OpenSSH · Create + identify · user-owned nodes</title>
           <rect x="200" y="245" width="145" height="72" rx="6" class="c-mask"/>
           <rect x="200" y="245" width="145" height="72" rx="6" class="c-security" data-animate="node" style="--step:1" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(206 251) scale(0.6875)">
@@ -350,8 +350,8 @@ rect.c-bg-rect { fill: var(--bg); }
             <path d="m5.8 8 1.5 1.5 3-3"/>
           </g>
           <text data-node-label="" x="272.5" y="279" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Private Identity</text>
-        <text x="272.5" y="295" class="t-muted" font-size="9" text-anchor="middle">tag:lab + Tailscale SSH</text>
-        <text x="272.5" y="309" class="t-security" font-size="7" text-anchor="middle">no public ingress</text>
+        <text x="272.5" y="295" class="t-muted" font-size="9" text-anchor="middle">auth key + OpenSSH</text>
+        <text x="272.5" y="309" class="t-security" font-size="7" text-anchor="middle">user-owned nodes</text>
         </g>
 
         <g id="node-preflight" data-node-id="preflight" data-node-label="Green Preflight" tabindex="0" role="button" aria-label="Focus Green Preflight, online, unique, reachable, Create + identify" aria-pressed="false" data-node-kind="security" data-node-sublabel="online, unique, reachable" data-node-tag="blocking gate" data-node-context="Create + identify">

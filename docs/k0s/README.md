@@ -1,9 +1,11 @@
 # Build and operate a k0s cluster over Tailscale
 
 **Owner:** Lab operator | **Frequency:** As needed
-**Last updated:** 2026-09-13 | **Last run:** 2026-09-13
+**Last updated:** 2026-09-19 | **Last run:** 2026-09-19
 
 This runbook builds and operates an eight-node Kubernetes cluster across two iximiuz Labs playgrounds. Steps 1 through 10 form the core deployment. Later sections add optional access, ingress, applications, and monitoring or cover recurring operations and recovery.
+
+**Current deployment:** Rebuilt on 2026-09-19 with default Tailscale settings and file-based auth-key enrollment. Use ordinary OpenSSH for administrative access. All 16 cross-playground host pairs and 18 repeated worker probes established direct paths without port overrides or custom Tailscale firewall rules.
 
 ## Choose a workflow
 
@@ -40,7 +42,7 @@ Do not advertise the Pod or Service CIDR through a Tailscale subnet route. Tailn
 Keep these requirements true throughout the cluster lifecycle:
 
 - Every host has a unique, stable hostname and Tailscale IPv4 address
-- Every host listens on its manifest-assigned Tailscale UDP port `41641` through `41648`
+- Every host uses the default Tailscale listener configuration
 - Every host remains in one tailnet with policy-authorized peer connectivity
 - `privateAddress` and `privateInterface` select `tailscale0` for k0s traffic
 - `api.onlyBindToAddress: true` excludes iximiuz Labs `172.16.0.x` addresses
@@ -97,15 +99,15 @@ Treat these versions as one tested set. Validate upgrades in a fresh playground 
 | --- | --- |
 | k0sctl | `v0.33.0` |
 | k0s and Kubernetes | `v1.36.4+k0s.0` |
-| Cilium | `v1.20.1` |
+| Cilium | `v1.20.2` |
 | Tailscale clients | `1.102.4` |
-| Tailscale Kubernetes Operator | chart and operator `1.102.3` |
+| Tailscale Kubernetes Operator | chart and operator `1.102.4` |
 | cert-manager | `v1.21.2` |
 | ingress-nginx | chart `4.15.1`, controller `v1.15.1` |
 | Envoy Gateway | `v1.9.1` |
 | ExternalDNS | chart `1.22.0`, controller `v0.22.0` |
 | Echo Server | `0.9.2` |
-| kube-prometheus-stack | chart `91.0.0`, Prometheus Operator `v0.94.0` |
+| kube-prometheus-stack | chart `91.4.1`, Prometheus Operator `v0.94.0` |
 | Sonobuoy | `v0.57.5` |
 
 The repository pins client tools in [`../../mise.toml`](../../mise.toml).
@@ -159,12 +161,12 @@ The example retains this personal lab's wildcard grant. That grant allows every 
 Before inviting another member, replace the wildcard with reviewed grants for:
 
 - Administrator access
-- `tag:lab` cluster ports between nodes
+- Cluster ports between the eight user-owned Kubernetes node addresses
 - The `tag:k8s` API endpoint
 
-An empty tag-owner list restricts assignment to administrator auth keys or scoped operator credentials. The exact `svc:lab-k0s` approver prevents the operator from advertising other Tailscale Services.
+An empty tag-owner list restricts assignment to administrator auth keys or scoped operator credentials. The Service approvers cover the four named API and application Services rather than every Service.
 
-Tailscale SSH policy and network grants are separate controls. The `check` action periodically reauthenticates administrators before granting root access.
+The shared policy retains `tag:lab` and Tailscale SSH rules for Incus. Kubernetes hosts use no tags and ordinary OpenSSH; their access depends on network grants and SSH keys.
 
 **Expected result:** The Tailscale policy editor accepts the policy without warnings.
 
@@ -172,7 +174,7 @@ Tailscale SSH policy and network grants are separate controls. The `check` actio
 
 ### Step 3: Enroll every playground machine
 
-Use the Kubernetes inventory with both current playground run IDs:
+Use the shared enrollment workflow with both current playground run IDs:
 
 ```bash
 mise exec -- ansible-playbook \
@@ -182,15 +184,21 @@ mise exec -- ansible-playbook \
   -e kubernetes_02_play_id=playground_run_id_2
 ```
 
-The shared `tailscale_enrollment` role checks every inventory host through `labctl`, decrypts only `tailscale.access_token`, creates a reusable preauthorized one-hour key for `tag:lab`, enrolls only disconnected hosts, enables Tailscale SSH, removes local and remote key files, revokes the key, and verifies every host through MagicDNS. The API token must belong to a tailnet administrator.
+If the pinned Ansible package exposes only `ansible-community`, replace `mise exec -- ansible-playbook` with `mise exec -- uvx --from ansible-core==2.21.4 ansible-playbook`. This runs the same playbook without changing repository tool pins.
+
+The role decrypts only `tailscale.access_token`, which must belong to a tailnet administrator. It creates a reusable, preauthorized one-hour auth key and transfers it using protected files. After enrolling disconnected nodes, it removes the files and revokes the key.
+
+For the Kubernetes inventory, the role runs `tailscale up --auth-key=file:/run/tailscale-auth-key` with no other options. Incus retains tagged enrollment and Tailscale SSH. If enrollment is interrupted, revoke the temporary key and remove `/run/tailscale-auth-key` from all eight hosts before retrying.
+
+Plain `tailscale up` does not enable Tailscale SSH. Verify ordinary OpenSSH administrator access over each node's Tailscale address before running `k0sctl`. Use `labctl` to configure SSH access if needed.
 
 If this tailnet previously contained machines with the same hostnames, remove those stale device records before enrollment. Duplicate names receive suffixed MagicDNS names such as `node-01-1`, and the address updater intentionally rejects duplicate hostnames. Delete only records confirmed offline and belonging to destroyed playground sessions; never remove a live or unrelated device to make validation pass. Allow MagicDNS to converge before reusing canonical names.
 
-A one-use key can enroll only one machine and is not suitable for this procedure. Never place auth keys in shell history, manifests, plaintext Git files, or command arguments. Do not enable `--accept-routes` without an explicit routed-subnet requirement and a CIDR review.
+Never put auth-key values in command arguments, logs, or tracked plaintext files. Do not enable `--accept-routes` or other non-default node options.
 
-**Expected result:** `tailscale status` shows eight online devices with `tag:lab`.
+**Expected result:** `tailscale status` shows eight online, user-owned devices with their canonical hostnames.
 
-**If it fails:** Check the Tailscale key list and revoke any remaining temporary key before retrying. Check `labctl` access, tag ownership, node time, and Tailscale connectivity.
+**If it fails:** Check API access, key revocation, device approval, `labctl` access, node time, and Tailscale connectivity.
 
 ### Step 4: Verify the Tailscale underlay
 
@@ -250,13 +258,7 @@ bootstrapping k0s:
 )
 ```
 
-Tailscale normally listens on UDP `41641` and discovers the external mapping
-through STUN and NAT traversal. In this lab, using that default on all four
-machines behind each playground NAT produced direct paths for only 8 of 16
-cross-playground host pairs even though every host reported UDP support and
-`MappingVariesByDestIP: false`. The manifests therefore assign unique listener
-ports `41641` through `41648`; keep them unless a complete 16-pair test proves a
-different NAT implementation handles the shared default correctly.
+Tailscale uses its default UDP listener and discovers external mappings through Session Traversal Utilities for NAT (STUN) and NAT traversal. Keep that default on every host. Allow discovery to converge and repeat the full probe before diagnosing failed paths. Investigate playground NAT and placement without adding port overrides or custom Tailscale firewall rules.
 
 **Expected result:** Every peer responds, hostnames are unique, `tailscale0` has a `100.x` address, and every cross-playground probe reports a public `IP:port` endpoint rather than DERP.
 
@@ -400,7 +402,7 @@ Install Cilium with the checked-in values:
 
 ```bash
 cilium install \
-  --version 1.20.1 \
+  --version 1.20.2 \
   --values docs/k0s/cilium-values.yaml
 cilium status --wait
 ```
@@ -538,7 +540,7 @@ Before a Kubernetes, k0s, or Cilium upgrade, run the non-disruptive profile. Thi
 )
 ```
 
-The tested set completed 451 end-to-end (e2e) tests with zero failures. All five `systemd-logs` plugins passed in 1 hour 51 minutes.
+The previous tested set completed 451 end-to-end (e2e) tests with zero failures. All five `systemd-logs` plugins passed in 1 hour 51 minutes. The 2026-09-19 rebuild ran `quick` mode only: eight e2e tests and five log plugins passed; full conformance has not been rerun.
 
 Run certification only on an empty cluster with backups and an outage window:
 
@@ -558,7 +560,7 @@ Run certification only on an empty cluster with backups and an outage window:
 )
 ```
 
-The tested set completed 453 e2e tests with zero failures. All five node-log plugins passed in about two hours.
+The previous tested set completed 453 e2e tests with zero failures. All five node-log plugins passed in about two hours. This is a historical result, not certification of the current rebuild.
 
 **Expected result:** The selected profile reports zero failed e2e tests and five passing log plugins.
 
@@ -644,7 +646,7 @@ Install the operator:
 helm upgrade --install tailscale-operator \
   tailscale-operator \
   --repo https://pkgs.tailscale.com/helmcharts \
-  --version 1.102.3 \
+  --version 1.102.4 \
   --namespace tailscale \
   --set-string apiServerProxyConfig.allowImpersonation=true \
   --wait
@@ -1183,7 +1185,7 @@ Install the pinned chart and wait for its controllers and workloads:
 helm upgrade --install monitoring \
   kube-prometheus-stack \
   --repo https://prometheus-community.github.io/helm-charts \
-  --version 91.0.0 \
+  --version 91.4.1 \
   --namespace monitoring \
   --create-namespace \
   --values docs/k0s/kube-prometheus-stack-values.yaml \
@@ -1689,15 +1691,15 @@ Use these procedures after deployment without repeating the full bootstrap.
 Render and inspect the target chart with the complete checked-in values before changing the cluster:
 
 ```bash
-helm template cilium cilium/cilium \
+helm template cilium cilium \
   --repo https://helm.cilium.io \
-  --version 1.20.1 \
+  --version 1.20.2 \
   --namespace kube-system \
   --values docs/k0s/cilium-values.yaml >/dev/null
 
-helm upgrade cilium cilium/cilium \
+helm upgrade cilium cilium \
   --repo https://helm.cilium.io \
-  --version 1.20.1 \
+  --version 1.20.2 \
   --namespace kube-system \
   --kube-context tailscale-k0s \
   --values docs/k0s/cilium-values.yaml \
@@ -1707,9 +1709,9 @@ helm upgrade cilium cilium/cilium \
 Apply the reviewed release and wait for the rollout:
 
 ```bash
-helm upgrade cilium cilium/cilium \
+helm upgrade cilium cilium \
   --repo https://helm.cilium.io \
-  --version 1.20.1 \
+  --version 1.20.2 \
   --namespace kube-system \
   --kube-context tailscale-k0s \
   --values docs/k0s/cilium-values.yaml \
@@ -1813,7 +1815,7 @@ Use observed symptoms to select the narrowest corrective action:
 | Tailscale paths use DERP | Direct UDP connectivity is unavailable | Check `tailscale netcheck`, firewall rules, and NAT behavior |
 | Cluster routes use another VPN | Accepted subnet routes overlap cluster CIDR ranges | Remove the route or choose unused Pod and Service ranges |
 | Canonical hostnames resolve to stale addresses or fresh devices receive `-1` suffixes | Destroyed playground devices remain registered in the tailnet | Remove only the confirmed offline records, restore the fresh devices' canonical names, and wait for MagicDNS convergence |
-| `tailscale ping` prints `pong` but exits nonzero | No direct peer path was established | Inspect `tailscale netcheck`, UDP reachability, NAT mappings, and the manifest-assigned unique listener ports; do not bootstrap until `--until-direct=true` succeeds |
+| `tailscale ping` prints `pong` but exits nonzero | No direct peer path was established | Inspect `tailscale netcheck`, UDP reachability, NAT mappings, and playground placement without overriding default ports; do not bootstrap until `--until-direct=true` succeeds |
 | Sonobuoy reports failures | Cluster behavior or the test environment failed | Preserve the archive and inspect each failed test |
 | `Certificate/hubble-ui` remains `Ready=False` | Cloudflare token permissions, ACME account, or DNS propagation failed | Inspect the related `Order` and `Challenge`; confirm `Zone - DNS - Edit` and `Zone - Zone - Read` for `canhdinh.com` without printing the token |
 | HTTPS presents the ingress default certificate | `hubble-ui-tls` is missing, invalid, or not loaded by ingress-nginx | Check the Certificate condition, Secret type, Ingress TLS reference, and ingress-nginx events and logs |
@@ -1955,7 +1957,7 @@ kubectl --context tailscale-k0s delete namespace tailscale
 Confirm `tailscale status` no longer lists the proxy devices or Service
 addresses. Then destroy the two confirmed iximiuz Labs run IDs. After both runs
 report `DESTROYED` or `TERMINATED`, select the eight offline Tailscale host
-identities by canonical hostname, `tag:lab`, and the addresses currently
+identities by canonical hostname, absence of tags, and the addresses currently
 recorded in `k0s.yaml`, plus the single offline operator identity. The block
 refuses to delete online, mismatched, or additional devices:
 
@@ -2006,7 +2008,7 @@ print(json.dumps(sorted(host["privateAddress"] for host in hosts)))
   jq -e --argjson expected "$expected_addresses" '
     [.devices[] | select(
       (.hostname | test("^(control-plane-0[1-3]|node-0[1-5])$")) and
-      (.tags == ["tag:lab"]) and
+      ((.tags // []) == []) and
       (.connectedToControl == false)
     ) | {id, hostname, addresses, tags}] as $hosts |
     [.devices[] | select(
@@ -2072,6 +2074,7 @@ Update this table after every deployment, upgrade, recovery, or teardown:
 | 2026-09-08 | Repository owner and OpenCode | Redeployed identity-based Kubernetes API access, private Hubble UI HTTPS, Echo Server through Gateway API, ExternalDNS, cert-manager, ingress-nginx, Envoy Gateway, and kube-prometheus-stack. Verified both API paths, five valid HTTPS endpoints, all routes and certificates, `2/2` Tailscale proxy backends for every exposed Service, 32/32 healthy Prometheus targets, and the reconciled Grafana command-center dashboard. |
 | 2026-09-08 | Repository owner and OpenCode | Made both Kubernetes playground runs persistent and reviewed the runbook end to end. Added fail-fast direct-path and bootstrap checks, safe kubeconfig replacement, explicit optional-service dependencies and contexts, rerunnable namespace creation, valid rollback commands, worker-only address reconciliation, and guarded post-destroy Tailscale cleanup. |
 | 2026-09-13 | Repository owner and OpenCode | Destroyed runs `6a9ffbc504c48567540eed8d` and `6a9ffbc504c48567540eed97`, removed 13 matching offline Tailscale host, proxy, and operator identities plus the stale `svc:lab-k0s` Service, and rebuilt persistent playgrounds `kubernetes-01-c13b7245` (`6aa686d2e7eedf93f38cd9b8`) and `kubernetes-02-40d9c62b` (`6aa686d2e7eedf93f38cd9c6`). Tailscale defaults produced only 8/16 direct cross-playground pairs despite UDP support and stable mappings; restoring unique ports produced 16/16 direct pairs and 18/18 repeated worker probes. Verified three-member etcd, five Ready workers, all 70 focused Cilium actions, Sonobuoy quick mode with 8/8 e2e tests and 5/5 log plugins, both API paths, five private HTTPS endpoints, `2/2` backends for every exposed Service, 32/32 Prometheus targets, and the Grafana dashboard. Upgraded cert-manager to `v1.21.2`, ExternalDNS to chart `1.22.0`/controller `v0.22.0`, and kube-prometheus-stack to chart `91.0.0`/Prometheus Operator `v0.94.0`. |
+| 2026-09-19 | Repository owner and OpenCode | Recreated persistent playgrounds `kubernetes-01-b75a45a2` (`6aae5d68ee725a7cc83cfdc1`) and `kubernetes-02-df19e40c` (`6aae5d68ee725a7cc83cfdcb`), removing the old cluster, Tailscale identities, Services, and application DNS records. Enrolled all eight hosts with only a file-based auth key, revoked enrollment keys, and verified default UDP `41641`, no tags, Tailscale SSH disabled, no advertised or accepted routes, and ordinary SSH access. After NAT discovery converged, all 16 cross-playground paths and 18 repeated worker probes were direct. Rebuilt k0s `v1.36.4+k0s.0`, Cilium `1.20.2`, Tailscale Operator `1.102.4`, and monitoring chart `91.4.1`; restored the other current charts, private endpoints, certificates, and Grafana dashboard. Verified three-member etcd, five Ready workers, 70/70 focused Cilium actions, Sonobuoy quick mode (8/8 e2e tests, 5/5 log plugins), and 32/32 Prometheus targets. |
 
 ## Supporting references
 

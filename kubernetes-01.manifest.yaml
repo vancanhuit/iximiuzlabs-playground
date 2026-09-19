@@ -100,7 +100,6 @@ playground:
         perl -p -i.bak -e 's/^(?!(127\.0\.0\.1|::1|fe|ff|#)).*$//g ; s/^\s*$//g' /etc/hosts
 
         curl -fsSL https://tailscale.com/install.sh | sh
-        sed -i 's/^PORT=.*/PORT="41641"/' /etc/default/tailscaled
         systemctl enable --now tailscaled
     init_node_01_1:
       name: init_node_01_1
@@ -114,7 +113,6 @@ playground:
         perl -p -i.bak -e 's/^(?!(127\.0\.0\.1|::1|fe|ff|#)).*$//g ; s/^\s*$//g' /etc/hosts
 
         curl -fsSL https://tailscale.com/install.sh | sh
-        sed -i 's/^PORT=.*/PORT="41644"/' /etc/default/tailscaled
         systemctl enable --now tailscaled
     init_node_02_1:
       name: init_node_02_1
@@ -128,7 +126,6 @@ playground:
         perl -p -i.bak -e 's/^(?!(127\.0\.0\.1|::1|fe|ff|#)).*$//g ; s/^\s*$//g' /etc/hosts
 
         curl -fsSL https://tailscale.com/install.sh | sh
-        sed -i 's/^PORT=.*/PORT="41645"/' /etc/default/tailscaled
         systemctl enable --now tailscaled
     init_node_03_1:
       name: init_node_03_1
@@ -142,7 +139,6 @@ playground:
         perl -p -i.bak -e 's/^(?!(127\.0\.0\.1|::1|fe|ff|#)).*$//g ; s/^\s*$//g' /etc/hosts
 
         curl -fsSL https://tailscale.com/install.sh | sh
-        sed -i 's/^PORT=.*/PORT="41646"/' /etc/default/tailscaled
         systemctl enable --now tailscaled
   accessControl:
     canList:

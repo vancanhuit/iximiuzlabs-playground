@@ -50,7 +50,7 @@
       "type": "security",
       "label": "Tailscale Tailnet",
       "sublabel": "identity + encrypted underlay",
-      "tag": "node identity: tag:lab",
+      "tag": "user-owned nodes",
       "pos": [250, 290],
       "size": [170, 72]
     },
