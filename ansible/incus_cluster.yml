@@ -285,6 +285,10 @@
       - incus-01
       - incus-02
       - incus-03
+    ovn_northbound_connection: >-
+      tcp:{{ hostvars['incus-01'].cluster_address }}:6641,
+      tcp:{{ hostvars['incus-02'].cluster_address }}:6641,
+      tcp:{{ hostvars['incus-03'].cluster_address }}:6641
   tasks:
     - name: Check the OVN uplink
       ansible.builtin.command: incus network show UPLINK
@@ -329,6 +333,40 @@
     - name: Configure OVN DNS servers
       ansible.builtin.command: incus network set ovn0 dns.nameservers=1.1.1.1,1.0.0.1
       changed_when: false
+
+    - name: Read the OVN logical router from Incus
+      ansible.builtin.command: incus query /1.0/networks/ovn0/state
+      register: ovn_network_state
+      changed_when: false
+
+    - name: Read OVN uplink neighbor aging
+      ansible.builtin.command:
+        argv:
+          - ovn-nbctl
+          - --timeout=15
+          - --db={{ ovn_northbound_connection | replace(' ', '') }}
+          - get
+          - Logical_Router
+          - "{{ (ovn_network_state.stdout | from_json).ovn.logical_router }}"
+          - options
+      register: ovn_router_options
+      changed_when: false
+
+    # The playground gateway MAC changes on resume; OVN otherwise keeps it indefinitely.
+    - name: Expire the OVN uplink gateway MAC binding after 30 idle seconds
+      ansible.builtin.command:
+        argv:
+          - ovn-nbctl
+          - --timeout=15
+          - --db={{ ovn_northbound_connection | replace(' ', '') }}
+          - set
+          - Logical_Router
+          - "{{ (ovn_network_state.stdout | from_json).ovn.logical_router }}"
+          - options:mac_binding_age_threshold={{ uplink_gateway }}/32:30
+      when: >-
+        ('mac_binding_age_threshold="' + uplink_gateway + '/32:30"')
+        not in ovn_router_options.stdout
+      changed_when: true
 
     - name: Read the default profile
       ansible.builtin.command: incus profile device get default eth0 network

@@ -1,7 +1,7 @@
 # Runbook: Deploy the Incus cluster playground
 
 **Owner:** Lab operator | **Frequency:** As needed
-**Last updated:** 2026-09-13 | **Last run:** 2026-09-13
+**Last updated:** 2026-09-19 | **Last run:** 2026-09-19
 
 ## Purpose
 
@@ -74,6 +74,10 @@ DNS uses the same north-south path. OVN DHCP advertises `1.1.1.1` and `1.0.0.1`,
 
 Every member's `eth1` must be up but have no host IPv4, IPv6, or link-local address. The `incus-ovn-uplink.service` unit runs after `systemd-networkd` and before Incus and `ovn-host`; it installs the unmanaged network definition, flushes addresses from `eth1`, and leaves the link active. This prevents host networking from competing with Open vSwitch for the OVN provider interface after a reboot.
 
+The playground gateway can acquire a new MAC address when a persistent run resumes. OVN's southbound database retains learned MAC bindings across that stop/resume, and aging is disabled by default.
+
+The playbook sets the `ovn0` logical router's `options:mac_binding_age_threshold` to `172.17.0.1/32:30`, derived from the discovered uplink gateway. OVN expires that gateway binding after 30 idle seconds and learns its current MAC through ARP. Other neighbors retain their default behavior. The setting persists in the replicated northbound database.
+
 Use these boundaries when diagnosing a failure:
 
 | Observation | Working portion | Inspect next |
@@ -143,6 +147,8 @@ git diff --check
 ```
 
 **Expected result:** Both playbooks pass the production lint profile and both syntax checks succeed.
+
+If the pinned Ansible package does not expose `ansible-playbook`, replace `mise exec -- ansible-playbook` with `mise exec -- uvx --from ansible-core==2.21.4 ansible-playbook` in this runbook.
 
 **If it fails:** Run `mise install` again, then fix the reported file before changing the live playground.
 
@@ -233,7 +239,7 @@ mise exec -- ansible-playbook \
   ansible/incus_cluster.yml
 ```
 
-The playbook validates the disks and interfaces, builds the three-member OVN database, forms the Incus cluster, initializes the local Btrfs pools, detaches host addresses from `eth1`, creates `UPLINK` and `ovn0`, configures the OVN DNS servers, updates the default profile, and verifies cluster and network state.
+The playbook validates the disks and interfaces, builds the three-member OVN database, forms the Incus cluster, initializes the local Btrfs pools, detaches host addresses from `eth1`, creates `UPLINK` and `ovn0`, configures the OVN DNS servers and gateway MAC-binding expiry, updates the default profile, and verifies cluster and network state.
 
 **Expected result:** All plays complete without failures. The first run reports changes; later runs should be mostly `ok` or `skipped`.
 
@@ -284,6 +290,7 @@ Confirm:
 - [ ] `eth1` is up but has no host IPv4 or IPv6 address on every member.
 - [ ] `incus-ovn-uplink.service` is enabled and active on every member.
 - [ ] `incus config get core.https_address` returns `0.0.0.0:8443`.
+- [ ] The `ovn0` logical router has `options:mac_binding_age_threshold="172.17.0.1/32:30"`.
 
 Run one disposable workload on each member and wait for DHCP:
 
@@ -320,6 +327,45 @@ done
 ```
 
 **Expected result:** Each container receives an address on `ovn0`, resolves and reaches both peers by name, resolves `deb.debian.org` through the configured DNS servers, completes `apt-get update`, and is removed afterward.
+
+### Stop/resume regression check
+
+For this check, defer the container deletion loop above until after resume verification. If you already removed the containers, repeat the launch and DHCP steps first. A rolling VM reboot alone does not exercise gateway replacement.
+
+Stop the persistent playground and check its status:
+
+```bash
+labctl playground stop playground_run_id
+labctl playground status playground_run_id
+```
+
+Repeat the status command until the run's `State` is `STOPPED`. Individual machines can report `STOPPED` while the run is still finalizing. Then resume it:
+
+```bash
+labctl playground restart playground_run_id
+```
+
+Wait for all three members to report `ONLINE`, then repeat the workload checks above on every member. Allow up to 60 seconds for gateway neighbor expiry and ARP recovery after the services are ready. Confirm the setting survived by querying the router name from Incus rather than assuming its internal ID:
+
+```bash
+ssh root@incus-01 'bash -s' <<'EOF'
+set -euo pipefail
+nb=$(incus config get network.ovn.northbound_connection)
+router=$(incus query /1.0/networks/ovn0/state |
+  python3 -c 'import json,sys; print(json.load(sys.stdin)["ovn"]["logical_router"])')
+ovn-nbctl --timeout=15 --db="$nb" get Logical_Router "$router" options
+EOF
+```
+
+**Expected result:** Gateway aging remains configured; container DNS, Internet access, and cross-member connectivity recover without an Ansible rerun or manual ARP refresh. Remove the disposable containers afterward.
+
+### Verified resume recovery on 2026-09-19
+
+Resuming run `6aa69e8bb4bf6f74dea37640` restored all three Incus members and both OVN database quorums, but container egress failed. OVN retained the September 13 gateway MAC `46:f6:76:7a:3a:49`; the resumed gateway used `3e:8c:8b:75:db:be`. An ARP refresh restored egress, confirming the stale binding as the cause.
+
+After enabling gateway-specific 30-second aging, reinserting the obsolete MAC reproduced the failure. OVN recovered automatically at about 30 seconds, even while outbound pings continued. A full playbook reconciliation completed with zero changes and no failures.
+
+A subsequent playground stop/resume changed the gateway MAC again to `42:7c:18:b1:d6:d8`; OVN learned it without manual intervention. Before and after resume, three disposable containers passed all six directed peer paths over both IPv4 and IPv6. They also passed external DNS, Internet IP probes, and `apt-get update`. All test containers were removed afterward.
 
 ### Verified state on 2026-09-13
 
@@ -360,12 +406,28 @@ After each reboot, `incus-ovn-uplink.service` was active, `eth1` had no global a
 | OVN says `eth1` has addresses | systemd-networkd still owns the uplink address | Confirm `/etc/systemd/network/20-eth1.network` is unmanaged, flush `eth1`, and rerun the playbook |
 | `ovn0` is unavailable after a reboot | `eth1` regained its playground address before Incus started | Confirm `incus-ovn-uplink.service` is enabled, rerun `ansible/incus_cluster.yml`, and restart `incus.service` after `eth1` is unnumbered |
 | Containers reach `ovn0` but not `1.1.1.1` | The OVN uplink gateway is unreachable | From the active OVN chassis, verify that `172.17.0.1` answers ARP on `eth1`; restore playground network egress before changing container DNS |
+| Container egress fails after playground resume, but hosts and cross-member traffic work | OVN retained the gateway's old MAC address | Verify `mac_binding_age_threshold` as above; rerun `ansible/incus_cluster.yml` if missing, then allow neighbor expiry and retry. Do not pin the gateway MAC or flush the entire southbound database |
 | Containers reach `1.1.1.1` but names do not resolve | OVN DHCP advertised missing or incorrect resolvers | Run `incus network set ovn0 dns.nameservers=1.1.1.1,1.0.0.1`, restart the test container, and rerun the playbook to persist the setting |
 | Members become `OFFLINE` after API configuration | `core.https_address` was bound only to Tailscale | Restore `incus config set core.https_address=0.0.0.0:8443` locally on every member |
 | MagicDNS resolves to a suffixed name | A stale Tailscale device owns the canonical hostname | Remove only the confirmed stale record, then reenroll the replacement node |
 | Ansible waits at SSH authentication | Tailscale SSH check mode requires reauthentication | Open the printed URL once; do not use `checkPeriod: always` with Ansible |
 
 ## Rollback and teardown
+
+To roll back gateway neighbor aging, remove only `mac_binding_age_threshold` from the logical router's `options` map:
+
+```bash
+ssh root@incus-01 'bash -s' <<'EOF'
+set -euo pipefail
+nb=$(incus config get network.ovn.northbound_connection)
+router=$(incus query /1.0/networks/ovn0/state |
+  python3 -c 'import json,sys; print(json.load(sys.stdin)["ovn"]["logical_router"])')
+ovn-nbctl --timeout=15 --db="$nb" remove Logical_Router "$router" \
+  options mac_binding_age_threshold
+EOF
+```
+
+Remove the corresponding Ansible task too, or the next reconciliation will restore it. This rollback reintroduces the stale-gateway risk after stop/resume.
 
 Stop a run when its state might still be needed:
 
@@ -393,6 +455,7 @@ The custom playground definition is separate from a run. To roll back its config
 
 | Date | Run by | Notes |
 | --- | --- | --- |
+| 2026-09-19 | Repository owner and OpenCode | Fixed stale OVN uplink gateway MAC bindings after resume with gateway-specific neighbor aging; verified fault-injection recovery, idempotence, and complete workload connectivity across a full playground stop/resume |
 | 2026-09-13 | Repository owner and OpenCode | Deleted the three stale Incus Tailscale devices; deployed persistent run `6aa69e8bb4bf6f74dea37640` from scratch; verified Incus, Btrfs, OVN quorum, full-mesh workloads, DNS, package egress, idempotence, and rolling reboot recovery |
 | 2026-09-08 | Repository owner and OpenCode | Resumed run `6a9bdbead17d324d6a33ce01`; configured control-host access, persistent OVN uplink recovery, explicit container DNS, and verified `apt-get update` |
 | 2026-09-05 | Repository owner and OpenCode | Deployed run `6a9bdbead17d324d6a33ce01`; verified three online Incus members, local Btrfs pools, OVN networking, Tailscale management, and container egress |
@@ -401,6 +464,7 @@ The custom playground definition is separate from a run. To roll back its config
 
 - [Zabbly Incus packages](https://github.com/zabbly/incus)
 - [Incus OVN cluster setup](https://linuxcontainers.org/incus/docs/main/howto/network_ovn_setup/#set-up-an-incus-cluster-on-ovn)
+- [OVN northbound schema: MAC-binding aging](https://www.ovn.org/support/dist-docs/ovn-nb.5.html) (also available in the installed OVN 25.03 `ovn-nb(5)` manual)
 - [Incus clustered storage](https://linuxcontainers.org/incus/docs/main/howto/cluster_config_storage/)
 - [Incus clustered networking](https://linuxcontainers.org/incus/docs/main/howto/cluster_config_networks/)
 - [Tailscale SSH](https://tailscale.com/docs/features/tailscale-ssh)
