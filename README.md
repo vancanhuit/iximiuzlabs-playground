@@ -160,7 +160,17 @@ labctl auth login
 labctl auth whoami
 ```
 
-`mise.toml` pins Python, `uv`, `kubectl`, the Cilium command-line interface (CLI), the GitHub CLI, `k0sctl`, Helm, SOPS, age, Gitleaks, TruffleHog, and Cocogitto. Install Docker, Tailscale, and `labctl` separately.
+`mise.toml` pins Python, `uv`, Ansible, ansible-lint, `kubectl`, the Cilium command-line interface (CLI), the GitHub CLI, `k0sctl`, Helm, SOPS, age, Gitleaks, TruffleHog, and Cocogitto. Install Docker, Tailscale, and `labctl` separately.
+
+Ansible and ansible-lint use mise's uv-backed `pipx` backend. The Ansible installation also exposes its `ansible-core` dependency's commands, including `ansible-playbook` and `ansible-galaxy`. Verify both installations:
+
+```bash
+ansible --version
+ansible-playbook --version
+ansible-lint --version
+```
+
+Run the Ansible commands in the cluster runbooks from the repository root so they use the pinned tools and `ansible.cfg`.
 
 Install the repository-managed Git hooks after installing the tools:
 

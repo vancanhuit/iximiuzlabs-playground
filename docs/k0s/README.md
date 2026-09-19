@@ -138,17 +138,25 @@ Follow Steps 1 through 10 in order for a new deployment. For later changes, use 
 
 ### Step 1: Prepare the control host
 
-Install the pinned tools and run the address-updater tests from the repository root:
+Install the pinned tools, validate the enrollment playbook, and run the address-updater tests from the repository root. Run all Ansible commands below from this directory:
 
 ```bash
 mise install
 mise ls --local
+ansible-playbook --version
+ansible-lint --version
+ansible-lint \
+  ansible/tailscale.yml \
+  ansible/roles/tailscale_enrollment
+ansible-playbook \
+  -i ansible/inventories/kubernetes.ini \
+  ansible/tailscale.yml --syntax-check
 uv sync --locked
 uv run --locked python -m unittest \
   scripts/test_update_k0s_tailscale_ips.py -v
 ```
 
-**Expected result:** `mise` lists the local tools, and the unit tests pass.
+**Expected result:** Both Ansible version commands succeed, the enrollment playbook passes lint and syntax checks, and the address-updater tests pass.
 
 **If it fails:** Resolve missing tool versions or Python dependencies before continuing. Do not bootstrap with an untested updater.
 
@@ -177,14 +185,12 @@ The shared policy retains `tag:lab` and Tailscale SSH rules for Incus. Kubernete
 Use the shared enrollment workflow with both current playground run IDs:
 
 ```bash
-mise exec -- ansible-playbook \
+ansible-playbook \
   -i ansible/inventories/kubernetes.ini \
   ansible/tailscale.yml \
   -e kubernetes_01_play_id=playground_run_id_1 \
   -e kubernetes_02_play_id=playground_run_id_2
 ```
-
-If the pinned Ansible package exposes only `ansible-community`, replace `mise exec -- ansible-playbook` with `mise exec -- uvx --from ansible-core==2.21.4 ansible-playbook`. This runs the same playbook without changing repository tool pins.
 
 The role decrypts only `tailscale.access_token`, which must belong to a tailnet administrator. It creates a reusable, preauthorized one-hour auth key and transfers it using protected files. After enrolling disconnected nodes, it removes the files and revokes the key.
 

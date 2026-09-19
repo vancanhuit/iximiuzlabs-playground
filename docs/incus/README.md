@@ -131,24 +131,26 @@ Incus cluster traffic uses `cluster.https_address` on `eth0`. Incus has one HTTP
 
 ### Step 1: Validate local configuration
 
+Run these commands and all later Ansible commands from the repository root:
+
 ```bash
 mise install
-mise exec -- ansible-lint \
+ansible-playbook --version
+ansible-lint --version
+ansible-lint \
   ansible/tailscale.yml \
   ansible/roles/tailscale_enrollment \
   ansible/incus_cluster.yml
-mise exec -- ansible-playbook \
+ansible-playbook \
   -i ansible/inventories/incus.ini \
   ansible/tailscale.yml --syntax-check
-mise exec -- ansible-playbook \
+ansible-playbook \
   -i ansible/inventories/incus.ini \
   ansible/incus_cluster.yml --syntax-check
 git diff --check
 ```
 
-**Expected result:** Both playbooks pass the production lint profile and both syntax checks succeed.
-
-If the pinned Ansible package does not expose `ansible-playbook`, replace `mise exec -- ansible-playbook` with `mise exec -- uvx --from ansible-core==2.21.4 ansible-playbook` in this runbook.
+**Expected result:** Both Ansible version commands succeed, both playbooks pass the production lint profile, and both syntax checks succeed.
 
 **If it fails:** Run `mise install` again, then fix the reported file before changing the live playground.
 
@@ -201,7 +203,7 @@ For a fresh run, record the returned run ID and make the run persistent. Wait fo
 ### Step 5: Enroll Tailscale through labctl
 
 ```bash
-mise exec -- ansible-playbook \
+ansible-playbook \
   -i ansible/inventories/incus.ini \
   ansible/tailscale.yml \
   -e incus_play_id=playground_run_id
@@ -234,7 +236,7 @@ Do not set `checkPeriod` to `always` for these hosts because Ansible opens multi
 Warning: on a fresh run, this command permanently formats `/dev/vdb` on every member.
 
 ```bash
-mise exec -- ansible-playbook \
+ansible-playbook \
   -i ansible/inventories/incus.ini \
   ansible/incus_cluster.yml
 ```

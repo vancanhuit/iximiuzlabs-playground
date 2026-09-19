@@ -361,7 +361,10 @@ url = "https://dl.k8s.io/v1.37.0/bin/windows/amd64/kubectl.exe"
 version = "14.4.0"
 backend = "pipx:ansible"
 specifiers = ["14.4.0"]
-uv = { path = ".mise/locks/pipx-ansible/14.4.0", digest = "sha256:2e6f9b7e65ca6146c370be9ce1447c44b19617f3216757cb4fdda50aa52097d8" }
+uv = { path = ".mise/locks/pipx-ansible/14.4.0~f1482a5e", digest = "sha256:63ffc1fd6df6729c46f6ff105a91dc7d91463685ee0a5beb3b2890178c471e97" }
+
+[tools."pipx:ansible".options]
+expose = '["ansible-core"]'
 
 [[tools."pipx:ansible-lint"]]
 version = "26.8.0"
