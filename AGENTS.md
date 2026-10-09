@@ -34,5 +34,5 @@
 
 ## Generated And Published Artifacts
 
-- `docs/k0s/architecture/*.architecture.json` are the authoritative diagram sources. Their `.html`, `.svg`, `*.visual-check.json`, and visual-check images are generated/exported companions; update and validate the set together rather than hand-editing only an export.
+- `docs/{k0s,incus}/architecture/*.excalidraw` are the authoritative diagram sources. Update the matching `.svg` export with each source change; use a light background and embed the scene so the SVG can also be reopened in Excalidraw. Follow `docs/diagrams.md` and visually check labels, arrows, and spacing at README width.
 - Playground manifests reference published `ghcr.io/vancanhuit/debian-rootfs` tags. A local image build does not update a running playground; publishing and `labctl playground update` are separate explicit operations.

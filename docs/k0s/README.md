@@ -55,11 +55,13 @@ Controllers do not run workloads. `kubectl get nodes` lists five workers. Use `k
 
 Use these diagrams when you need more context than the deployment steps provide:
 
-- [Lab architecture](architecture/lab-architecture.html): hosts, cluster components, and network boundaries
-- [Bootstrap journey](architecture/bootstrap-journey.html): ordered deployment sequence
-- [Network data paths](architecture/network-data-paths.html): node, Pod, Service, and egress packet flows
-- [Private Hubble HTTPS architecture](architecture/hubble-private-https.html): service and certificate ownership
-- [DNS-01 issuance sequence](architecture/hubble-dns01.html): certificate provisioning
+- [Lab architecture](architecture/lab-architecture.svg): hosts, cluster components, and network boundaries
+- [Bootstrap journey](architecture/bootstrap-journey.svg): ordered deployment sequence
+- [Network data paths](architecture/network-data-paths.svg): node, Pod, Service, and egress packet flows
+- [Private Hubble HTTPS architecture](architecture/hubble-private-https.svg): service and certificate ownership
+- [DNS-01 issuance sequence](architecture/hubble-dns01.svg): certificate provisioning
+
+The [diagram catalog](../diagrams.md#kubernetes-and-secrets) links all editable Excalidraw sources, including API access, Echo, monitoring, and secrets. Click a preview to view it at full size.
 
 [![k0s lab architecture](architecture/lab-architecture.svg)](architecture/lab-architecture.svg)
 
@@ -71,7 +73,7 @@ The diagram uses one representative source worker and one destination worker. Th
 
 [![Kubernetes network data paths](architecture/network-data-paths.svg)](architecture/network-data-paths.svg)
 
-Open the [interactive network data-path diagram](architecture/network-data-paths.html) and select a guided view to isolate cross-node, same-node, Service-backend, or Internet-egress traffic.
+The [network data-path diagram](architecture/network-data-paths.svg) separates node, cross-node Pod, same-node Pod, Service, and Internet-egress traffic into labeled rows. Read each row from left to right.
 
 | Flow | Forward data path | Address and encapsulation behavior |
 | --- | --- | --- |
@@ -689,7 +691,7 @@ The API proxy in `auth` mode converts a Tailscale identity into a Kubernetes ide
 
 [![Tailscale identity to Kubernetes RBAC](architecture/api-impersonation.svg)](architecture/api-impersonation.svg)
 
-Open the [interactive impersonation sequence](architecture/api-impersonation.html) to isolate tailnet authentication, impersonation, and resource authorization.
+The [impersonation diagram](architecture/api-impersonation.svg) separates tailnet access, proxy impersonation rights, and resource authorization into three numbered checks.
 
 Each request crosses three independent authorization boundaries:
 
@@ -809,7 +811,7 @@ Keep the direct `tailscale-k0s` context. It remains the recovery path when clust
 
 Hubble Relay and Hubble UI are enabled by [`cilium-values.yaml`](cilium-values.yaml). Install cert-manager and ingress-nginx to terminate browser-trusted TLS without changing Cilium's Helm-owned `hubble-ui` ClusterIP Service:
 
-[![Private Hubble UI HTTPS architecture](architecture/hubble-private-https.svg)](architecture/hubble-private-https.html)
+[![Private Hubble UI HTTPS architecture](architecture/hubble-private-https.svg)](architecture/hubble-private-https.svg)
 
 The request and certificate paths are separate. Cloudflare hosts the public DNS records for the custom hostname and ACME validation but does not proxy Hubble UI traffic. The DNS-only `A` record returns a private Tailscale address. A policy-authorized tailnet client connects through the Tailscale Service to ingress-nginx, which terminates TLS and forwards HTTP to Cilium's `hubble-ui` Service.
 
@@ -875,7 +877,7 @@ Create the Cloudflare API token Secret without exposing the credential in comman
 
 Render the ACME email from SOPS, apply the issuer, certificate, ingress, and Tailscale Service, then wait for issuance:
 
-[![Cloudflare DNS-01 certificate sequence](architecture/hubble-dns01.svg)](architecture/hubble-dns01.html)
+[![Cloudflare DNS-01 certificate sequence](architecture/hubble-dns01.svg)](architecture/hubble-dns01.svg)
 
 ```bash
 (
@@ -990,7 +992,7 @@ Track custom-domain support for the native Layer 7 alternative in [tailscale/tai
 
 Deploy Envoy Gateway as the Gateway API implementation, expose its managed Envoy Service through the Tailscale operator, and let ExternalDNS maintain the DNS-only Cloudflare record for `echo.playground.canhdinh.com`. The application address remains private: Cloudflare is authoritative for DNS and ACME DNS-01 only, while tailnet policy controls access to the Envoy gateway.
 
-[![Echo Server private Gateway API architecture](architecture/echo-gateway-api.svg)](architecture/echo-gateway-api.html)
+[![Echo Server private Gateway API architecture](architecture/echo-gateway-api.svg)](architecture/echo-gateway-api.svg)
 
 #### How Envoy Gateway and its load balancer are provisioned
 
@@ -1175,9 +1177,9 @@ One Gateway owns three HTTPS listeners and one private Tailscale Service address
 
 Separate routes send each application hostname to its chart-managed ClusterIP Service. cert-manager issues one certificate per listener. ExternalDNS creates the three DNS-only Cloudflare records from the accepted routes.
 
-Open the [interactive monitoring Gateway API architecture](architecture/monitoring-gateway-api.html) to trace private HTTPS requests, DNS and certificate automation, or controller ownership.
+The [monitoring Gateway API diagram](architecture/monitoring-gateway-api.svg) separates private HTTPS requests, backend selection, controller ownership, and DNS/certificate automation.
 
-[![Private Kubernetes monitoring through Gateway API](architecture/monitoring-gateway-api.svg)](architecture/monitoring-gateway-api.html)
+[![Private Kubernetes monitoring through Gateway API](architecture/monitoring-gateway-api.svg)](architecture/monitoring-gateway-api.svg)
 
 This cluster has no StorageClass. The checked-in values therefore use ephemeral storage and bound Prometheus retention to three days or 8 GB. Prometheus and Alertmanager history, silences, and Grafana database changes are lost when their Pods are recreated or moved. Add a tested StorageClass and explicit persistence values before treating this as durable production monitoring.
 

@@ -51,6 +51,7 @@ Use this map to locate each image, manifest, and cluster configuration:
 | [`docs/k0s/k0s.yaml`](docs/k0s/k0s.yaml) | Eight-node `k0sctl` cluster definition |
 | [`docs/k0s/cilium-values.yaml`](docs/k0s/cilium-values.yaml) | Cilium Helm values for the `k0s` cluster |
 | [`docs/k0s/README.md`](docs/k0s/README.md) | Full `k0s` and Cilium runbook |
+| [`docs/diagrams.md`](docs/diagrams.md) | Diagram catalog and Excalidraw editing instructions |
 | [`.sops.yaml`](.sops.yaml) | SOPS rule that selects the age recipient for encrypted secret files |
 | [`secrets/lab.sops.yaml`](secrets/lab.sops.yaml) | Versioned ciphertext for credentials used by the lab runbooks |
 
@@ -81,7 +82,7 @@ This is envelope encryption. The public recipient beginning with `age1` is safe 
 
 [![SOPS and age envelope-encryption workflow](docs/k0s/architecture/sops-age.svg)](docs/k0s/architecture/sops-age.svg)
 
-Open the [interactive SOPS and age workflow](docs/k0s/architecture/sops-age.html) to inspect the encryption, storage, and point-of-use boundaries.
+The diagram separates encryption, storage, and point-of-use boundaries. Download its [Excalidraw source](docs/k0s/architecture/sops-age.excalidraw) to edit it; see the [diagram guide](docs/diagrams.md).
 
 ### Configure access
 

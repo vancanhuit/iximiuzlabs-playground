@@ -20,16 +20,18 @@ The Btrfs pool is local storage. Incus can move instances between members, but t
 
 ## Architecture diagrams
 
-- [Incus cluster architecture](architecture/incus-cluster.html): management access, cluster control, database quorums, and member-local storage
-- [OVN network data paths](architecture/ovn-network.html): cross-member Geneve traffic, physical uplink egress, and boot recovery
+- [Incus cluster architecture](architecture/incus-cluster.svg): management access, cluster control, database quorums, and member-local storage
+- [OVN network data paths](architecture/ovn-network.svg): cross-member Geneve traffic, physical uplink egress, and boot recovery
 
-[![Three-node Incus cluster architecture](architecture/incus-cluster.svg)](architecture/incus-cluster.html)
+[![Three-node Incus cluster architecture](architecture/incus-cluster.svg)](architecture/incus-cluster.svg)
 
-[![Incus OVN network data paths](architecture/ovn-network.svg)](architecture/ovn-network.html)
+[![Incus OVN network data paths](architecture/ovn-network.svg)](architecture/ovn-network.svg)
+
+The [diagram catalog](../diagrams.md#incus) links each editable Excalidraw source and explains how to update the SVG previews.
 
 ### OVN network data paths
 
-Open the [interactive OVN network diagram](architecture/ovn-network.html) and select **Cross-member traffic**, **Internet egress**, or **Uplink boot recovery** to isolate a path.
+The [OVN network diagram](architecture/ovn-network.svg) gives same-member, cross-member, Internet egress, and boot recovery their own labeled rows. Read each row from left to right.
 
 OVN separates the logical container network from the networks that carry its traffic:
 
