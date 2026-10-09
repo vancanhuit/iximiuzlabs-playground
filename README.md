@@ -1,7 +1,7 @@
 # Runbook: Deploy Debian and Kubernetes playgrounds
 
 **Owner:** Lab operator | **Frequency:** As needed
-**Last updated:** 2026-08-30 | **Last run:** 2026-08-30
+**Last updated:** 2026-10-09 | **Last run:** 2026-10-09
 
 ## Purpose
 
@@ -509,6 +509,7 @@ Record each image publication, playground deployment, update, or removal:
 | 2026-08-30 | Not recorded | Converted the deployment guide into an operational runbook |
 | 2026-08-30 | Repository owner and OpenCode | Recreated Kubernetes runs `6a93971d8bf0b87423a618b4` and `6a93971c156818a291cad1ef` from the updated playground definitions |
 | 2026-08-30 | Repository owner and OpenCode | Rebuilt and published both root filesystem images, updated all four playground definitions, verified Debian runs `6a93a6e48bf0b87423a9f221` and `6a93a6e48bf0b87423a9f22f`, and revalidated the persistent Kubernetes cluster |
+| 2026-10-09 | Repository owner and OpenCode | Rebuilt and published both images; final Docker image-index digests are `trixie-base` (`sha256:751b57dd3f6ebc447e1bcc7afdf94671ae0cb1cad5b1768d27303c6452a3fa3d`) and `trixie-dev` (`sha256:bf18f13dc0836e6e05bdba32d7007d0b04f0eb0c740de9c963b0e25a976cf4e0`). Initial publication used `crane push` after intermittent network failures; verified anonymous access, and subsequent Docker pushes succeeded. Re-created `debian-trixie-base-334f5825` and `debian-trixie-dev-95cf7759` from the repository manifests. Verified healthy Debian runs `6ac8ecf6c5845e5b265742c5` and `6ac8ee00cde73a52e4caa97c`, SSH, sudo, configured resources, and development tools. |
 
 ## Playground and cluster references
 
