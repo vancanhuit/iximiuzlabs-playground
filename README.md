@@ -1,7 +1,7 @@
 # Runbook: Deploy Debian and Kubernetes playgrounds
 
 **Owner:** Lab operator | **Frequency:** As needed
-**Last updated:** 2026-10-09 | **Last run:** 2026-10-09
+**Last updated:** 2026-10-24 | **Last run:** 2026-10-24
 
 ## Purpose
 
@@ -10,8 +10,6 @@ Use this runbook to publish the Debian Trixie images and deploy their custom [ix
 Use [`docs/k0s/README.md`](docs/k0s/README.md) after both Kubernetes playgrounds are running. That runbook owns tailnet policy, machine enrollment, k0s, Cilium, conformance testing, and private Kubernetes API access.
 
 ## Choose a workflow
-
-You don't need to follow every section for every change. Use the shortest path that matches your task:
 
 | Task | Follow |
 | --- | --- |
@@ -33,8 +31,6 @@ For a new environment, follow Steps 1 through 6 in order. The recurring operatio
 > The examples retain the repository owner’s values to reproduce the tested setup. Keep replacements consistent across tasks, manifests, and cluster configuration. Publish images under an accessible registry path.
 
 ## Repository map
-
-Use this map to locate each image, manifest, and cluster configuration:
 
 | Path | Purpose |
 | --- | --- |
@@ -250,7 +246,7 @@ Log in again before the next push.
 
 Build and publish the base image before the development image.
 
-### Base image
+#### Base image
 
 Build and push:
 
@@ -261,7 +257,7 @@ docker push ghcr.io/vancanhuit/debian-rootfs:trixie-base
 
 The base image extends the upstream [`100.rootfs-debian-stable`](https://github.com/iximiuz/labs/tree/main/playgrounds/100.rootfs-debian-stable) pattern with a minimal system administration environment.
 
-### Development image
+#### Development image
 
 The development image builds on `trixie-base`. The `mise` task exposes the authenticated GitHub token to BuildKit:
 
@@ -348,19 +344,6 @@ Do not enroll the machines from this runbook. Continue with the k0s runbook so i
 ### Step 6: Hand off to the k0s runbook
 
 Follow the dedicated runbook from Step 1 to bootstrap and verify the supported Kubernetes configuration. Do not skip directly to `k0sctl apply`: the preceding steps establish tailnet policy, enroll and verify every host, reject conflicting routes, and populate the current Tailscale addresses in `docs/k0s/k0s.yaml`.
-
-The k0s workflow is the repository’s supported Kubernetes path. The tested workflow uses `k0sctl` across both playgrounds to reproduce the multi-controller cluster.
-
-Use the dedicated [`k0s` runbook](docs/k0s/README.md) for:
-
-1. tailnet policy and secure enrollment of all eight machines
-2. Tailscale underlay, route, hostname, and address verification
-3. `k0sctl` dry-run and bootstrap
-4. multihomed controller API binding through `tailscale0`
-5. local kubeconfig installation
-6. Cilium kube-proxy replacement and Hubble
-7. cluster and connectivity verification
-8. private Kubernetes API access through the Tailscale operator
 
 Workers remain `NotReady` until you install Cilium. Complete the runbook before evaluating cluster health.
 
@@ -491,8 +474,6 @@ For Kubernetes rollback and teardown, follow [`docs/k0s/README.md`](docs/k0s/REA
 
 ## Escalation
 
-Use the failing system to choose the escalation path:
-
 | Situation | Contact | Method |
 | --- | --- | --- |
 | Registry authentication, package publication, or image access failure | Repository owner | Repository issue tracker |
@@ -500,20 +481,16 @@ Use the failing system to choose the escalation path:
 | Tailnet enrollment, ACL, or device approval failure | Tailnet owner | Organization-approved operations channel |
 | k0s, Cilium, or etcd failure after playground deployment | Kubernetes platform owner | Organization-approved incident channel |
 
-## History
+## Latest changes
 
-Record each image publication, playground deployment, update, or removal:
+2026-10-24:
 
-| Date | Run by | Notes |
-| --- | --- | --- |
-| 2026-08-30 | Not recorded | Converted the deployment guide into an operational runbook |
-| 2026-08-30 | Repository owner and OpenCode | Recreated Kubernetes runs `6a93971d8bf0b87423a618b4` and `6a93971c156818a291cad1ef` from the updated playground definitions |
-| 2026-08-30 | Repository owner and OpenCode | Rebuilt and published both root filesystem images, updated all four playground definitions, verified Debian runs `6a93a6e48bf0b87423a9f221` and `6a93a6e48bf0b87423a9f22f`, and revalidated the persistent Kubernetes cluster |
-| 2026-10-09 | Repository owner and OpenCode | Rebuilt and published both images; final Docker image-index digests are `trixie-base` (`sha256:751b57dd3f6ebc447e1bcc7afdf94671ae0cb1cad5b1768d27303c6452a3fa3d`) and `trixie-dev` (`sha256:bf18f13dc0836e6e05bdba32d7007d0b04f0eb0c740de9c963b0e25a976cf4e0`). Initial publication used `crane push` after intermittent network failures; verified anonymous access, and subsequent Docker pushes succeeded. Re-created `debian-trixie-base-334f5825` and `debian-trixie-dev-95cf7759` from the repository manifests. Verified healthy Debian runs `6ac8ecf6c5845e5b265742c5` and `6ac8ee00cde73a52e4caa97c`, SSH, sudo, configured resources, and development tools. |
+- Resumed Kubernetes runs `6aae5d68ee725a7cc83cfdc1` and `6aae5d68ee725a7cc83cfdcb` with their disks intact.
+- Upgraded the cluster components and restored monitoring data. See the [latest cluster maintenance results](docs/k0s/README.md#latest-maintenance).
+
+Playground definitions and published images are unchanged. Replace this summary after the next maintenance run.
 
 ## Playground and cluster references
-
-Use these sources to verify the external tools and procedures in this guide:
 
 - [iximiuz Labs custom playgrounds](https://labs.iximiuz.com/docs/custom-playgrounds)
 - [iximiuz Labs CLI](https://github.com/iximiuz/labctl)

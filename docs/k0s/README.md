@@ -1,15 +1,13 @@
 # Build and operate a k0s cluster over Tailscale
 
 **Owner:** Lab operator | **Frequency:** As needed
-**Last updated:** 2026-09-19 | **Last run:** 2026-09-19
+**Last updated:** 2026-10-24 | **Last run:** 2026-10-24
 
-This runbook builds and operates an eight-node Kubernetes cluster across two iximiuz Labs playgrounds. Steps 1 through 10 form the core deployment. Later sections add optional access, ingress, applications, and monitoring or cover recurring operations and recovery.
+Use this runbook to deploy and operate the eight-node Kubernetes cluster across two iximiuz Labs playgrounds. Complete Steps 1 through 10 before adding optional services.
 
-**Current deployment:** Rebuilt on 2026-09-19 with default Tailscale settings and file-based auth-key enrollment. Use ordinary OpenSSH for administrative access. All 16 cross-playground host pairs and 18 repeated worker probes established direct paths without port overrides or custom Tailscale firewall rules.
+The hosts use default Tailscale settings, file-based auth-key enrollment, and ordinary OpenSSH for administration. Preserve the direct `tailscale-k0s` recovery context when configuring proxy access.
 
 ## Choose a workflow
-
-Start with the workflow that matches your task:
 
 | Task | Follow |
 | --- | --- |
@@ -21,7 +19,7 @@ Start with the workflow that matches your task:
 | Upgrade or diagnose the cluster | [Recurring operations](#recurring-operations) and [troubleshooting](#troubleshooting) |
 | Remove services or the cluster | [Rollback and safe teardown](#rollback-and-safe-teardown) |
 
-This page is for the lab operator who controls the playgrounds, tailnet, and Kubernetes cluster. Record environment-specific contacts and the last successful run before sharing it with another operator.
+The operator needs access to the playgrounds, tailnet, and Kubernetes cluster. Confirm the escalation contacts before maintenance.
 
 ## Purpose
 
@@ -53,8 +51,6 @@ Keep these requirements true throughout the cluster lifecycle:
 
 Controllers do not run workloads. `kubectl get nodes` lists five workers. Use `k0s status` and `k0s etcd member-list` to inspect controllers.
 
-Use these diagrams when you need more context than the deployment steps provide:
-
 - [Lab architecture](architecture/lab-architecture.svg): hosts, cluster components, and network boundaries
 - [Bootstrap journey](architecture/bootstrap-journey.svg): ordered deployment sequence
 - [Network data paths](architecture/network-data-paths.svg): node, Pod, Service, and egress packet flows
@@ -72,8 +68,6 @@ The [diagram catalog](../diagrams.md#kubernetes-and-secrets) links all editable 
 The diagram uses one representative source worker and one destination worker. The same stages apply to every pair among the five workers. Controllers run no workload Pods.
 
 [![Kubernetes network data paths](architecture/network-data-paths.svg)](architecture/network-data-paths.svg)
-
-The [network data-path diagram](architecture/network-data-paths.svg) separates node, cross-node Pod, same-node Pod, Service, and Internet-egress traffic into labeled rows. Read each row from left to right.
 
 | Flow | Forward data path | Address and encapsulation behavior |
 | --- | --- | --- |
@@ -93,26 +87,29 @@ Reply packets traverse the corresponding stages in reverse. Cilium connection tr
 
 Do not advertise `10.244.0.0/16` or `10.96.0.0/12` as Tailscale subnet routes. Cilium owns those ranges, while Tailscale carries only the node underlay and explicitly exposed Tailscale Services.
 
-## Tested versions
+## Current versions
 
-Treat these versions as one tested set. Validate upgrades in a fresh playground before changing a shared cluster.
+Test upgrades in a fresh playground before changing a shared cluster.
 
 | Component | Version |
 | --- | --- |
-| k0sctl | `v0.33.0` |
-| k0s and Kubernetes | `v1.36.4+k0s.0` |
-| Cilium | `v1.20.2` |
-| Tailscale clients | `1.102.4` |
-| Tailscale Kubernetes Operator | chart and operator `1.102.4` |
-| cert-manager | `v1.21.2` |
+| k0sctl | `v0.33.1` |
+| k0s and Kubernetes | `v1.36.4+k0s.1` |
+| Cilium | `v1.20.4` |
+| Tailscale clients | `1.104.2` |
+| Tailscale Kubernetes Operator | chart and operator `1.104.2` |
+| cert-manager | `v1.21.3` |
 | ingress-nginx | chart `4.15.1`, controller `v1.15.1` |
-| Envoy Gateway | `v1.9.1` |
-| ExternalDNS | chart `1.22.0`, controller `v0.22.0` |
+| Envoy Gateway | `v1.9.2`, Envoy Proxy `v1.39.5` |
+| ExternalDNS | chart `1.23.0`, controller `v0.24.0` |
 | Echo Server | `0.9.2` |
-| kube-prometheus-stack | chart `91.4.1`, Prometheus Operator `v0.94.0` |
+| kube-prometheus-stack | chart `92.11.0`, Prometheus Operator `v0.94.2` |
+| Prometheus | `v3.15.1` |
+| Grafana | `13.2.4` |
+| Alertmanager | `v0.34.1` |
 | Sonobuoy | `v0.57.5` |
 
-The repository pins client tools in [`../../mise.toml`](../../mise.toml).
+The repository pins client tools in [`../../mise.toml`](../../mise.toml). The ExternalDNS and monitoring values files pin controller, Prometheus, and config-reloader patches newer than their charts' defaults. Both EnvoyProxy manifests pin the latest security patch in Envoy Gateway's supported Envoy 1.39 series.
 
 ## Prerequisites
 
@@ -410,7 +407,7 @@ Install Cilium with the checked-in values:
 
 ```bash
 cilium install \
-  --version 1.20.2 \
+  --version 1.20.4 \
   --values docs/k0s/cilium-values.yaml
 cilium status --wait
 ```
@@ -506,7 +503,7 @@ or failure to establish a direct connection as a failed underlay check.
 
 ### Step 10: Run Kubernetes conformance tests
 
-Install the tested Sonobuoy version without changing repository pins:
+Install Sonobuoy for end-to-end (e2e) tests without changing repository pins:
 
 ```bash
 mise install sonobuoy@0.57.5
@@ -548,8 +545,6 @@ Before a Kubernetes, k0s, or Cilium upgrade, run the non-disruptive profile. Thi
 )
 ```
 
-The previous tested set completed 451 end-to-end (e2e) tests with zero failures. All five `systemd-logs` plugins passed in 1 hour 51 minutes. The 2026-09-19 rebuild ran `quick` mode only: eight e2e tests and five log plugins passed; full conformance has not been rerun.
-
 Run certification only on an empty cluster with backups and an outage window:
 
 ```bash
@@ -568,7 +563,7 @@ Run certification only on an empty cluster with backups and an outage window:
 )
 ```
 
-The previous tested set completed 453 e2e tests with zero failures. All five node-log plugins passed in about two hours. This is a historical result, not certification of the current rebuild.
+Check the [latest maintenance results](#latest-maintenance) before treating this cluster as conformant.
 
 **Expected result:** The selected profile reports zero failed e2e tests and five passing log plugins.
 
@@ -654,7 +649,7 @@ Install the operator:
 helm upgrade --install tailscale-operator \
   tailscale-operator \
   --repo https://pkgs.tailscale.com/helmcharts \
-  --version 1.102.4 \
+  --version 1.104.2 \
   --namespace tailscale \
   --set-string apiServerProxyConfig.allowImpersonation=true \
   --wait
@@ -833,7 +828,7 @@ The `LoadBalancer` Service represents desired state rather than an external appl
 ```bash
 helm upgrade --install cert-manager \
   oci://quay.io/jetstack/charts/cert-manager \
-  --version v1.21.2 \
+  --version v1.21.3 \
   --namespace cert-manager \
   --create-namespace \
   --set crds.enabled=true \
@@ -980,12 +975,6 @@ openssl s_client \
 
 **Client IP limitation:** This deployment exposes ingress-nginx through a Tailscale Layer 3 `LoadBalancer` Service. The selected ProxyGroup Pod forwards the connection to ingress-nginx, so ingress-nginx sees that proxy Pod IP rather than the tailnet client's `100.x` address. Setting `externalTrafficPolicy: Local`, `use-forwarded-headers`, or `proxy-real-ip-cidr` cannot recover an address that the Tailscale proxy did not pass in a trusted header or PROXY protocol record. Do not trust arbitrary incoming forwarding headers or enable PROXY protocol unless every connection comes from a trusted sender that emits it.
 
-Track upstream support in [tailscale/tailscale#11024](https://github.com/tailscale/tailscale/issues/11024), with the related Tailscale Serve proxy work in [tailscale/tailscale#14531](https://github.com/tailscale/tailscale/issues/14531). The forwarded-header trust boundary is also documented by [kubernetes/ingress-nginx#9163](https://github.com/kubernetes/ingress-nginx/issues/9163).
-
-Native Tailscale Layer 7 Ingress (`ingressClassName: tailscale`) uses Tailscale Serve and can provide sanitized Tailscale identity headers. It terminates TLS at Tailscale and uses a tailnet `*.ts.net` hostname and certificate, so it cannot directly replace this custom-domain, cert-manager, ingress-nginx design. Preserving a trustworthy client IP with the current design requires a topology change, such as co-locating Tailscale with ingress-nginx and requiring PROXY protocol v2.
-
-Track custom-domain support for the native Layer 7 alternative in [tailscale/tailscale#12709](https://github.com/tailscale/tailscale/issues/12709) and identity metadata for Layer 3 Services in [tailscale/tailscale#15657](https://github.com/tailscale/tailscale/issues/15657).
-
 **If it fails:** Inspect `Certificate`, `Order`, and `Challenge` events; verify the Cloudflare token permissions and public TXT propagation; check ingress-nginx, the `hubble-ui` endpoints, the Tailscale Service and operator logs, the tailnet grant for `tag:k8s` on TCP ports `80` and `443`, and that the application `A` record remains DNS-only.
 
 ### Deploy Echo Server through Gateway API
@@ -1016,7 +1005,7 @@ Install the pinned Envoy Gateway release. Its chart installs the Gateway API and
 ```bash
 helm upgrade --install envoy-gateway \
   oci://docker.io/envoyproxy/gateway-helm \
-  --version v1.9.1 \
+  --version v1.9.2 \
   --namespace envoy-gateway-system \
   --create-namespace \
   --kube-context tailscale-k0s \
@@ -1033,7 +1022,7 @@ Enable cert-manager's Gateway API controller after the CRDs exist, then create t
 ```bash
 helm upgrade cert-manager \
   oci://quay.io/jetstack/charts/cert-manager \
-  --version v1.21.2 \
+  --version v1.21.3 \
   --namespace cert-manager \
   --set crds.enabled=true \
   --set config.gatewayAPI.enabled=true \
@@ -1104,7 +1093,7 @@ Install ExternalDNS with a `sync` policy, a route and Gateway label filter, a un
 helm upgrade --install external-dns \
   external-dns \
   --repo https://kubernetes-sigs.github.io/external-dns \
-  --version 1.22.0 \
+  --version 1.23.0 \
   --namespace external-dns \
   --values docs/k0s/external-dns-values.yaml \
   --kube-context tailscale-k0s \
@@ -1193,7 +1182,7 @@ Install the pinned chart and wait for its controllers and workloads:
 helm upgrade --install monitoring \
   kube-prometheus-stack \
   --repo https://prometheus-community.github.io/helm-charts \
-  --version 91.4.1 \
+  --version 92.11.0 \
   --namespace monitoring \
   --create-namespace \
   --values docs/k0s/kube-prometheus-stack-values.yaml \
@@ -1420,275 +1409,23 @@ kubectl --context tailscale-k0s get service \
   -o jsonpath='{.items[0].status.conditions[?(@.type=="TailscaleIngressSvcConfigured")].message}{"\n"}'
 ```
 
-### Live status reference
+### Verify monitoring health
 
-The following output was captured from the running lab on 2026-08-30. Use it as a structural reference, not as fixed expected output: resource names, ages, process IDs, Pod IPs, and Tailscale addresses change when the cluster is rebuilt.
+Check scrape health and the loaded rule set through Prometheus:
 
-List the worker nodes and confirm that every InternalIP belongs to the Tailscale underlay:
+```bash
+curl --fail --silent --show-error \
+  https://prometheus.playground.canhdinh.com/api/v1/targets | \
+  jq '{active: (.data.activeTargets | length), up: ([.data.activeTargets[] | select(.health == "up")] | length), down: ([.data.activeTargets[] | select(.health != "up")] | length)}'
 
-```console
-$ kubectl get nodes -o wide
-NAME      STATUS   ROLES    AGE     VERSION       INTERNAL-IP      EXTERNAL-IP   OS-IMAGE                       KERNEL-VERSION    CONTAINER-RUNTIME
-node-01   Ready    <none>   3h24m   v1.36.3+k0s   100.116.95.79    <none>        Debian GNU/Linux 13 (trixie)   6.1.167 (amd64)   containerd://2.3.3
-node-02   Ready    <none>   3h24m   v1.36.3+k0s   100.127.198.66   <none>        Debian GNU/Linux 13 (trixie)   6.1.167 (amd64)   containerd://2.3.3
-node-03   Ready    <none>   3h24m   v1.36.3+k0s   100.94.184.38    <none>        Debian GNU/Linux 13 (trixie)   6.1.167 (amd64)   containerd://2.3.3
-node-04   Ready    <none>   3h24m   v1.36.3+k0s   100.66.160.66    <none>        Debian GNU/Linux 13 (trixie)   6.1.167 (amd64)   containerd://2.3.3
-node-05   Ready    <none>   3h24m   v1.36.3+k0s   100.120.47.6     <none>        Debian GNU/Linux 13 (trixie)   6.1.167 (amd64)   containerd://2.3.3
+curl --fail --silent --show-error \
+  https://prometheus.playground.canhdinh.com/api/v1/rules | \
+  jq '{groups: (.data.groups | length), alertRules: ([.data.groups[].rules[] | select(.type == "alerting")] | length), recordingRules: ([.data.groups[].rules[] | select(.type == "recording")] | length), firing: [.data.groups[].rules[] | select(.type == "alerting" and .state == "firing") | .name]}'
 ```
 
-Inspect all namespaced workloads and the controllers that maintain them:
+**Expected result:** Every active target is up, and Prometheus returns its loaded rule groups. Grafana displays the rules as read-only data-source-managed rules because its Prometheus data source has `manageAlerts: true`.
 
-```console
-$ kubectl get all --all-namespaces
-NAMESPACE     NAME                                   READY   STATUS    RESTARTS   AGE
-kube-system   pod/cilium-677d2                       1/1     Running   0          3h27m
-kube-system   pod/cilium-6k9t7                       1/1     Running   0          3h27m
-kube-system   pod/cilium-ccbd2                       1/1     Running   0          3h27m
-kube-system   pod/cilium-kfqh2                       1/1     Running   0          3h27m
-kube-system   pod/cilium-nqppf                       1/1     Running   0          3h27m
-kube-system   pod/cilium-operator-6fdfd468dd-xhgsj   1/1     Running   0          3h27m
-kube-system   pod/cilium-operator-6fdfd468dd-z5tsz   1/1     Running   0          3h27m
-kube-system   pod/coredns-86f8659d76-j4hln           1/1     Running   0          3h28m
-kube-system   pod/coredns-86f8659d76-nfvrv           1/1     Running   0          3h28m
-kube-system   pod/hubble-relay-5fd64868c6-6pdk8      1/1     Running   0          3h27m
-kube-system   pod/hubble-ui-5b94b84b8c-tm25j         2/2     Running   0          3h27m
-kube-system   pod/konnectivity-agent-2rxsj           1/1     Running   0          3h28m
-kube-system   pod/konnectivity-agent-h5nzp           1/1     Running   0          3h28m
-kube-system   pod/konnectivity-agent-hpxvk           1/1     Running   0          3h28m
-kube-system   pod/konnectivity-agent-jn6d7           1/1     Running   0          3h28m
-kube-system   pod/konnectivity-agent-zhzmv           1/1     Running   0          3h28m
-kube-system   pod/metrics-server-d987bf784-p7fhn     1/1     Running   0          3h28m
-kube-system   pod/nllb-node-01                       1/1     Running   0          3h28m
-kube-system   pod/nllb-node-02                       1/1     Running   0          3h28m
-kube-system   pod/nllb-node-03                       1/1     Running   0          3h28m
-kube-system   pod/nllb-node-04                       1/1     Running   0          3h28m
-kube-system   pod/nllb-node-05                       1/1     Running   0          3h28m
-tailscale     pod/lab-k0s-0                          1/1     Running   0          3h20m
-tailscale     pod/lab-k0s-1                          1/1     Running   0          3h20m
-tailscale     pod/operator-548c6f88bc-m8dvg          1/1     Running   0          3h21m
-
-NAMESPACE     NAME                     TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)                  AGE
-default       service/kubernetes       ClusterIP   10.96.0.1        <none>        443/TCP                  3h29m
-kube-system   service/hubble-peer      ClusterIP   10.101.251.91    <none>        443/TCP                  3h27m
-kube-system   service/hubble-relay     ClusterIP   10.103.81.195    <none>        80/TCP                   3h27m
-kube-system   service/hubble-ui        ClusterIP   10.106.61.237    <none>        80/TCP                   3h27m
-kube-system   service/kube-dns         ClusterIP   10.96.0.10       <none>        53/UDP,53/TCP,9153/TCP   3h29m
-kube-system   service/metrics-server   ClusterIP   10.107.188.107   <none>        443/TCP                  3h28m
-
-NAMESPACE     NAME                                DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR            AGE
-kube-system   daemonset.apps/cilium               5         5         5       5            5           kubernetes.io/os=linux   3h27m
-kube-system   daemonset.apps/konnectivity-agent   5         5         5       5            5           <none>                   3h29m
-
-NAMESPACE     NAME                              READY   UP-TO-DATE   AVAILABLE   AGE
-kube-system   deployment.apps/cilium-operator   2/2     2            2           3h27m
-kube-system   deployment.apps/coredns           2/2     2            2           3h29m
-kube-system   deployment.apps/hubble-relay      1/1     1            1           3h27m
-kube-system   deployment.apps/hubble-ui         1/1     1            1           3h27m
-kube-system   deployment.apps/metrics-server    1/1     1            1           3h28m
-tailscale     deployment.apps/operator          1/1     1            1           3h21m
-
-NAMESPACE     NAME                                         DESIRED   CURRENT   READY   AGE
-kube-system   replicaset.apps/cilium-operator-6fdfd468dd   2         2         2       3h27m
-kube-system   replicaset.apps/coredns-84958f7b59           0         0         0       3h29m
-kube-system   replicaset.apps/coredns-86f8659d76           2         2         2       3h28m
-kube-system   replicaset.apps/hubble-relay-5fd64868c6      1         1         1       3h27m
-kube-system   replicaset.apps/hubble-ui-5b94b84b8c         1         1         1       3h27m
-kube-system   replicaset.apps/metrics-server-d987bf784     1         1         1       3h28m
-tailscale     replicaset.apps/operator-548c6f88bc          1         1         1       3h21m
-
-NAMESPACE   NAME                       READY   AGE
-tailscale   statefulset.apps/lab-k0s   2/2     3h20m
-```
-
-Check Cilium independently of generic Kubernetes readiness:
-
-```console
-$ cilium status
-Cilium:             OK
-Operator:           OK
-Envoy DaemonSet:    disabled (using embedded mode)
-Hubble Relay:       OK
-ClusterMesh:        disabled
-
-DaemonSet              cilium           Desired: 5, Ready: 5/5, Available: 5/5
-Deployment             cilium-operator  Desired: 2, Ready: 2/2, Available: 2/2
-Deployment             hubble-relay     Desired: 1, Ready: 1/1, Available: 1/1
-Deployment             hubble-ui        Desired: 1, Ready: 1/1, Available: 1/1
-Cluster Pods:          8/8 managed by Cilium
-Helm chart version:    1.20.1
-```
-
-Controllers are intentionally absent from `kubectl get nodes`. Query each controller directly to confirm its k0s process and role:
-
-```console
-$ ssh root@control-plane-01 k0s status
-Version: v1.36.4+k0s.0
-Process ID: 2157
-Role: controller
-Workloads: false
-SingleNode: false
-```
-
-Healthy output has five `Ready` workers, no non-running workload in the full `kubectl get all --all-namespaces` output, all desired Cilium replicas available, and every controller reporting `Role: controller` with `Workloads: false`.
-
-#### Post-deployment application status
-
-The following output was captured after deploying Hubble UI, Echo Server, and the shared HA ingress ProxyGroup on 2026-09-01. Ages, Pod IPs, generated names, node placement, and Tailscale Service addresses change across rebuilds.
-
-Confirm that both API and ingress ProxyGroups are Ready and that the ingress replicas run on different workers:
-
-```console
-$ kubectl --context tailscale-k0s get proxygroup
-NAME          STATUS            URL                                 TYPE             AGE
-lab-ingress   ProxyGroupReady                                       ingress          54m
-lab-k0s       ProxyGroupReady   https://lab-k0s.tailaa4bf1.ts.net   kube-apiserver   2d5h
-
-$ kubectl --context tailscale-k0s -n tailscale get pods \
-    -l tailscale.com/parent-resource=lab-ingress -o wide
-NAME            READY   STATUS    RESTARTS   AGE   IP             NODE
-lab-ingress-0   1/1     Running   0          12m   10.244.3.190   node-01
-lab-ingress-1   1/1     Running   0          53m   10.244.4.241   node-04
-```
-
-Inspect the Tailscale-backed application Services. A Ready Service reports that every ingress replica advertises its virtual IP:
-
-```console
-$ kubectl --context tailscale-k0s get service \
-    -n ingress-nginx hubble-ui-tailscale
-NAME                  TYPE           CLUSTER-IP       EXTERNAL-IP     PORT(S)                      AGE
-hubble-ui-tailscale   LoadBalancer   10.101.237.207   100.99.104.91   80:32718/TCP,443:31195/TCP   2d1h
-
-$ kubectl --context tailscale-k0s get service \
-    -n envoy-gateway-system \
-    -l gateway.envoyproxy.io/owning-gateway-name=echo
-NAME                       TYPE           CLUSTER-IP      EXTERNAL-IP       PORT(S)         AGE
-envoy-echo-echo-85befeca   LoadBalancer   10.111.10.133   100.107.252.170   443:30553/TCP   2d
-
-$ kubectl --context tailscale-k0s -n ingress-nginx \
-    get service hubble-ui-tailscale \
-    -o jsonpath='{.status.conditions[?(@.type=="TailscaleIngressSvcConfigured")].message}{"\n"}'
-2/2 proxy backends ready and advertising
-
-$ kubectl --context tailscale-k0s -n envoy-gateway-system \
-    get service -l gateway.envoyproxy.io/owning-gateway-name=echo \
-    -o jsonpath='{.items[0].status.conditions[?(@.type=="TailscaleIngressSvcConfigured")].message}{"\n"}'
-2/2 proxy backends ready and advertising
-```
-
-Confirm the application workloads, Gateway API state, and certificates:
-
-```console
-$ kubectl --context tailscale-k0s get deployment --all-namespaces \
-    -l 'app.kubernetes.io/name in (ingress-nginx,echo-server,external-dns,cert-manager)'
-NAMESPACE       NAME                       READY   UP-TO-DATE   AVAILABLE   AGE
-cert-manager    cert-manager               1/1     1            1           2d1h
-echo            echo-server                2/2     2            2           2d
-external-dns    external-dns               1/1     1            1           2d1h
-ingress-nginx   ingress-nginx-controller   1/1     1            1           2d1h
-
-$ kubectl --context tailscale-k0s -n echo get gateway,httproute
-NAME                                     CLASS       ADDRESS           PROGRAMMED   AGE
-gateway.gateway.networking.k8s.io/echo   tailscale   100.107.252.170   True         2d
-
-NAME                                       HOSTNAMES                          AGE
-httproute.gateway.networking.k8s.io/echo   ["echo.playground.canhdinh.com"]   2d
-
-$ kubectl --context tailscale-k0s get certificate --all-namespaces
-NAMESPACE     NAME                               READY   SECRET                             AGE
-echo          echo-playground-canhdinh-com-tls   True    echo-playground-canhdinh-com-tls   2d
-kube-system   hubble-ui                          True    hubble-ui-tls                      2d1h
-```
-
-Finally, verify both private HTTPS paths from an authorized tailnet client:
-
-```console
-$ curl --fail --show-error --head \
-    https://hubble-ui.playground.canhdinh.com/
-HTTP/2 200
-content-type: text/html
-strict-transport-security: max-age=31536000; includeSubDomains
-
-$ curl --fail --show-error \
-    'https://echo.playground.canhdinh.com/?echo_body=gateway-api'
-"gateway-api"
-```
-
-#### Monitoring stack status
-
-The following output was captured after installing kube-prometheus-stack, exposing its three interfaces through Gateway API, enabling read-only Prometheus rule visibility in Grafana, and reconciling the API-managed Kubernetes command-center dashboard on 2026-09-01. Ages, Pod IPs, generated names, and Tailscale Service addresses change across rebuilds.
-
-Confirm that every monitoring workload is Ready. The node-exporter Pods use host networking and therefore show each worker's Tailscale InternalIP:
-
-```console
-$ kubectl --context tailscale-k0s -n monitoring get pods -o wide
-NAME                                                     READY   STATUS    RESTARTS   NODE
-alertmanager-monitoring-kube-prometheus-alertmanager-0   2/2     Running   0          node-05
-monitoring-grafana-7b7975d6d7-s82vl                      3/3     Running   0          node-04
-monitoring-kube-prometheus-operator-8dccd655b-6fm62      1/1     Running   0          node-05
-monitoring-kube-state-metrics-7b56559c6f-2rdh4           1/1     Running   0          node-01
-monitoring-prometheus-node-exporter-5h65t                1/1     Running   0          node-02
-monitoring-prometheus-node-exporter-mw9hc                1/1     Running   0          node-01
-monitoring-prometheus-node-exporter-qr8b5                1/1     Running   0          node-03
-monitoring-prometheus-node-exporter-rmjtj                1/1     Running   0          node-05
-monitoring-prometheus-node-exporter-zrff8                1/1     Running   0          node-04
-prometheus-monitoring-kube-prometheus-prometheus-0       2/2     Running   0          node-04
-```
-
-Inspect the Gateway, routes, certificates, and generated Tailscale LoadBalancer Service:
-
-```console
-$ kubectl --context tailscale-k0s -n monitoring get gateway,httproute
-NAME                                           CLASS                  ADDRESS          PROGRAMMED
-gateway.gateway.networking.k8s.io/monitoring   monitoring-tailscale   100.89.207.205   True
-
-NAME                                               HOSTNAMES
-httproute.gateway.networking.k8s.io/alertmanager   ["alertmanager.playground.canhdinh.com"]
-httproute.gateway.networking.k8s.io/grafana        ["grafana.playground.canhdinh.com"]
-httproute.gateway.networking.k8s.io/prometheus     ["prometheus.playground.canhdinh.com"]
-
-$ kubectl --context tailscale-k0s -n monitoring get certificate
-NAME                                       READY   SECRET
-alertmanager-playground-canhdinh-com-tls   True    alertmanager-playground-canhdinh-com-tls
-grafana-playground-canhdinh-com-tls        True    grafana-playground-canhdinh-com-tls
-prometheus-playground-canhdinh-com-tls     True    prometheus-playground-canhdinh-com-tls
-
-$ kubectl --context tailscale-k0s -n envoy-gateway-system get service \
-    -l gateway.envoyproxy.io/owning-gateway-name=monitoring
-NAME                                   TYPE           CLUSTER-IP       EXTERNAL-IP      PORT(S)
-envoy-monitoring-monitoring-9b4a98e3   LoadBalancer   10.103.128.133   100.89.207.205   443:31004/TCP
-
-$ kubectl --context tailscale-k0s -n envoy-gateway-system get service \
-    -l gateway.envoyproxy.io/owning-gateway-name=monitoring \
-    -o jsonpath='{.items[0].status.conditions[?(@.type=="TailscaleIngressSvcConfigured")].message}{"\n"}'
-2/2 proxy backends ready and advertising
-```
-
-Verify scrape health and the loaded rule set through Prometheus:
-
-```console
-$ curl --fail --silent --show-error \
-    https://prometheus.playground.canhdinh.com/api/v1/targets | \
-    jq '{active: (.data.activeTargets | length), up: ([.data.activeTargets[] | select(.health == "up")] | length), down: ([.data.activeTargets[] | select(.health != "up")] | length)}'
-{
-  "active": 32,
-  "up": 32,
-  "down": 0
-}
-
-$ curl --fail --silent --show-error \
-    https://prometheus.playground.canhdinh.com/api/v1/rules | \
-    jq '{groups: (.data.groups | length), alertRules: ([.data.groups[].rules[] | select(.type == "alerting")] | length), recordingRules: ([.data.groups[].rules[] | select(.type == "recording")] | length), firing: [.data.groups[].rules[] | select(.type == "alerting" and .state == "firing") | .name]}'
-{
-  "groups": 30,
-  "alertRules": 134,
-  "recordingRules": 85,
-  "firing": ["Watchdog"]
-}
-```
-
-Grafana's provisioned Prometheus data source has `manageAlerts: true`, so **Alerting > Alert rules** displays these 134 rules as read-only data-source-managed rules. The expected always-firing `Watchdog` is the only active rule in this snapshot. The reconciled `Kubernetes / Cluster Command Center` dashboard has UID `kubernetes-command-center`, version `1`, and 17 panels.
-
-Grafana uses ephemeral storage. A Helm upgrade that recreates its Pod removes this API-managed dashboard, so rerun the dashboard reconciliation command before recording the deployment as complete. No external notification receiver is configured for this lab.
+**If it fails:** Inspect the affected target's ServiceMonitor, endpoints, TLS settings, and authentication. Check Prometheus Operator logs for rejected configuration. Reconcile the Grafana dashboard after any Pod replacement that loses its ephemeral database.
 
 ## Recurring operations
 
@@ -1701,13 +1438,13 @@ Render and inspect the target chart with the complete checked-in values before c
 ```bash
 helm template cilium cilium \
   --repo https://helm.cilium.io \
-  --version 1.20.2 \
+  --version 1.20.4 \
   --namespace kube-system \
   --values docs/k0s/cilium-values.yaml >/dev/null
 
 helm upgrade cilium cilium \
   --repo https://helm.cilium.io \
-  --version 1.20.2 \
+  --version 1.20.4 \
   --namespace kube-system \
   --kube-context tailscale-k0s \
   --values docs/k0s/cilium-values.yaml \
@@ -1719,7 +1456,7 @@ Apply the reviewed release and wait for the rollout:
 ```bash
 helm upgrade cilium cilium \
   --repo https://helm.cilium.io \
-  --version 1.20.2 \
+  --version 1.20.4 \
   --namespace kube-system \
   --kube-context tailscale-k0s \
   --values docs/k0s/cilium-values.yaml \
@@ -2064,29 +1801,28 @@ Record environment-specific contacts before another operator uses this runbook:
 | iximiuz Labs provisioning or network failure | iximiuz Labs support | [iximiuz Labs documentation](https://labs.iximiuz.com/docs) |
 | Reproducible repository defect | Repository owner | Repository issue tracker |
 
-## Run history
+## Latest maintenance
 
-Update this table after every deployment, upgrade, recovery, or teardown:
+2026-10-24:
 
-| Date | Run by | Notes |
-| --- | --- | --- |
-| 2026-08-29 | Not recorded | Converted the deployment guide into an operational runbook |
-| 2026-08-30 | Repository owner and OpenCode | Rebuilt two playgrounds from scratch; verified k0s, Cilium connectivity, Sonobuoy quick mode, and both Kubernetes API paths |
-| 2026-08-30 | Repository owner and OpenCode | Exposed Hubble UI through a private Tailscale LoadBalancer; installed cert-manager and ingress-nginx; issued and verified a Let's Encrypt ECDSA certificate with Cloudflare DNS-01 |
-| 2026-08-30 | Repository owner and OpenCode | Deployed Echo Server through Envoy Gateway and a private Tailscale LoadBalancer; automated Cloudflare DNS with ExternalDNS and issued a Let's Encrypt ECDSA certificate with DNS-01 |
-| 2026-09-01 | Repository owner and OpenCode | Deployed kube-prometheus-stack and its Kubernetes command-center dashboard; exposed Prometheus, Alertmanager, and Grafana through one private Envoy Gateway with ExternalDNS and Let's Encrypt DNS-01 certificates |
-| 2026-09-01 | Repository owner and OpenCode | Upgraded all eight hosts to k0s `v1.36.4+k0s.0` and Cilium to `1.20.1`; verified API and etcd health, five Ready workers, 70 focused connectivity actions with Hubble Relay forwarded, ingress endpoints, and 32 healthy Prometheus targets |
-| 2026-09-02 | Repository owner and OpenCode | Removed all lab workloads, DNS records, Tailscale Services and devices, sessions, and playground definitions; rebuilt from clean state; verified five Ready workers, three-member etcd, 70 focused Cilium actions, Sonobuoy quick mode, both API paths, private Hubble and Echo endpoints, and the monitoring stack |
-| 2026-09-06 | Repository owner and OpenCode | Recreated both Kubernetes playgrounds, removed eight stale host devices, and rebuilt the core cluster from clean machines. Verified three-member etcd, five Ready workers, Cilium and Hubble health, MTUs `1280`/`1230`, all 70 focused Cilium actions, Sonobuoy quick mode with 8/8 e2e tests and 5/5 log plugins, and direct cross-playground Tailscale paths. |
-| 2026-09-08 | Repository owner and OpenCode | Deleted the previous runs and eight stale Tailscale nodes, assigned unique Tailscale UDP listener ports to all eight machines, and rebuilt playgrounds `kubernetes-01-d3e073f5` (`6a9ffbc504c48567540eed8d`) and `kubernetes-02-cd089d78` (`6a9ffbc504c48567540eed97`). Verified all 16 cross-playground host pairs and 18/18 repeated worker probes used direct endpoints, three-member etcd, five Ready workers, Cilium and Hubble health, all 70 focused Cilium actions, and Sonobuoy quick mode with 8/8 e2e tests and 5/5 log plugins. |
-| 2026-09-08 | Repository owner and OpenCode | Redeployed identity-based Kubernetes API access, private Hubble UI HTTPS, Echo Server through Gateway API, ExternalDNS, cert-manager, ingress-nginx, Envoy Gateway, and kube-prometheus-stack. Verified both API paths, five valid HTTPS endpoints, all routes and certificates, `2/2` Tailscale proxy backends for every exposed Service, 32/32 healthy Prometheus targets, and the reconciled Grafana command-center dashboard. |
-| 2026-09-08 | Repository owner and OpenCode | Made both Kubernetes playground runs persistent and reviewed the runbook end to end. Added fail-fast direct-path and bootstrap checks, safe kubeconfig replacement, explicit optional-service dependencies and contexts, rerunnable namespace creation, valid rollback commands, worker-only address reconciliation, and guarded post-destroy Tailscale cleanup. |
-| 2026-09-13 | Repository owner and OpenCode | Destroyed runs `6a9ffbc504c48567540eed8d` and `6a9ffbc504c48567540eed97`, removed 13 matching offline Tailscale host, proxy, and operator identities plus the stale `svc:lab-k0s` Service, and rebuilt persistent playgrounds `kubernetes-01-c13b7245` (`6aa686d2e7eedf93f38cd9b8`) and `kubernetes-02-40d9c62b` (`6aa686d2e7eedf93f38cd9c6`). Tailscale defaults produced only 8/16 direct cross-playground pairs despite UDP support and stable mappings; restoring unique ports produced 16/16 direct pairs and 18/18 repeated worker probes. Verified three-member etcd, five Ready workers, all 70 focused Cilium actions, Sonobuoy quick mode with 8/8 e2e tests and 5/5 log plugins, both API paths, five private HTTPS endpoints, `2/2` backends for every exposed Service, 32/32 Prometheus targets, and the Grafana dashboard. Upgraded cert-manager to `v1.21.2`, ExternalDNS to chart `1.22.0`/controller `v0.22.0`, and kube-prometheus-stack to chart `91.0.0`/Prometheus Operator `v0.94.0`. |
-| 2026-09-19 | Repository owner and OpenCode | Recreated persistent playgrounds `kubernetes-01-b75a45a2` (`6aae5d68ee725a7cc83cfdc1`) and `kubernetes-02-df19e40c` (`6aae5d68ee725a7cc83cfdcb`), removing the old cluster, Tailscale identities, Services, and application DNS records. Enrolled all eight hosts with only a file-based auth key, revoked enrollment keys, and verified default UDP `41641`, no tags, Tailscale SSH disabled, no advertised or accepted routes, and ordinary SSH access. After NAT discovery converged, all 16 cross-playground paths and 18 repeated worker probes were direct. Rebuilt k0s `v1.36.4+k0s.0`, Cilium `1.20.2`, Tailscale Operator `1.102.4`, and monitoring chart `91.4.1`; restored the other current charts, private endpoints, certificates, and Grafana dashboard. Verified three-member etcd, five Ready workers, 70/70 focused Cilium actions, Sonobuoy quick mode (8/8 e2e tests, 5/5 log plugins), and 32/32 Prometheus targets. |
+- Upgraded k0s and Tailscale on all eight hosts, Cilium, and the installed add-ons to the [current versions](#current-versions).
+- Restored Prometheus, Alertmanager, and Grafana data after the monitoring upgrade. Confirmed 32 historical `up` series and the 17-panel command-center dashboard.
+- Removed test resources, local and remote backups, and temporary restore files after verification.
+
+| Check | Result |
+| --- | --- |
+| Cluster | Three etcd members, five Ready workers, 47 healthy Pods |
+| Cilium connectivity | 70/70 actions passed |
+| Sonobuoy quick profile | 8/8 e2e tests and 5/5 log plugins passed |
+| Tailscale direct paths | 16/16 host pairs and 18/18 repeated worker probes passed |
+| Private access | Both API paths and all five HTTPS endpoints passed |
+| Prometheus targets | 32/32 healthy |
+
+Full conformance remains unverified. The latest full non-disruptive run passed 450 e2e tests and failed the sample aggregated API-server test with stale `wardle.example.com/v1alpha1` discovery. All five log plugins passed. Only the quick profile was rerun after the upgrade.
+
+Replace this summary after the next maintenance run.
 
 ## Supporting references
-
-Use these sources to validate version-specific behavior:
 
 - [iximiuz Labs playgrounds](https://labs.iximiuz.com/docs/playgrounds)
 - [k0sctl configuration](https://github.com/k0sproject/k0sctl#configuration-file)
